@@ -26,4 +26,5 @@ supabase/
 - Android/iOS: open projects in IDEs
 
 ## Environment
-- Configure `.env` files per app; see respective READMEs in subfolders.
+- Copy `.env.example` to `.env` at repo root and fill values used by the server.
+- Per-project details are in their READMEs.

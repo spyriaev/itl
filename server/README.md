@@ -8,3 +8,8 @@ Minimal Ktor server with `/health` endpoint.
 
 ## Env
 - `PORT` (default 8080)
+- `DATABASE_URL` (Supabase Postgres connection)
+- `SUPABASE_URL` (project URL)
+- `SUPABASE_ANON_KEY` (client key for verification if needed)
+- `SUPABASE_SERVICE_ROLE_KEY` (server key for Storage signed URLs)
+- `REDIS_URL` (Heroku Redis)
