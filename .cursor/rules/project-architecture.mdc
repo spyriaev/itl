@@ -1,0 +1,9 @@
+---
+alwaysApply: true
+---
+
+Короткий ответ
+Хороший стек для «нативные iOS (Swift) + нативный Android (Kotlin) + Web (React) + сервер (Kotlin)»:
+Клиенты: iOS (SwiftUI + PDFKit), Android (Jetpack Compose + PdfRenderer), Web (React + react-pdf/pdf.js).
+Сервер: Kotlin/Ktor, Postgres, Redis, MinIO (S3), Qdrant, TEI (bge-m3) для эмбеддингов, LLM через vLLM/TGI/Ollama. Стриминг чата — SSE.
+Общая логика RAG — только на сервере. Клиенты передают текущую страницу/раздел и вопросы.

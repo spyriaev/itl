@@ -1,0 +1,16 @@
+project_id = "your-project-id"
+api = {}
+db = {}
+studio = {}
+
+[functions]
+enabled = false
+
+[auth]
+site_url = "http://localhost:3000"
+
+[storage]
+file_size_limit = "200mb"
+image_size_limit = "0"
+allowed_mime_types = ["application/pdf"]
+
