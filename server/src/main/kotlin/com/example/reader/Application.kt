@@ -23,7 +23,7 @@ fun Application.module() {
     install(StatusPages) {
         exception<Throwable> { call, cause ->
             call.respondText(text = "Internal Server Error", status = io.ktor.http.HttpStatusCode.InternalServerError)
-            environment.log.error("Unhandled", cause)
+            this@module.environment.log.error("Unhandled", cause)
         }
     }
 

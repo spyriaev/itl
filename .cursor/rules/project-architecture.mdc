@@ -1,7 +1,6 @@
 ---
-alwaysApply: true
+alwaysApply: false
 ---
-
 Короткий ответ
 Хороший стек для «нативные iOS (Swift) + нативный Android (Kotlin) + Web (React) + сервер (Kotlin)»:
 Клиенты: iOS (SwiftUI + PDFKit), Android (Jetpack Compose + PdfRenderer), Web (React + react-pdf/pdf.js).
