@@ -21,6 +21,16 @@ supabase/     # Database schema and migrations
 
 ## Quick Start
 
+🚀 **NEW: Automated Setup Scripts Available!**
+
+See **[QUICKSTART.md](QUICKSTART.md)** for the fastest way to get started.
+
+Or use the automated startup script:
+```bash
+# Setup .env files first (see QUICKSTART.md)
+./start-dev.sh  # Starts both backend and web client
+```
+
 ### 1. Clone and Setup Environment
 
 ```bash
@@ -29,9 +39,9 @@ git clone <repository-url>
 cd itl
 
 # Copy environment files
-cp .env.example .env
-cp server/.env.example server/.env
-cp web/.env.example web/.env
+cp server/env.example server/.env
+cp web/env.example web/.env
+# Edit .env files with your Supabase credentials
 ```
 
 ### 2. Supabase Setup
