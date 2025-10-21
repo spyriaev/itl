@@ -30,15 +30,5 @@ export async function uploadPdfToStorage(file: File, storageKey: string): Promis
   return data.path
 }
 
-/**
- * Generate a unique storage key for a file
- * @param filename Original filename
- * @returns A unique storage key
- */
-export function generateStorageKey(filename: string): string {
-  const timestamp = Date.now()
-  const sanitizedFilename = filename.replace(/[^a-zA-Z0-9.-]/g, '_')
-  return `uploads/${timestamp}-${sanitizedFilename}`
-}
 
 

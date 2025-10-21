@@ -1,6 +1,6 @@
-# AI Reader Monorepo
+# Innesi Monorepo
 
-Monorepo for native iOS (Swift), Android (Kotlin), Web (React), Kotlin server (Ktor), and Supabase schema.
+Monorepo for native iOS (Swift), Android (Kotlin), Web (React), Python server (FastAPI), and Supabase schema.
 
 ## Structure
 
@@ -8,13 +8,13 @@ Monorepo for native iOS (Swift), Android (Kotlin), Web (React), Kotlin server (K
 ios/          # iOS app (Swift + XcodeGen)
 android/      # Android app (Kotlin)
 web/          # Web app (React + Vite)
-server/       # Backend server (Kotlin + Ktor)
+server/       # Backend server (Python + FastAPI)
 supabase/     # Database schema and migrations
 ```
 
 ## Prerequisites
 - Node.js LTS, pnpm or npm
-- Java 17 (for Android + Ktor)
+- Python 3.11+ (for FastAPI server)
 - Android Studio / Xcode
 - Supabase CLI (for database management)
 - Heroku CLI (optional, for server deploy)
@@ -72,7 +72,7 @@ npm run dev
 **Backend Server:**
 ```bash
 cd server
-./gradlew run
+./run-dev.sh
 # Server runs on http://localhost:8080
 ```
 
@@ -105,7 +105,7 @@ All `.env.example` files contain the required variables.
 ## Tech Stack
 
 - **Frontend**: React 18, TypeScript, Vite
-- **Backend**: Kotlin, Ktor, Gradle
+- **Backend**: Python, FastAPI, SQLAlchemy
 - **Database**: Supabase (PostgreSQL + pgvector)
 - **Mobile**: Swift (iOS), Kotlin (Android)
 - **Storage**: Supabase Storage

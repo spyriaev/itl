@@ -1,6 +1,23 @@
-import { generateStorageKey, uploadPdfToStorage } from '../lib/supabase'
+import { supabase, uploadPdfToStorage } from '../lib/supabase'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
+
+/**
+ * Generate a unique storage key for a file with user ID
+ */
+function generateStorageKey(userId: string, filename: string): string {
+  const timestamp = Date.now()
+  const sanitizedFilename = filename.replace(/[^a-zA-Z0-9.-]/g, '_')
+  return `${userId}/${timestamp}-${sanitizedFilename}`
+}
+
+/**
+ * Get current session token
+ */
+async function getAuthToken(): Promise<string | null> {
+  const { data: { session } } = await supabase.auth.getSession()
+  return session?.access_token || null
+}
 
 export interface UploadProgress {
   stage: 'validating' | 'uploading' | 'saving_metadata' | 'complete' | 'error'
@@ -57,10 +74,16 @@ async function saveDocumentMetadata(
   mime: string,
   checksumSha256: string
 ): Promise<DocumentMetadata> {
+  const token = await getAuthToken()
+  if (!token) {
+    throw new Error('Not authenticated')
+  }
+
   const response = await fetch(`${API_URL}/api/documents`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
     },
     body: JSON.stringify({
       title,
@@ -87,6 +110,12 @@ export async function uploadPdfFile(
   onProgress?: (progress: UploadProgress) => void
 ): Promise<DocumentMetadata> {
   try {
+    // Get current user
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      throw new Error('Not authenticated')
+    }
+
     // Stage 1: Validation
     onProgress?.({
       stage: 'validating',
@@ -106,7 +135,7 @@ export async function uploadPdfFile(
       message: 'Uploading to storage...',
     })
 
-    const storageKey = generateStorageKey(file.name)
+    const storageKey = generateStorageKey(user.id, file.name)
     await uploadPdfToStorage(file, storageKey)
 
     onProgress?.({
@@ -156,7 +185,16 @@ export async function uploadPdfFile(
  * Fetch list of documents from the backend
  */
 export async function fetchDocuments(limit: number = 50, offset: number = 0): Promise<DocumentMetadata[]> {
-  const response = await fetch(`${API_URL}/api/documents?limit=${limit}&offset=${offset}`)
+  const token = await getAuthToken()
+  if (!token) {
+    throw new Error('Not authenticated')
+  }
+
+  const response = await fetch(`${API_URL}/api/documents?limit=${limit}&offset=${offset}`, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+  })
 
   if (!response.ok) {
     throw new Error('Failed to fetch documents')
