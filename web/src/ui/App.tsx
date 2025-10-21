@@ -47,7 +47,7 @@ function AppContent() {
               gap: 12,
             }}>
               <span>📚</span>
-              AI Reader
+              Innesi Reader
             </h1>
             <p style={{
               margin: '8px 0 0 0',

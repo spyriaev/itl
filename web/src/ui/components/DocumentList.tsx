@@ -27,14 +27,26 @@ export function DocumentList({ refreshTrigger }: DocumentListProps) {
     loadDocuments()
   }, [refreshTrigger])
 
-  const formatFileSize = (bytes: number): string => {
+  const formatFileSize = (bytes: number | null | undefined): string => {
+    if (bytes === null || bytes === undefined || bytes < 0) {
+      return 'Unknown size'
+    }
+    
     if (bytes < 1024) return bytes + ' B'
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB'
     return (bytes / (1024 * 1024)).toFixed(2) + ' MB'
   }
 
   const formatDate = (dateStr: string): string => {
+    if (!dateStr) return 'Unknown date'
+    
     const date = new Date(dateStr)
+    
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+      return 'Invalid date'
+    }
+    
     return date.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
@@ -166,7 +178,7 @@ export function DocumentList({ refreshTrigger }: DocumentListProps) {
                   flexWrap: 'wrap',
                 }}>
                   <span>
-                    📦 {doc.sizeBytes ? formatFileSize(doc.sizeBytes) : 'Unknown size'}
+                    📦 {formatFileSize(doc.sizeBytes)}
                   </span>
                   <span>
                     📅 {formatDate(doc.createdAt)}

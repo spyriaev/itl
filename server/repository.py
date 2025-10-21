@@ -25,11 +25,11 @@ def create_document(db: Session, request: CreateDocumentRequest, user_id: str) -
     return DocumentResponse(
         id=str(db_document.id),
         title=db_document.title,
-        storage_key=db_document.storage_key,
-        size_bytes=db_document.size_bytes,
+        storageKey=db_document.storage_key,
+        sizeBytes=db_document.size_bytes,
         mime=db_document.mime,
         status=db_document.status,
-        created_at=db_document.created_at.isoformat()
+        createdAt=db_document.created_at.isoformat()
     )
 
 def list_documents(db: Session, user_id: str, limit: int = 50, offset: int = 0) -> List[DocumentResponse]:
@@ -45,11 +45,11 @@ def list_documents(db: Session, user_id: str, limit: int = 50, offset: int = 0) 
         DocumentResponse(
             id=str(doc.id),
             title=doc.title,
-            storage_key=doc.storage_key,
-            size_bytes=doc.size_bytes,
+            storageKey=doc.storage_key,
+            sizeBytes=doc.size_bytes,
             mime=doc.mime,
             status=doc.status,
-            created_at=doc.created_at.isoformat()
+            createdAt=doc.created_at.isoformat()
         )
         for doc in documents
     ]

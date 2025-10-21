@@ -2,7 +2,7 @@ from sqlalchemy import Column, String, BigInteger, DateTime, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql import func
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 import uuid
 
@@ -25,19 +25,23 @@ class Document(Base):
 # Pydantic models for API requests/responses
 class CreateDocumentRequest(BaseModel):
     title: Optional[str] = None
-    storage_key: str
-    size_bytes: int
+    storage_key: str = Field(alias="storageKey")
+    size_bytes: int = Field(alias="sizeBytes")
     mime: str
-    checksum_sha256: Optional[str] = None
+    checksum_sha256: Optional[str] = Field(None, alias="checksumSha256")
+    
+    class Config:
+        allow_population_by_field_name = True  # Allow both snake_case and camelCase
 
 class DocumentResponse(BaseModel):
     id: str
     title: Optional[str] = None
-    storage_key: str
-    size_bytes: Optional[int] = None
+    storageKey: str
+    sizeBytes: Optional[int]
     mime: Optional[str] = None
     status: str
-    created_at: str
+    createdAt: str
     
     class Config:
         from_attributes = True
+        populate_by_name = True

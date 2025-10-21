@@ -4,7 +4,12 @@ import os
 from typing import Generator
 
 # Database configuration
-DATABASE_URL = os.getenv("DATABASE_URL") or "postgresql://postgres:foxtot-gUmmaw-zujqu2@aws-1-us-east-1.pooler.supabase.com:6543/postgres"
+username = os.getenv("DATABASE_USERNAME")
+password = os.getenv("DATABASE_PASSWORD")
+dbname = os.getenv("DATABASE_NAME")
+port = os.getenv("DATABASE_PORT")
+host = os.getenv("DATABASE_HOST")
+DATABASE_URL = (f"postgresql+psycopg2://{username}:{password}@{host}:{port}/{dbname}")
 
 # Create engine with connection pooling
 engine = create_engine(

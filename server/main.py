@@ -1,8 +1,10 @@
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException, status, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from typing import List
 import os
+import logging
 
 from database import get_db, test_database_connection, engine
 from auth import get_current_user_id
@@ -22,14 +24,62 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Add logging middleware
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    """Log all incoming requests with headers"""
+    print(f"\n🔍 REQUEST LOG:")
+    print(f"   Method: {request.method}")
+    print(f"   URL: {request.url}")
+    print(f"   Headers:")
+    
+    # Log all headers
+    for header_name, header_value in request.headers.items():
+        # Mask sensitive headers
+        if header_name.lower() in ['authorization', 'cookie']:
+            if header_name.lower() == 'authorization':
+                # Show first 20 chars of token for debugging
+                masked_value = header_value[:20] + "..." if len(header_value) > 20 else header_value
+                print(f"     {header_name}: {masked_value}")
+            else:
+                print(f"     {header_name}: [MASKED]")
+        else:
+            print(f"     {header_name}: {header_value}")
+    
+    print(f"   Query params: {dict(request.query_params)}")
+    
+    # Log request body for debugging
+    if request.method in ["POST", "PUT", "PATCH"]:
+        try:
+            body = await request.body()
+            print(f"   Request body: {body.decode('utf-8')}")
+        except Exception as e:
+            print(f"   Request body: [Error reading body: {e}]")
+    
+    print("=" * 50)
+    
+    response = await call_next(request)
+    
+    print(f"📤 RESPONSE LOG:")
+    print(f"   Status: {response.status_code}")
+    print("=" * 50)
+    
+    return response
+
 # Global exception handlers
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request, exc):
-    return {"error": exc.detail}
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"error": exc.detail}
+    )
 
 @app.exception_handler(Exception)
 async def general_exception_handler(request, exc):
-    return {"error": f"Internal Server Error: {str(exc)}"}
+    return JSONResponse(
+        status_code=500,
+        content={"error": f"Internal Server Error: {str(exc)}"}
+    )
 
 # Routes
 @app.get("/health")

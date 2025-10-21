@@ -11,6 +11,8 @@ export function AuthModal({ onClose }: AuthModalProps) {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [hoveredSubmit, setHoveredSubmit] = useState(false)
+  const [hoveredGoogle, setHoveredGoogle] = useState(false)
   const { signIn, signUp, signInWithGoogle } = useAuth()
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -123,7 +125,12 @@ export function AuthModal({ onClose }: AuthModalProps) {
 
           <button
             type="submit"
-            style={styles.submitButton}
+            style={{
+              ...styles.submitButton,
+              ...(hoveredSubmit ? styles.submitButtonHover : {}),
+            }}
+            onMouseEnter={() => setHoveredSubmit(true)}
+            onMouseLeave={() => setHoveredSubmit(false)}
             disabled={loading}
           >
             {loading ? 'Loading...' : mode === 'signin' ? 'Sign In' : 'Sign Up'}
@@ -136,7 +143,12 @@ export function AuthModal({ onClose }: AuthModalProps) {
 
         <button
           onClick={handleGoogleSignIn}
-          style={styles.googleButton}
+          style={{
+            ...styles.googleButton,
+            ...(hoveredGoogle ? styles.googleButtonHover : {}),
+          }}
+          onMouseEnter={() => setHoveredGoogle(true)}
+          onMouseLeave={() => setHoveredGoogle(false)}
           disabled={loading}
         >
           <svg style={styles.googleIcon} viewBox="0 0 24 24">
@@ -256,7 +268,14 @@ const styles: { [key: string]: React.CSSProperties } = {
     fontSize: '16px',
     fontWeight: '600',
     cursor: 'pointer',
-    transition: 'background-color 0.2s',
+    transition: 'all 0.2s ease-in-out',
+    boxShadow: '0 2px 4px rgba(59, 130, 246, 0.2)',
+  },
+  submitButtonHover: {
+    backgroundColor: '#1d4ed8 !important',
+    transform: 'translateY(-2px)',
+    boxShadow: '0 6px 16px rgba(59, 130, 246, 0.4)',
+    color: 'white !important',
   },
   divider: {
     position: 'relative',
@@ -287,6 +306,10 @@ const styles: { [key: string]: React.CSSProperties } = {
     cursor: 'pointer',
     transition: 'background-color 0.2s, border-color 0.2s',
   },
+  googleButtonHover: {
+    backgroundColor: '#f9fafb',
+    borderColor: '#9ca3af',
+  },
   googleIcon: {
     width: '20px',
     height: '20px',
@@ -303,12 +326,15 @@ dividerStyle.textContent = `
     outline: none;
     border-color: #3b82f6;
   }
-  button:hover:not(:disabled) {
-    opacity: 0.9;
-  }
   button:disabled {
     opacity: 0.6;
     cursor: not-allowed;
+  }
+  button[type="submit"]:hover:not(:disabled) {
+    background-color: #1d4ed8 !important;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4) !important;
+    color: white !important;
   }
 `
 document.head.appendChild(dividerStyle)
