@@ -45,7 +45,7 @@ echo -e "${GREEN}📦 Loading environment variables...${NC}"
 export $(grep -v '^#' .env | xargs)
 
 # Validate required variables
-REQUIRED_VARS=("DATABASE_URL" "SUPABASE_JWT_SECRET")
+REQUIRED_VARS=("SUPABASE_JWT_SECRET")
 MISSING_VARS=()
 
 for var in "${REQUIRED_VARS[@]}"; do

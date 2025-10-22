@@ -203,4 +203,57 @@ export async function fetchDocuments(limit: number = 50, offset: number = 0): Pr
   return response.json()
 }
 
+export interface DocumentViewInfo {
+  url: string
+  lastViewedPage: number
+  title: string
+}
+
+/**
+ * Get signed URL for viewing a document
+ */
+export async function getDocumentViewUrl(documentId: string): Promise<DocumentViewInfo> {
+  const token = await getAuthToken()
+  if (!token) {
+    throw new Error('Not authenticated')
+  }
+
+  const response = await fetch(`${API_URL}/api/documents/${documentId}/view`, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Failed to get view URL' }))
+    throw new Error(error.error || 'Failed to get view URL')
+  }
+
+  return response.json()
+}
+
+/**
+ * Update viewing progress for a document
+ */
+export async function updateViewProgress(documentId: string, page: number): Promise<void> {
+  const token = await getAuthToken()
+  if (!token) {
+    throw new Error('Not authenticated')
+  }
+
+  const response = await fetch(`${API_URL}/api/documents/${documentId}/progress`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify({ page }),
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Failed to update progress' }))
+    throw new Error(error.error || 'Failed to update progress')
+  }
+}
+
 

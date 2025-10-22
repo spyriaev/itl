@@ -1,0 +1,595 @@
+import React, { useState, useEffect, useCallback, useRef } from 'react'
+import { Document, Page, pdfjs } from 'react-pdf'
+import { getDocumentViewUrl, updateViewProgress, DocumentViewInfo } from '../../services/uploadService'
+
+// Configure PDF.js worker
+pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`
+
+interface PdfViewerProps {
+  documentId: string
+  onClose: () => void
+}
+
+export function PdfViewer({ documentId, onClose }: PdfViewerProps) {
+  const [documentInfo, setDocumentInfo] = useState<DocumentViewInfo | null>(null)
+  const [numPages, setNumPages] = useState<number>(0)
+  const [currentPage, setCurrentPage] = useState<number>(1)
+  const [scale, setScale] = useState<number>(1.0)
+  const [loading, setLoading] = useState<boolean>(true)
+  const [error, setError] = useState<string | null>(null)
+  const [continuousScroll, setContinuousScroll] = useState<boolean>(true) // По умолчанию включен непрерывный режим
+  
+  // Refs для отслеживания скролла
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const pageRefs = useRef<(HTMLDivElement | null)[]>([])
+
+  // Load document info
+  useEffect(() => {
+    const loadDocument = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+        const info = await getDocumentViewUrl(documentId)
+        setDocumentInfo(info)
+        setCurrentPage(info.lastViewedPage)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load document')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadDocument()
+  }, [documentId])
+
+  // Debounced progress saving
+  const saveProgress = useCallback(
+    (() => {
+      let timeoutId: NodeJS.Timeout
+      return (page: number) => {
+        clearTimeout(timeoutId)
+        timeoutId = setTimeout(() => {
+          updateViewProgress(documentId, page).catch(console.error)
+        }, 2000)
+      }
+    })(),
+    [documentId]
+  )
+
+  const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
+    setNumPages(numPages)
+    // Инициализируем refs для страниц
+    pageRefs.current = new Array(numPages).fill(null)
+    
+    // Прокручиваем к последней просмотренной странице
+    setTimeout(() => {
+      scrollToPage(currentPage)
+    }, 200)
+  }
+
+  // Функция для прокрутки к определенной странице
+  const scrollToPage = useCallback((pageNumber: number) => {
+    if (!continuousScroll || !scrollContainerRef.current || pageRefs.current.length === 0) {
+      return
+    }
+
+    const pageRef = pageRefs.current[pageNumber - 1]
+    if (pageRef && scrollContainerRef.current) {
+      const container = scrollContainerRef.current
+      const containerRect = container.getBoundingClientRect()
+      const pageRect = pageRef.getBoundingClientRect()
+      
+      // Вычисляем позицию для центрирования страницы
+      const scrollTop = pageRef.offsetTop - containerRect.height / 2 + pageRect.height / 2
+      
+      console.log(`Scrolling to page ${pageNumber}, scrollTop: ${scrollTop}`)
+      
+      container.scrollTo({
+        top: Math.max(0, scrollTop),
+        behavior: 'auto'
+      })
+    }
+  }, [continuousScroll])
+
+  // Функция для определения видимой страницы при скролле
+  const updateVisiblePage = useCallback(() => {
+    if (!continuousScroll || !scrollContainerRef.current || pageRefs.current.length === 0) {
+      return
+    }
+
+    const container = scrollContainerRef.current
+    const containerRect = container.getBoundingClientRect()
+    const containerTop = containerRect.top
+    const containerBottom = containerRect.bottom
+    const containerHeight = containerRect.height
+
+    let mostVisiblePage = 1
+    let maxVisibleArea = 0
+
+    pageRefs.current.forEach((pageRef, index) => {
+      if (pageRef) {
+        const pageRect = pageRef.getBoundingClientRect()
+        const pageTop = pageRect.top
+        const pageBottom = pageRect.bottom
+        
+        // Вычисляем пересечение страницы с видимой областью
+        const visibleTop = Math.max(pageTop, containerTop)
+        const visibleBottom = Math.min(pageBottom, containerBottom)
+        const visibleHeight = Math.max(0, visibleBottom - visibleTop)
+        
+        // Вычисляем процент видимости страницы
+        const pageHeight = pageRect.height
+        const visibilityRatio = visibleHeight / pageHeight
+        
+        console.log(`Page ${index + 1}: visibility ratio = ${visibilityRatio.toFixed(2)}`)
+
+        if (visibilityRatio > maxVisibleArea) {
+          maxVisibleArea = visibilityRatio
+          mostVisiblePage = index + 1
+        }
+      }
+    })
+
+    if (mostVisiblePage !== currentPage) {
+      console.log(`Page changed from ${currentPage} to ${mostVisiblePage} (visibility: ${maxVisibleArea.toFixed(2)})`)
+      setCurrentPage(mostVisiblePage)
+      saveProgress(mostVisiblePage)
+    }
+  }, [continuousScroll, currentPage, saveProgress])
+
+  const goToPrevPage = () => {
+    if (currentPage > 1) {
+      const newPage = currentPage - 1
+      setCurrentPage(newPage)
+      saveProgress(newPage)
+    }
+  }
+
+  const goToNextPage = () => {
+    if (currentPage < numPages) {
+      const newPage = currentPage + 1
+      setCurrentPage(newPage)
+      saveProgress(newPage)
+    }
+  }
+
+  const handlePageChange = (page: number) => {
+    if (page >= 1 && page <= numPages) {
+      setCurrentPage(page)
+      saveProgress(page)
+    }
+  }
+
+  const toggleContinuousScroll = () => {
+    setContinuousScroll(!continuousScroll)
+    
+    // Если переключаемся в режим непрерывного скролла, прокручиваем к текущей странице
+    if (!continuousScroll) {
+      setTimeout(() => {
+        scrollToPage(currentPage)
+      }, 100)
+    }
+  }
+
+  // Обработчик скролла для отслеживания видимой страницы
+  useEffect(() => {
+    const container = scrollContainerRef.current
+    if (!container || !continuousScroll) return
+
+    const handleScroll = () => {
+      console.log('Scroll event triggered')
+      updateVisiblePage()
+    }
+
+    // Добавляем обработчик с throttling для производительности
+    let timeoutId: NodeJS.Timeout
+    const throttledHandleScroll = () => {
+      clearTimeout(timeoutId)
+      timeoutId = setTimeout(handleScroll, 50) // Уменьшили задержку для более отзывчивого отслеживания
+    }
+
+    container.addEventListener('scroll', throttledHandleScroll)
+    
+    // Также добавляем обработчик для изменения размера окна
+    const handleResize = () => {
+      setTimeout(handleScroll, 100)
+    }
+    window.addEventListener('resize', handleResize)
+    
+    return () => {
+      container.removeEventListener('scroll', throttledHandleScroll)
+      window.removeEventListener('resize', handleResize)
+      clearTimeout(timeoutId)
+    }
+  }, [updateVisiblePage, continuousScroll])
+
+  // Дополнительная проверка видимой страницы каждые 500ms
+  useEffect(() => {
+    if (!continuousScroll) return
+
+    const interval = setInterval(() => {
+      updateVisiblePage()
+    }, 500)
+
+    return () => clearInterval(interval)
+  }, [continuousScroll, updateVisiblePage])
+
+  const zoomIn = () => {
+    setScale(prev => Math.min(prev + 0.25, 3.0))
+  }
+
+  const zoomOut = () => {
+    setScale(prev => Math.max(prev - 0.25, 0.5))
+  }
+
+  const resetZoom = () => {
+    setScale(1.0)
+  }
+
+  if (loading) {
+    return (
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1000,
+      }}>
+        <div style={{
+          backgroundColor: 'white',
+          padding: 32,
+          borderRadius: 12,
+          textAlign: 'center',
+          boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)',
+        }}>
+          <div style={{ fontSize: 32, marginBottom: 16 }}>⏳</div>
+          <p style={{ margin: 0, fontSize: 16, color: '#374151' }}>Loading PDF...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1000,
+      }}>
+        <div style={{
+          backgroundColor: 'white',
+          padding: 32,
+          borderRadius: 12,
+          textAlign: 'center',
+          boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)',
+          maxWidth: 400,
+        }}>
+          <div style={{ fontSize: 32, marginBottom: 16 }}>❌</div>
+          <h3 style={{ margin: '0 0 16px 0', fontSize: 18, fontWeight: 600, color: '#111827' }}>
+            Error Loading PDF
+          </h3>
+          <p style={{ margin: '0 0 24px 0', fontSize: 14, color: '#6B7280' }}>
+            {error}
+          </p>
+          <button
+            onClick={onClose}
+            style={{
+              padding: '8px 16px',
+              backgroundColor: '#DC2626',
+              color: 'white',
+              border: 'none',
+              borderRadius: 6,
+              fontSize: 14,
+              fontWeight: 500,
+              cursor: 'pointer',
+            }}
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (!documentInfo) {
+    return null
+  }
+
+  return (
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(0, 0, 0, 0.8)',
+      zIndex: 1000,
+      display: 'flex',
+      flexDirection: 'column',
+    }}>
+      {/* Header Controls */}
+      <div style={{
+        backgroundColor: 'white',
+        padding: '16px 24px',
+        borderBottom: '1px solid #E5E7EB',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        boxShadow: '0 1px 3px 0 rgb(0 0 0 / 0.1)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <button
+            onClick={onClose}
+            style={{
+              padding: '8px 12px',
+              backgroundColor: '#F3F4F6',
+              color: '#374151',
+              border: '1px solid #D1D5DB',
+              borderRadius: 6,
+              fontSize: 14,
+              fontWeight: 500,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+            }}
+          >
+            ← Back to Library
+          </button>
+          <h2 style={{
+            margin: 0,
+            fontSize: 18,
+            fontWeight: 600,
+            color: '#111827',
+            maxWidth: 300,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}>
+            {documentInfo.title}
+          </h2>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          {/* Page Navigation - Only show in single page mode */}
+          {!continuousScroll && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <button
+                onClick={goToPrevPage}
+                disabled={currentPage <= 1}
+                style={{
+                  padding: '6px 10px',
+                  backgroundColor: currentPage <= 1 ? '#F9FAFB' : '#F3F4F6',
+                  color: currentPage <= 1 ? '#9CA3AF' : '#374151',
+                  border: '1px solid #D1D5DB',
+                  borderRadius: 4,
+                  fontSize: 14,
+                  cursor: currentPage <= 1 ? 'not-allowed' : 'pointer',
+                }}
+              >
+                ←
+              </button>
+              <span style={{ fontSize: 14, color: '#374151', minWidth: 80, textAlign: 'center' }}>
+                Page {currentPage} of {numPages}
+              </span>
+              <button
+                onClick={goToNextPage}
+                disabled={currentPage >= numPages}
+                style={{
+                  padding: '6px 10px',
+                  backgroundColor: currentPage >= numPages ? '#F9FAFB' : '#F3F4F6',
+                  color: currentPage >= numPages ? '#9CA3AF' : '#374151',
+                  border: '1px solid #D1D5DB',
+                  borderRadius: 4,
+                  fontSize: 14,
+                  cursor: currentPage >= numPages ? 'not-allowed' : 'pointer',
+                }}
+              >
+                →
+              </button>
+            </div>
+          )}
+
+          {/* Page count indicator for continuous scroll mode */}
+          {continuousScroll && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 14, color: '#374151', fontWeight: 500 }}>
+                📄 Page {currentPage} of {numPages}
+              </span>
+              <button
+                onClick={() => scrollToPage(currentPage)}
+                style={{
+                  padding: '4px 8px',
+                  backgroundColor: '#F3F4F6',
+                  color: '#374151',
+                  border: '1px solid #D1D5DB',
+                  borderRadius: 4,
+                  fontSize: 12,
+                  cursor: 'pointer',
+                }}
+                title="Scroll to current page"
+              >
+                📍
+              </button>
+            </div>
+          )}
+
+          {/* Zoom Controls */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button
+              onClick={zoomOut}
+              style={{
+                padding: '6px 10px',
+                backgroundColor: '#F3F4F6',
+                color: '#374151',
+                border: '1px solid #D1D5DB',
+                borderRadius: 4,
+                fontSize: 14,
+                cursor: 'pointer',
+              }}
+            >
+              −
+            </button>
+            <span style={{ fontSize: 14, color: '#374151', minWidth: 50, textAlign: 'center' }}>
+              {Math.round(scale * 100)}%
+            </span>
+            <button
+              onClick={zoomIn}
+              style={{
+                padding: '6px 10px',
+                backgroundColor: '#F3F4F6',
+                color: '#374151',
+                border: '1px solid #D1D5DB',
+                borderRadius: 4,
+                fontSize: 14,
+                cursor: 'pointer',
+              }}
+            >
+              +
+            </button>
+            <button
+              onClick={resetZoom}
+              style={{
+                padding: '6px 10px',
+                backgroundColor: '#F3F4F6',
+                color: '#374151',
+                border: '1px solid #D1D5DB',
+                borderRadius: 4,
+                fontSize: 12,
+                cursor: 'pointer',
+              }}
+            >
+              Reset
+            </button>
+          </div>
+
+          {/* Scroll Mode Toggle */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button
+              onClick={toggleContinuousScroll}
+              style={{
+                padding: '6px 12px',
+                backgroundColor: continuousScroll ? '#3B82F6' : '#F3F4F6',
+                color: continuousScroll ? 'white' : '#374151',
+                border: '1px solid #D1D5DB',
+                borderRadius: 4,
+                fontSize: 12,
+                cursor: 'pointer',
+                fontWeight: 500,
+              }}
+            >
+              {continuousScroll ? '📄 Continuous' : '📖 Single Page'}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* PDF Content */}
+      <div 
+        ref={scrollContainerRef}
+        style={{
+          flex: 1,
+          display: 'flex',
+          alignItems: continuousScroll ? 'flex-start' : 'center',
+          justifyContent: 'center',
+          padding: 24,
+          overflow: 'auto',
+        }}>
+        {continuousScroll ? (
+          /* Continuous Scroll Mode - All pages stacked vertically */
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 16,
+            width: '100%',
+            maxWidth: '100%',
+          }}>
+            <Document
+              file={documentInfo.url}
+              onLoadSuccess={onDocumentLoadSuccess}
+              onLoadError={(error) => setError('Failed to load PDF document')}
+            >
+              {numPages > 0 ? (
+                Array.from({ length: numPages }, (_, index) => (
+                  <div
+                    key={index + 1}
+                    ref={(el) => pageRefs.current[index] = el}
+                    style={{
+                      backgroundColor: 'white',
+                      borderRadius: 8,
+                      boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
+                      padding: 16,
+                      marginBottom: 8,
+                    }}
+                  >
+                    <Page
+                      pageNumber={index + 1}
+                      scale={scale}
+                      renderTextLayer={false}
+                      renderAnnotationLayer={false}
+                    />
+                    {/* Page number indicator */}
+                    <div style={{
+                      textAlign: 'center',
+                      marginTop: 8,
+                      fontSize: 12,
+                      color: '#6B7280',
+                      fontWeight: 500,
+                    }}>
+                      Page {index + 1} of {numPages}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div style={{
+                  backgroundColor: 'white',
+                  padding: 32,
+                  borderRadius: 12,
+                  textAlign: 'center',
+                  boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
+                }}>
+                  <div style={{ fontSize: 32, marginBottom: 16 }}>⏳</div>
+                  <p style={{ margin: 0, fontSize: 16, color: '#374151' }}>Loading PDF pages...</p>
+                </div>
+              )}
+            </Document>
+          </div>
+        ) : (
+          /* Single Page Mode - Original behavior */
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: 8,
+            boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
+            padding: 16,
+          }}>
+            <Document
+              file={documentInfo.url}
+              onLoadSuccess={onDocumentLoadSuccess}
+              onLoadError={(error) => setError('Failed to load PDF document')}
+            >
+              <Page
+                pageNumber={currentPage}
+                scale={scale}
+                renderTextLayer={false}
+                renderAnnotationLayer={false}
+              />
+            </Document>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}

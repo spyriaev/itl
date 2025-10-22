@@ -6,14 +6,14 @@ from typing import List
 import os
 import logging
 
-from database import get_db, test_database_connection, engine
+from database import get_db, test_database_connection, engine, supabase
 from auth import get_current_user_id
-from models import CreateDocumentRequest, DocumentResponse, Base
-from repository import create_document, list_documents
+from models import CreateDocumentRequest, DocumentResponse, Base, UpdateProgressRequest
+from repository import create_document, list_documents, get_document_by_id, update_document_progress
 
 
 # Create FastAPI app
-app = FastAPI(title="AI Reader API", version="1.0.0")
+app = FastAPI(title="Innesi API", version="1.0.0")
 
 # Add CORS middleware
 app.add_middleware(
@@ -146,6 +146,90 @@ async def list_documents_endpoint(
         )
     
     return list_documents(db, user_id, limit, offset)
+
+@app.get("/api/documents/{document_id}/view")
+async def get_document_view_url(
+    document_id: str,
+    user_id: str = Depends(get_current_user_id),
+    db: Session = Depends(get_db)
+):
+    """Get signed URL for viewing a document"""
+    # Check database connectivity
+    if not test_database_connection():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database not available"
+        )
+    
+    # Get document and verify ownership
+    document = get_document_by_id(db, document_id, user_id)
+    if not document:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found"
+        )
+    
+    try:
+        # Create signed URL (expires in 1 hour)
+        if not supabase:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Supabase storage not available"
+            )
+            
+        signed_url_response = supabase.storage.from_('pdfs').create_signed_url(
+            document.storage_key,
+            expires_in=3600
+        )
+        
+        if not signed_url_response.get('signedURL'):
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to create signed URL"
+            )
+        
+        return {
+            "url": signed_url_response['signedURL'],
+            "lastViewedPage": document.last_viewed_page or 1,
+            "title": document.title
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create signed URL: {str(e)}"
+        )
+
+@app.patch("/api/documents/{document_id}/progress")
+async def update_view_progress(
+    document_id: str,
+    request: UpdateProgressRequest,
+    user_id: str = Depends(get_current_user_id),
+    db: Session = Depends(get_db)
+):
+    """Update the last viewed page for a document"""
+    # Check database connectivity
+    if not test_database_connection():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database not available"
+        )
+    
+    # Validate page number
+    if request.page < 1:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Page number must be greater than 0"
+        )
+    
+    # Update progress
+    success = update_document_progress(db, document_id, request.page, user_id)
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found"
+        )
+    
+    return {"message": "Progress updated successfully"}
 
 if __name__ == "__main__":
     import uvicorn

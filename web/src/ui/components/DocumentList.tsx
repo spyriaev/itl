@@ -3,9 +3,10 @@ import { fetchDocuments, DocumentMetadata } from '../../services/uploadService'
 
 interface DocumentListProps {
   refreshTrigger?: number
+  onDocumentClick: (documentId: string) => void
 }
 
-export function DocumentList({ refreshTrigger }: DocumentListProps) {
+export function DocumentList({ refreshTrigger, onDocumentClick }: DocumentListProps) {
   const [documents, setDocuments] = useState<DocumentMetadata[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -153,6 +154,7 @@ export function DocumentList({ refreshTrigger }: DocumentListProps) {
             }}
             onMouseEnter={(e) => e.currentTarget.style.boxShadow = '0 4px 6px -1px rgb(0 0 0 / 0.1)'}
             onMouseLeave={(e) => e.currentTarget.style.boxShadow = 'none'}
+            onClick={() => onDocumentClick(doc.id)}
           >
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
               <div style={{ fontSize: 40, lineHeight: 1 }}>📄</div>

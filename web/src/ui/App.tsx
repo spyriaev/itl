@@ -5,13 +5,30 @@ import { DocumentList } from './components/DocumentList'
 import { UserMenu } from './components/UserMenu'
 import { AuthModal } from './components/AuthModal'
 import { ProtectedRoute } from './components/ProtectedRoute'
+import { PdfViewer } from './components/PdfViewer'
+
+type ViewMode = 'library' | 'reader'
 
 function AppContent() {
   const [refreshTrigger, setRefreshTrigger] = useState(0)
+  const [viewMode, setViewMode] = useState<ViewMode>('library')
+  const [currentDocumentId, setCurrentDocumentId] = useState<string | null>(null)
   const { user } = useAuth()
 
   const handleUploadComplete = () => {
     // Trigger document list refresh
+    setRefreshTrigger(prev => prev + 1)
+  }
+
+  const handleDocumentClick = (documentId: string) => {
+    setCurrentDocumentId(documentId)
+    setViewMode('reader')
+  }
+
+  const handleCloseReader = () => {
+    setCurrentDocumentId(null)
+    setViewMode('library')
+    // Refresh document list to show updated progress
     setRefreshTrigger(prev => prev + 1)
   }
 
@@ -54,7 +71,7 @@ function AppContent() {
               fontSize: 14,
               color: '#6B7280',
             }}>
-              Upload and manage your PDF documents
+              {viewMode === 'library' ? 'Upload and manage your PDF documents' : 'Reading PDF document'}
             </p>
           </div>
           <UserMenu />
@@ -68,24 +85,39 @@ function AppContent() {
         padding: '0 24px 48px 24px',
       }}>
         <ProtectedRoute fallback={<AuthModal />}>
-          {/* Upload Section */}
-          <section style={{ marginBottom: 48 }}>
-            <h2 style={{
-              margin: '0 0 24px 0',
-              fontSize: 20,
-              fontWeight: 600,
-              color: '#111827',
-              textAlign: 'center',
-            }}>
-              Upload PDF Document
-            </h2>
-            <FileUpload onUploadComplete={handleUploadComplete} />
-          </section>
+          {viewMode === 'library' ? (
+            <>
+              {/* Upload Section */}
+              <section style={{ marginBottom: 48 }}>
+                <h2 style={{
+                  margin: '0 0 24px 0',
+                  fontSize: 20,
+                  fontWeight: 600,
+                  color: '#111827',
+                  textAlign: 'center',
+                }}>
+                  Upload PDF Document
+                </h2>
+                <FileUpload onUploadComplete={handleUploadComplete} />
+              </section>
 
-          {/* Documents Section */}
-          <section>
-            <DocumentList refreshTrigger={refreshTrigger} />
-          </section>
+              {/* Documents Section */}
+              <section>
+                <DocumentList 
+                  refreshTrigger={refreshTrigger} 
+                  onDocumentClick={handleDocumentClick}
+                />
+              </section>
+            </>
+          ) : (
+            /* Reader Mode - PdfViewer will handle the full screen display */
+            currentDocumentId && (
+              <PdfViewer 
+                documentId={currentDocumentId} 
+                onClose={handleCloseReader}
+              />
+            )
+          )}
         </ProtectedRoute>
       </main>
     </div>

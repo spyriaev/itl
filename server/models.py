@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, BigInteger, DateTime, Text
+from sqlalchemy import Column, String, BigInteger, DateTime, Text, Integer
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql import func
@@ -21,6 +21,8 @@ class Document(Base):
     status = Column(Text, default="created")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     uploaded_by_session = Column(Text, nullable=True)
+    last_viewed_page = Column(Integer, default=1)
+    last_viewed_at = Column(DateTime(timezone=True), nullable=True)
 
 # Pydantic models for API requests/responses
 class CreateDocumentRequest(BaseModel):
@@ -45,3 +47,6 @@ class DocumentResponse(BaseModel):
     class Config:
         from_attributes = True
         populate_by_name = True
+
+class UpdateProgressRequest(BaseModel):
+    page: int

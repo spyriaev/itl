@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
-from typing import List
+from typing import List, Optional
 import uuid
 from datetime import datetime
 from models import Document, CreateDocumentRequest, DocumentResponse
@@ -53,3 +53,38 @@ def list_documents(db: Session, user_id: str, limit: int = 50, offset: int = 0) 
         )
         for doc in documents
     ]
+
+def get_document_by_id(db: Session, document_id: str, owner_id: str) -> Optional[Document]:
+    """Get a document by ID, ensuring it belongs to the owner"""
+    try:
+        doc_uuid = uuid.UUID(document_id)
+        owner_uuid = uuid.UUID(owner_id)
+        
+        return db.query(Document)\
+            .filter(Document.id == doc_uuid)\
+            .filter(Document.owner_id == owner_uuid)\
+            .first()
+    except ValueError:
+        return None
+
+def update_document_progress(db: Session, document_id: str, page: int, owner_id: str) -> bool:
+    """Update the last viewed page and timestamp for a document"""
+    try:
+        doc_uuid = uuid.UUID(document_id)
+        owner_uuid = uuid.UUID(owner_id)
+        
+        document = db.query(Document)\
+            .filter(Document.id == doc_uuid)\
+            .filter(Document.owner_id == owner_uuid)\
+            .first()
+        
+        if not document:
+            return False
+        
+        document.last_viewed_page = page
+        document.last_viewed_at = datetime.utcnow()
+        
+        db.commit()
+        return True
+    except ValueError:
+        return False

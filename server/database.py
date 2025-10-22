@@ -2,14 +2,28 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 import os
 from typing import Generator
+from supabase import create_client, Client
 
 # Database configuration
-username = os.getenv("DATABASE_USERNAME")
-password = os.getenv("DATABASE_PASSWORD")
-dbname = os.getenv("DATABASE_NAME")
-port = os.getenv("DATABASE_PORT")
-host = os.getenv("DATABASE_HOST")
+username = os.getenv("DATABASE_USERNAME", "postgres")
+password = os.getenv("DATABASE_PASSWORD", "postgres")
+dbname = os.getenv("DATABASE_NAME", "postgres")
+port = os.getenv("DATABASE_PORT", "54322")
+host = os.getenv("DATABASE_HOST", "127.0.0.1")
 DATABASE_URL = (f"postgresql+psycopg2://{username}:{password}@{host}:{port}/{dbname}")
+
+# Supabase configuration
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
+
+# Create Supabase client
+supabase: Client = None
+if SUPABASE_URL and SUPABASE_SERVICE_KEY:
+    try:
+        supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+    except Exception as e:
+        print(f"Warning: Failed to create Supabase client: {e}")
+        supabase = None
 
 # Create engine with connection pooling
 engine = create_engine(
