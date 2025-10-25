@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { Document, Page, pdfjs } from 'react-pdf'
 import { getDocumentViewUrl, updateViewProgress, DocumentViewInfo } from '../../services/uploadService'
+import { ChatProvider } from '../../contexts/ChatContext'
+import { ChatPanel } from './ChatPanel'
 import 'react-pdf/dist/Page/AnnotationLayer.css'
 import 'react-pdf/dist/Page/TextLayer.css'
 
@@ -20,6 +22,8 @@ export function PdfViewer({ documentId, onClose }: PdfViewerProps) {
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
   const [continuousScroll, setContinuousScroll] = useState<boolean>(true) // По умолчанию включен непрерывный режим
+  const [isChatVisible, setIsChatVisible] = useState<boolean>(false)
+  const [isMobile, setIsMobile] = useState<boolean>(window.innerWidth < 768)
   
   // Refs для отслеживания скролла
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -43,6 +47,16 @@ export function PdfViewer({ documentId, onClose }: PdfViewerProps) {
 
     loadDocument()
   }, [documentId])
+
+  // Handle window resize
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768)
+    }
+
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
 
   // Debounced progress saving
   const saveProgress = useCallback(
@@ -495,20 +509,51 @@ export function PdfViewer({ documentId, onClose }: PdfViewerProps) {
               {continuousScroll ? '📄 Continuous' : '📖 Single Page'}
             </button>
           </div>
+
+          {/* Chat Toggle */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button
+              onClick={() => setIsChatVisible(!isChatVisible)}
+              style={{
+                padding: '6px 12px',
+                backgroundColor: isChatVisible ? '#10B981' : '#F3F4F6',
+                color: isChatVisible ? 'white' : '#374151',
+                border: '1px solid #D1D5DB',
+                borderRadius: 4,
+                fontSize: 12,
+                cursor: 'pointer',
+                fontWeight: 500,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+              }}
+            >
+              <span>🤖</span>
+              <span>{isChatVisible ? 'Hide AI' : 'Show AI'}</span>
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* PDF Content */}
-      <div 
-        ref={scrollContainerRef}
-        style={{
-          flex: 1,
-          display: 'flex',
-          alignItems: continuousScroll ? 'flex-start' : 'center',
-          justifyContent: 'center',
-          padding: 24,
-          overflow: 'auto',
-        }}>
+      {/* Main Content Area */}
+      <div style={{
+        flex: 1,
+        display: 'flex',
+        overflow: 'hidden',
+      }}>
+        {/* PDF Content */}
+        <div 
+          ref={scrollContainerRef}
+          style={{
+            flex: 1,
+            display: 'flex',
+            alignItems: continuousScroll ? 'flex-start' : 'center',
+            justifyContent: 'center',
+            padding: 24,
+            overflow: 'auto',
+            marginRight: isChatVisible ? (isMobile ? 0 : 400) : 0,
+            transition: 'margin-right 0.3s ease-out',
+          }}>
         {continuousScroll ? (
           /* Continuous Scroll Mode - All pages stacked vertically */
           <div style={{
@@ -591,6 +636,18 @@ export function PdfViewer({ documentId, onClose }: PdfViewerProps) {
             </Document>
           </div>
         )}
+        </div>
+
+        {/* Chat Panel */}
+        <ChatProvider>
+          <ChatPanel
+            documentId={documentId}
+            currentPage={currentPage}
+            isVisible={isChatVisible}
+            onToggle={() => setIsChatVisible(!isChatVisible)}
+            isMobile={isMobile}
+          />
+        </ChatProvider>
       </div>
     </div>
   )

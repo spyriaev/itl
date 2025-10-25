@@ -1,15 +1,27 @@
 from fastapi import FastAPI, Depends, HTTPException, status, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from sqlalchemy.orm import Session
 from typing import List
 import os
 import logging
+import json
+import asyncio
+import uuid
 
 from database import get_db, test_database_connection, engine, supabase
 from auth import get_current_user_id
-from models import CreateDocumentRequest, DocumentResponse, Base, UpdateProgressRequest
-from repository import create_document, list_documents, get_document_by_id, update_document_progress
+from models import (
+    CreateDocumentRequest, DocumentResponse, Base, UpdateProgressRequest,
+    CreateThreadRequest, ThreadResponse, CreateMessageRequest, MessageResponse,
+    ThreadWithMessagesResponse, Document, ChatThread
+)
+from repository import (
+    create_document, list_documents, get_document_by_id, update_document_progress,
+    create_chat_thread, list_chat_threads, get_chat_thread_with_messages,
+    create_chat_message, update_thread_title
+)
+from ai_service import ai_service
 
 
 # Create FastAPI app
@@ -230,6 +242,201 @@ async def update_view_progress(
         )
     
     return {"message": "Progress updated successfully"}
+
+# Chat API endpoints
+@app.post("/api/documents/{document_id}/chat/threads", response_model=ThreadResponse, status_code=status.HTTP_201_CREATED)
+async def create_chat_thread_endpoint(
+    document_id: str,
+    request: CreateThreadRequest,
+    user_id: str = Depends(get_current_user_id),
+    db: Session = Depends(get_db)
+):
+    """Create a new chat thread for a document"""
+    # Check database connectivity
+    if not test_database_connection():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database not available"
+        )
+    
+    # Verify document exists and belongs to user
+    document = get_document_by_id(db, document_id, user_id)
+    if not document:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found"
+        )
+    
+    # Generate title from request or use default
+    title = request.title or f"Chat about {document.title or 'document'}"
+    
+    return create_chat_thread(db, document_id, user_id, title)
+
+@app.get("/api/documents/{document_id}/chat/threads", response_model=List[ThreadResponse])
+async def list_chat_threads_endpoint(
+    document_id: str,
+    user_id: str = Depends(get_current_user_id),
+    db: Session = Depends(get_db)
+):
+    """List chat threads for a document"""
+    # Check database connectivity
+    if not test_database_connection():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database not available"
+        )
+    
+    # Verify document exists and belongs to user
+    document = get_document_by_id(db, document_id, user_id)
+    if not document:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found"
+        )
+    
+    return list_chat_threads(db, document_id, user_id)
+
+@app.get("/api/chat/threads/{thread_id}/messages", response_model=ThreadWithMessagesResponse)
+async def get_chat_thread_messages(
+    thread_id: str,
+    user_id: str = Depends(get_current_user_id),
+    db: Session = Depends(get_db)
+):
+    """Get chat thread with its messages"""
+    # Check database connectivity
+    if not test_database_connection():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database not available"
+        )
+    
+    thread_with_messages = get_chat_thread_with_messages(db, thread_id, user_id)
+    if not thread_with_messages:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Thread not found"
+        )
+    
+    return thread_with_messages
+
+@app.post("/api/chat/threads/{thread_id}/messages")
+async def send_chat_message(
+    thread_id: str,
+    request: CreateMessageRequest,
+    user_id: str = Depends(get_current_user_id),
+    db: Session = Depends(get_db)
+):
+    """Send a message to a chat thread and stream the AI response"""
+    # Check database connectivity
+    if not test_database_connection():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database not available"
+        )
+    
+    # Get thread with messages to verify ownership and get document info
+    thread_with_messages = get_chat_thread_with_messages(db, thread_id, user_id)
+    if not thread_with_messages:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Thread not found"
+        )
+    
+    # Get document info from thread
+    thread = db.query(ChatThread).filter(ChatThread.id == uuid.UUID(thread_id)).first()
+    if not thread:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Thread not found"
+        )
+    
+    document = db.query(Document).filter(Document.id == thread.document_id).first()
+    if not document:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found"
+        )
+    
+    # Save user message
+    user_message = create_chat_message(
+        db, thread_id, "user", request.content, request.pageContext
+    )
+    
+    # Get document view URL for AI context
+    try:
+        if not supabase:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Supabase storage not available"
+            )
+            
+        signed_url_response = supabase.storage.from_('pdfs').create_signed_url(
+            document.storage_key,
+            expires_in=3600
+        )
+        
+        if not signed_url_response.get('signedURL'):
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to create signed URL"
+            )
+        
+        pdf_url = signed_url_response['signedURL']
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create signed URL: {str(e)}"
+        )
+    
+    # Prepare messages for AI (excluding the just-added user message)
+    ai_messages = [
+        {"role": msg.role, "content": msg.content}
+        for msg in thread_with_messages.messages
+    ]
+    
+    # Add the new user message
+    ai_messages.append({"role": "user", "content": request.content})
+    
+    # Get current page context (use request pageContext or document's last viewed page)
+    current_page = request.pageContext or document.last_viewed_page or 1
+    
+    # Estimate total pages (this is a rough estimate, could be improved)
+    total_pages = 100  # Default fallback
+    
+    async def generate_response():
+        """Generate streaming response"""
+        assistant_content = ""
+        
+        try:
+            # Stream AI response
+            async for chunk in ai_service.generate_response_stream(
+                ai_messages, pdf_url, current_page, total_pages
+            ):
+                assistant_content += chunk
+                yield f"data: {json.dumps({'type': 'chunk', 'content': chunk})}\n\n"
+            
+            # Save complete assistant message
+            assistant_message = create_chat_message(
+                db, thread_id, "assistant", assistant_content, current_page
+            )
+            
+            # Send completion signal
+            yield f"data: {json.dumps({'type': 'complete', 'messageId': assistant_message.id})}\n\n"
+            
+        except Exception as e:
+            # Send error signal
+            yield f"data: {json.dumps({'type': 'error', 'error': str(e)})}\n\n"
+    
+    return StreamingResponse(
+        generate_response(),
+        media_type="text/plain",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "Content-Type": "text/event-stream",
+        }
+    )
 
 if __name__ == "__main__":
     import uvicorn

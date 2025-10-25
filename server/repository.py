@@ -3,7 +3,11 @@ from sqlalchemy import desc
 from typing import List, Optional
 import uuid
 from datetime import datetime
-from models import Document, CreateDocumentRequest, DocumentResponse
+from models import (
+    Document, CreateDocumentRequest, DocumentResponse,
+    ChatThread, ChatMessage, CreateThreadRequest, ThreadResponse,
+    CreateMessageRequest, MessageResponse, ThreadWithMessagesResponse
+)
 
 def create_document(db: Session, request: CreateDocumentRequest, user_id: str) -> DocumentResponse:
     """Create a new document record"""
@@ -83,6 +87,124 @@ def update_document_progress(db: Session, document_id: str, page: int, owner_id:
         
         document.last_viewed_page = page
         document.last_viewed_at = datetime.utcnow()
+        
+        db.commit()
+        return True
+    except ValueError:
+        return False
+
+# Chat-related repository functions
+def create_chat_thread(db: Session, document_id: str, user_id: str, title: str) -> ThreadResponse:
+    """Create a new chat thread for a document"""
+    thread = ChatThread(
+        id=uuid.uuid4(),
+        document_id=uuid.UUID(document_id),
+        user_id=uuid.UUID(user_id),
+        title=title
+    )
+    
+    db.add(thread)
+    db.commit()
+    db.refresh(thread)
+    
+    return ThreadResponse(
+        id=str(thread.id),
+        title=thread.title,
+        createdAt=thread.created_at.isoformat(),
+        updatedAt=thread.updated_at.isoformat()
+    )
+
+def list_chat_threads(db: Session, document_id: str, user_id: str) -> List[ThreadResponse]:
+    """List chat threads for a document"""
+    threads = db.query(ChatThread)\
+        .filter(ChatThread.document_id == uuid.UUID(document_id))\
+        .filter(ChatThread.user_id == uuid.UUID(user_id))\
+        .order_by(desc(ChatThread.updated_at))\
+        .all()
+    
+    return [
+        ThreadResponse(
+            id=str(thread.id),
+            title=thread.title,
+            createdAt=thread.created_at.isoformat(),
+            updatedAt=thread.updated_at.isoformat()
+        )
+        for thread in threads
+    ]
+
+def get_chat_thread_with_messages(db: Session, thread_id: str, user_id: str) -> Optional[ThreadWithMessagesResponse]:
+    """Get a chat thread with its messages"""
+    thread = db.query(ChatThread)\
+        .filter(ChatThread.id == uuid.UUID(thread_id))\
+        .filter(ChatThread.user_id == uuid.UUID(user_id))\
+        .first()
+    
+    if not thread:
+        return None
+    
+    messages = db.query(ChatMessage)\
+        .filter(ChatMessage.thread_id == thread.id)\
+        .order_by(ChatMessage.created_at)\
+        .all()
+    
+    return ThreadWithMessagesResponse(
+        id=str(thread.id),
+        title=thread.title,
+        createdAt=thread.created_at.isoformat(),
+        updatedAt=thread.updated_at.isoformat(),
+        messages=[
+            MessageResponse(
+                id=str(msg.id),
+                role=msg.role,
+                content=msg.content,
+                pageContext=msg.page_context,
+                createdAt=msg.created_at.isoformat()
+            )
+            for msg in messages
+        ]
+    )
+
+def create_chat_message(db: Session, thread_id: str, role: str, content: str, page_context: Optional[int] = None) -> MessageResponse:
+    """Create a new chat message"""
+    message = ChatMessage(
+        id=uuid.uuid4(),
+        thread_id=uuid.UUID(thread_id),
+        role=role,
+        content=content,
+        page_context=page_context
+    )
+    
+    db.add(message)
+    
+    # Update thread's updated_at timestamp
+    thread = db.query(ChatThread).filter(ChatThread.id == uuid.UUID(thread_id)).first()
+    if thread:
+        thread.updated_at = datetime.utcnow()
+    
+    db.commit()
+    db.refresh(message)
+    
+    return MessageResponse(
+        id=str(message.id),
+        role=message.role,
+        content=message.content,
+        pageContext=message.page_context,
+        createdAt=message.created_at.isoformat()
+    )
+
+def update_thread_title(db: Session, thread_id: str, user_id: str, title: str) -> bool:
+    """Update a thread's title"""
+    try:
+        thread = db.query(ChatThread)\
+            .filter(ChatThread.id == uuid.UUID(thread_id))\
+            .filter(ChatThread.user_id == uuid.UUID(user_id))\
+            .first()
+        
+        if not thread:
+            return False
+        
+        thread.title = title
+        thread.updated_at = datetime.utcnow()
         
         db.commit()
         return True
