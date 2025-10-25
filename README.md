@@ -1,120 +1,183 @@
-# Innesi Monorepo
+# Supabase CLI
 
-Monorepo for native iOS (Swift), Android (Kotlin), Web (React), Python server (FastAPI), and Supabase schema.
+[![Coverage Status](https://coveralls.io/repos/github/supabase/cli/badge.svg?branch=main)](https://coveralls.io/github/supabase/cli?branch=main) [![Bitbucket Pipelines](https://img.shields.io/bitbucket/pipelines/supabase-cli/setup-cli/master?style=flat-square&label=Bitbucket%20Canary)](https://bitbucket.org/supabase-cli/setup-cli/pipelines) [![Gitlab Pipeline Status](https://img.shields.io/gitlab/pipeline-status/sweatybridge%2Fsetup-cli?label=Gitlab%20Canary)
+](https://gitlab.com/sweatybridge/setup-cli/-/pipelines)
 
-## Structure
+[Supabase](https://supabase.io) is an open source Firebase alternative. We're building the features of Firebase using enterprise-grade open source tools.
 
-```
-ios/          # iOS app (Swift + XcodeGen)
-android/      # Android app (Kotlin)
-web/          # Web app (React + Vite)
-server/       # Backend server (Python + FastAPI)
-supabase/     # Database schema and migrations
-```
+This repository contains all the functionality for Supabase CLI.
 
-## Prerequisites
-- Node.js LTS, pnpm or npm
-- Python 3.11+ (for FastAPI server)
-- Android Studio / Xcode
-- Supabase CLI (for database management)
-- Heroku CLI (optional, for server deploy)
+- [x] Running Supabase locally
+- [x] Managing database migrations
+- [x] Creating and deploying Supabase Functions
+- [x] Generating types directly from your database schema
+- [x] Making authenticated HTTP requests to [Management API](https://supabase.com/docs/reference/api/introduction)
 
-## Quick Start
+## Getting started
 
-🚀 **NEW: Automated Setup Scripts Available!**
+### Install the CLI
 
-See **[QUICKSTART.md](QUICKSTART.md)** for the fastest way to get started.
-
-Or use the automated startup script:
-```bash
-# Setup .env files first (see QUICKSTART.md)
-./start-dev.sh  # Starts both backend and web client
-```
-
-### 1. Clone and Setup Environment
+Available via [NPM](https://www.npmjs.com) as dev dependency. To install:
 
 ```bash
-# Clone the repository
-git clone <repository-url>
-cd itl
-
-# Copy environment files
-cp server/env.example server/.env
-cp web/env.example web/.env
-# Edit .env files with your Supabase credentials
+npm i supabase --save-dev
 ```
 
-### 2. Supabase Setup
+To install the beta release channel:
 
-This project uses **Supabase Cloud** database. The database and migrations are already set up.
-
-For local development with Supabase:
 ```bash
-# Start local Supabase (optional)
-supabase start
-
-# Apply migrations to local instance
-supabase db reset
+npm i supabase@beta --save-dev
 ```
 
-See `supabase/README.md` for more details about database schema and migrations.
+When installing with yarn 4, you need to disable experimental fetch with the following nodejs config.
 
-### 3. Start Development Servers
+```
+NODE_OPTIONS=--no-experimental-fetch yarn add supabase
+```
 
-**Web App:**
+> **Note**
+For Bun versions below v1.0.17, you must add `supabase` as a [trusted dependency](https://bun.sh/guides/install/trusted) before running `bun add -D supabase`.
+
+<details>
+  <summary><b>macOS</b></summary>
+
+  Available via [Homebrew](https://brew.sh). To install:
+
+  ```sh
+  brew install supabase/tap/supabase
+  ```
+
+  To install the beta release channel:
+  
+  ```sh
+  brew install supabase/tap/supabase-beta
+  brew link --overwrite supabase-beta
+  ```
+  
+  To upgrade:
+
+  ```sh
+  brew upgrade supabase
+  ```
+</details>
+
+<details>
+  <summary><b>Windows</b></summary>
+
+  Available via [Scoop](https://scoop.sh). To install:
+
+  ```powershell
+  scoop bucket add supabase https://github.com/supabase/scoop-bucket.git
+  scoop install supabase
+  ```
+
+  To upgrade:
+
+  ```powershell
+  scoop update supabase
+  ```
+</details>
+
+<details>
+  <summary><b>Linux</b></summary>
+
+  Available via [Homebrew](https://brew.sh) and Linux packages.
+
+  #### via Homebrew
+
+  To install:
+
+  ```sh
+  brew install supabase/tap/supabase
+  ```
+
+  To upgrade:
+
+  ```sh
+  brew upgrade supabase
+  ```
+
+  #### via Linux packages
+
+  Linux packages are provided in [Releases](https://github.com/supabase/cli/releases). To install, download the `.apk`/`.deb`/`.rpm`/`.pkg.tar.zst` file depending on your package manager and run the respective commands.
+
+  ```sh
+  sudo apk add --allow-untrusted <...>.apk
+  ```
+
+  ```sh
+  sudo dpkg -i <...>.deb
+  ```
+
+  ```sh
+  sudo rpm -i <...>.rpm
+  ```
+
+  ```sh
+  sudo pacman -U <...>.pkg.tar.zst
+  ```
+</details>
+
+<details>
+  <summary><b>Other Platforms</b></summary>
+
+  You can also install the CLI via [go modules](https://go.dev/ref/mod#go-install) without the help of package managers.
+
+  ```sh
+  go install github.com/supabase/cli@latest
+  ```
+
+  Add a symlink to the binary in `$PATH` for easier access:
+
+  ```sh
+  ln -s "$(go env GOPATH)/bin/cli" /usr/bin/supabase
+  ```
+
+  This works on other non-standard Linux distros.
+</details>
+
+<details>
+  <summary><b>Community Maintained Packages</b></summary>
+
+  Available via [pkgx](https://pkgx.sh/). Package script [here](https://github.com/pkgxdev/pantry/blob/main/projects/supabase.com/cli/package.yml).
+  To install in your working directory:
+
+  ```bash
+  pkgx install supabase
+  ```
+
+  Available via [Nixpkgs](https://nixos.org/). Package script [here](https://github.com/NixOS/nixpkgs/blob/master/pkgs/development/tools/supabase-cli/default.nix).
+</details>
+
+### Run the CLI
+
 ```bash
-cd web
-npm install
-npm run dev
-# Access at http://localhost:5173
+supabase bootstrap
 ```
 
-**Backend Server:**
+Or using npx:
+
 ```bash
-cd server
-./run-dev.sh
-# Server runs on http://localhost:8080
+npx supabase bootstrap
 ```
 
-**Mobile Apps:**
-- **Android**: Open `android/` in Android Studio
-- **iOS**: Generate Xcode project with `cd ios && xcodegen` then open in Xcode
+The bootstrap command will guide you through the process of setting up a Supabase project using one of the [starter](https://github.com/supabase-community/supabase-samples/blob/main/samples.json) templates.
 
-## Environment Variables
+## Docs
 
-Each component has its own `.env` file:
+Command & config reference can be found [here](https://supabase.com/docs/reference/cli/about).
 
-- **Root** (`/.env`): General Supabase configuration
-- **Server** (`/server/.env`): Backend API configuration
-- **Web** (`/web/.env`): Frontend configuration (uses `VITE_` prefix)
+## Breaking changes
 
-All `.env.example` files contain the required variables.
+We follow semantic versioning for changes that directly impact CLI commands, flags, and configurations.
 
-## Database
+However, due to dependencies on other service images, we cannot guarantee that schema migrations, seed.sql, and generated types will always work for the same CLI major version. If you need such guarantees, we encourage you to pin a specific version of CLI in package.json.
 
-**Supabase Project:**
-- Project: ITL
-- Region: East US (North Virginia)
-- API URL: `https://sjrfppeisxmglrozufoy.supabase.co`
+## Developing
 
-**Schema:**
-- `documents` table: PDF metadata and upload tracking
-- `document_chunks` table: Text chunks with vector embeddings for RAG
-- `pdfs` storage bucket: Private PDF file storage
+To run from source:
 
-## Tech Stack
-
-- **Frontend**: React 18, TypeScript, Vite
-- **Backend**: Python, FastAPI, SQLAlchemy
-- **Database**: Supabase (PostgreSQL + pgvector)
-- **Mobile**: Swift (iOS), Kotlin (Android)
-- **Storage**: Supabase Storage
-
-## Project Details
-
-Per-project documentation:
-- [Supabase Setup](supabase/README.md)
-- [Server](server/README.md)
-- [Web](web/README.md)
-- [iOS](ios/README.md)
-- [Android](android/README.md)
+```sh
+# Go >= 1.22
+go run . help
+```
