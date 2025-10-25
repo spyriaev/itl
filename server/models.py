@@ -124,3 +124,24 @@ class ThreadWithMessagesResponse(BaseModel):
     class Config:
         from_attributes = True
         populate_by_name = True
+
+# Page questions related models
+class PageQuestionResponse(BaseModel):
+    id: str
+    threadId: str
+    threadTitle: str
+    content: str
+    createdAt: str
+    
+    class Config:
+        from_attributes = True
+        populate_by_name = True
+
+class PageQuestionsResponse(BaseModel):
+    pageNumber: int
+    totalQuestions: int
+    questions: List[PageQuestionResponse]
+    
+    class Config:
+        from_attributes = True
+        populate_by_name = True

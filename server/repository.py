@@ -6,7 +6,8 @@ from datetime import datetime
 from models import (
     Document, CreateDocumentRequest, DocumentResponse,
     ChatThread, ChatMessage, CreateThreadRequest, ThreadResponse,
-    CreateMessageRequest, MessageResponse, ThreadWithMessagesResponse
+    CreateMessageRequest, MessageResponse, ThreadWithMessagesResponse,
+    PageQuestionResponse, PageQuestionsResponse
 )
 
 def create_document(db: Session, request: CreateDocumentRequest, user_id: str) -> DocumentResponse:
@@ -210,3 +211,53 @@ def update_thread_title(db: Session, thread_id: str, user_id: str, title: str) -
         return True
     except ValueError:
         return False
+
+def get_page_questions(db: Session, document_id: str, page_number: int, user_id: str, limit: int = 3) -> PageQuestionsResponse:
+    """Get user questions asked on a specific page"""
+    try:
+        doc_uuid = uuid.UUID(document_id)
+        user_uuid = uuid.UUID(user_id)
+        
+        # Get total count of user messages for this page
+        total_count = db.query(ChatMessage)\
+            .join(ChatThread)\
+            .filter(ChatThread.document_id == doc_uuid)\
+            .filter(ChatThread.user_id == user_uuid)\
+            .filter(ChatMessage.page_context == page_number)\
+            .filter(ChatMessage.role == 'user')\
+            .count()
+        
+        # Get limited number of questions with thread info
+        messages_with_threads = db.query(ChatMessage, ChatThread)\
+            .join(ChatThread, ChatMessage.thread_id == ChatThread.id)\
+            .filter(ChatThread.document_id == doc_uuid)\
+            .filter(ChatThread.user_id == user_uuid)\
+            .filter(ChatMessage.page_context == page_number)\
+            .filter(ChatMessage.role == 'user')\
+            .order_by(desc(ChatMessage.created_at))\
+            .limit(limit)\
+            .all()
+        
+        questions = [
+            PageQuestionResponse(
+                id=str(msg.id),
+                threadId=str(thread.id),
+                threadTitle=thread.title,
+                content=msg.content,
+                createdAt=msg.created_at.isoformat()
+            )
+            for msg, thread in messages_with_threads
+        ]
+        
+        return PageQuestionsResponse(
+            pageNumber=page_number,
+            totalQuestions=total_count,
+            questions=questions
+        )
+    except ValueError:
+        # If UUIDs are invalid, return empty response
+        return PageQuestionsResponse(
+            pageNumber=page_number,
+            totalQuestions=0,
+            questions=[]
+        )

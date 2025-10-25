@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { Document, Page, pdfjs } from 'react-pdf'
 import { getDocumentViewUrl, updateViewProgress, DocumentViewInfo } from '../../services/uploadService'
-import { ChatProvider } from '../../contexts/ChatContext'
+import { chatService, PageQuestionsData } from '../../services/chatService'
+import { ChatProvider, useChat } from '../../contexts/ChatContext'
 import { ChatPanel } from './ChatPanel'
+import { PageRelatedQuestions } from './PageRelatedQuestions'
 import 'react-pdf/dist/Page/AnnotationLayer.css'
 import 'react-pdf/dist/Page/TextLayer.css'
 
@@ -14,7 +16,7 @@ interface PdfViewerProps {
   onClose: () => void
 }
 
-export function PdfViewer({ documentId, onClose }: PdfViewerProps) {
+function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
   const [documentInfo, setDocumentInfo] = useState<DocumentViewInfo | null>(null)
   const [numPages, setNumPages] = useState<number>(0)
   const [currentPage, setCurrentPage] = useState<number>(1)
@@ -24,10 +26,14 @@ export function PdfViewer({ documentId, onClose }: PdfViewerProps) {
   const [continuousScroll, setContinuousScroll] = useState<boolean>(true) // По умолчанию включен непрерывный режим
   const [isChatVisible, setIsChatVisible] = useState<boolean>(false)
   const [isMobile, setIsMobile] = useState<boolean>(window.innerWidth < 768)
+  const [pageQuestionsMap, setPageQuestionsMap] = useState<Map<number, PageQuestionsData>>(new Map())
   
   // Refs для отслеживания скролла
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const pageRefs = useRef<(HTMLDivElement | null)[]>([])
+  
+  // Get chat context for navigation
+  const { navigateToMessage } = useChat()
 
   // Load document info
   useEffect(() => {
@@ -82,6 +88,39 @@ export function PdfViewer({ documentId, onClose }: PdfViewerProps) {
       scrollToPage(currentPage)
     }, 200)
   }
+
+  // Fetch page questions for all pages after document loads
+  useEffect(() => {
+    if (!documentId || numPages === 0) return
+
+    const fetchAllPageQuestions = async () => {
+      const questionsMap = new Map<number, PageQuestionsData>()
+      
+      // Fetch questions for each page
+      for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+        try {
+          const questionsData = await chatService.getPageQuestions(documentId, pageNum)
+          if (questionsData.totalQuestions > 0) {
+            questionsMap.set(pageNum, questionsData)
+          }
+        } catch (err) {
+          console.error(`Failed to fetch questions for page ${pageNum}:`, err)
+        }
+      }
+      
+      setPageQuestionsMap(questionsMap)
+    }
+
+    fetchAllPageQuestions()
+  }, [documentId, numPages])
+
+  // Handle question click - open chat panel and navigate to message
+  const handleQuestionClick = useCallback((threadId: string, messageId: string) => {
+    if (!isChatVisible) {
+      setIsChatVisible(true)
+    }
+    navigateToMessage(threadId, messageId)
+  }, [isChatVisible, navigateToMessage])
 
   // Функция для прокрутки к определенной странице
   const scrollToPage = useCallback((pageNumber: number) => {
@@ -598,6 +637,12 @@ export function PdfViewer({ documentId, onClose }: PdfViewerProps) {
                     }}>
                       Page {index + 1} of {numPages}
                     </div>
+                    
+                    {/* Related questions for this page */}
+                    <PageRelatedQuestions
+                      questionsData={pageQuestionsMap.get(index + 1) || null}
+                      onQuestionClick={handleQuestionClick}
+                    />
                   </div>
                 ))
               ) : (
@@ -639,16 +684,23 @@ export function PdfViewer({ documentId, onClose }: PdfViewerProps) {
         </div>
 
         {/* Chat Panel */}
-        <ChatProvider>
-          <ChatPanel
-            documentId={documentId}
-            currentPage={currentPage}
-            isVisible={isChatVisible}
-            onToggle={() => setIsChatVisible(!isChatVisible)}
-            isMobile={isMobile}
-          />
-        </ChatProvider>
+        <ChatPanel
+          documentId={documentId}
+          currentPage={currentPage}
+          isVisible={isChatVisible}
+          onToggle={() => setIsChatVisible(!isChatVisible)}
+          isMobile={isMobile}
+        />
       </div>
     </div>
+  )
+}
+
+// Wrap with ChatProvider
+export function PdfViewer(props: PdfViewerProps) {
+  return (
+    <ChatProvider>
+      <PdfViewerContent {...props} />
+    </ChatProvider>
   )
 }

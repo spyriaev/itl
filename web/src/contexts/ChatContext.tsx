@@ -9,6 +9,7 @@ interface ChatContextType {
   isLoading: boolean
   isStreaming: boolean
   error: string | null
+  targetMessageId: string | null
   
   // Actions
   loadThreads: (documentId: string) => Promise<void>
@@ -16,6 +17,7 @@ interface ChatContextType {
   createNewThread: (documentId: string, title?: string) => Promise<ChatThread>
   sendMessage: (content: string, pageContext?: number) => Promise<void>
   startNewConversation: (documentId: string, firstMessage: string, pageContext?: number) => Promise<void>
+  navigateToMessage: (threadId: string, messageId: string) => Promise<void>
   clearError: () => void
 }
 
@@ -32,6 +34,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [isStreaming, setIsStreaming] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [targetMessageId, setTargetMessageId] = useState<string | null>(null)
 
   const clearError = useCallback(() => {
     setError(null)
@@ -208,6 +211,26 @@ export function ChatProvider({ children }: ChatProviderProps) {
     }
   }, [])
 
+  const navigateToMessage = useCallback(async (threadId: string, messageId: string) => {
+    try {
+      setIsLoading(true)
+      setError(null)
+      const threadWithMessages = await chatService.getThreadMessages(threadId)
+      setActiveThread(threadWithMessages)
+      setMessages(threadWithMessages.messages)
+      setTargetMessageId(messageId)
+      
+      // Clear target message after a delay to allow scroll animation
+      setTimeout(() => {
+        setTargetMessageId(null)
+      }, 3000)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to navigate to message')
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
+
   const contextValue: ChatContextType = {
     activeThread,
     messages,
@@ -215,11 +238,13 @@ export function ChatProvider({ children }: ChatProviderProps) {
     isLoading,
     isStreaming,
     error,
+    targetMessageId,
     loadThreads,
     selectThread,
     createNewThread,
     sendMessage,
     startNewConversation,
+    navigateToMessage,
     clearError,
   }
 

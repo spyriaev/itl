@@ -19,6 +19,7 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
     isLoading,
     isStreaming,
     error,
+    targetMessageId,
     loadThreads,
     selectThread,
     createNewThread,
@@ -31,6 +32,7 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
   const [isComposing, setIsComposing] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const messageRefs = useRef<Map<string, HTMLDivElement>>(new Map())
 
   // Load threads when document changes
   useEffect(() => {
@@ -39,10 +41,24 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
     }
   }, [documentId, loadThreads])
 
-  // Auto-scroll to bottom when new messages arrive
+  // Auto-scroll to bottom when new messages arrive or scroll to target message
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+    if (targetMessageId) {
+      // Scroll to specific message
+      const targetElement = messageRefs.current.get(targetMessageId)
+      if (targetElement) {
+        targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        // Add highlight animation
+        targetElement.style.animation = 'highlight 2s ease-out'
+        setTimeout(() => {
+          targetElement.style.animation = ''
+        }, 2000)
+      }
+    } else {
+      // Normal auto-scroll to bottom
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [messages, targetMessageId])
 
   // Focus input when panel becomes visible
   useEffect(() => {
@@ -255,7 +271,17 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
         ) : (
           <>
             {messages.map((message) => (
-              <div key={message.id} className="message-enter">
+              <div 
+                key={message.id} 
+                className="message-enter"
+                ref={(el) => {
+                  if (el) {
+                    messageRefs.current.set(message.id, el)
+                  } else {
+                    messageRefs.current.delete(message.id)
+                  }
+                }}
+              >
                 <ChatMessage message={message} />
               </div>
             ))}
@@ -417,6 +443,15 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
         
         .message-enter {
           animation: fadeIn 0.3s ease-out;
+        }
+        
+        @keyframes highlight {
+          0% {
+            background-color: #FEF3C7;
+          }
+          100% {
+            background-color: transparent;
+          }
         }
       `}</style>
     </div>

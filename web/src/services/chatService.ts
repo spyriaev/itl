@@ -37,6 +37,20 @@ export interface StreamEvent {
   error?: string
 }
 
+export interface PageQuestion {
+  id: string
+  threadId: string
+  threadTitle: string
+  content: string
+  createdAt: string
+}
+
+export interface PageQuestionsData {
+  pageNumber: number
+  totalQuestions: number
+  questions: PageQuestion[]
+}
+
 class ChatService {
   private async getAuthHeaders(): Promise<HeadersInit> {
     const { data: { session } } = await supabase.auth.getSession()
@@ -177,6 +191,22 @@ class ChatService {
     )
 
     return thread
+  }
+
+  async getPageQuestions(documentId: string, pageNumber: number): Promise<PageQuestionsData> {
+    const response = await fetch(
+      `${API_BASE_URL}/api/documents/${documentId}/pages/${pageNumber}/questions`,
+      {
+        method: 'GET',
+        headers: await this.getAuthHeaders(),
+      }
+    )
+
+    if (!response.ok) {
+      throw new Error(`Failed to get page questions: ${response.statusText}`)
+    }
+
+    return response.json()
   }
 }
 

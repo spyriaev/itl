@@ -14,12 +14,12 @@ from auth import get_current_user_id
 from models import (
     CreateDocumentRequest, DocumentResponse, Base, UpdateProgressRequest,
     CreateThreadRequest, ThreadResponse, CreateMessageRequest, MessageResponse,
-    ThreadWithMessagesResponse, Document, ChatThread
+    ThreadWithMessagesResponse, Document, ChatThread, PageQuestionsResponse
 )
 from repository import (
     create_document, list_documents, get_document_by_id, update_document_progress,
     create_chat_thread, list_chat_threads, get_chat_thread_with_messages,
-    create_chat_message, update_thread_title
+    create_chat_message, update_thread_title, get_page_questions
 )
 from ai_service import ai_service
 
@@ -295,6 +295,31 @@ async def list_chat_threads_endpoint(
         )
     
     return list_chat_threads(db, document_id, user_id)
+
+@app.get("/api/documents/{document_id}/pages/{page_number}/questions", response_model=PageQuestionsResponse)
+async def get_page_questions_endpoint(
+    document_id: str,
+    page_number: int,
+    user_id: str = Depends(get_current_user_id),
+    db: Session = Depends(get_db)
+):
+    """Get questions asked on a specific page of a document"""
+    # Check database connectivity
+    if not test_database_connection():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database not available"
+        )
+    
+    # Verify document exists and belongs to user
+    document = get_document_by_id(db, document_id, user_id)
+    if not document:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found"
+        )
+    
+    return get_page_questions(db, document_id, page_number, user_id, limit=3)
 
 @app.get("/api/chat/threads/{thread_id}/messages", response_model=ThreadWithMessagesResponse)
 async def get_chat_thread_messages(
