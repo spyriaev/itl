@@ -386,18 +386,69 @@ async def send_chat_message(
         )
     
     # Get context type and chapter info
-    context_type = request.contextType or "page"
+    # If contextType is None/undefined, use "none" to skip context entirely
+    context_type = request.contextType if request.contextType is not None else None
     chapter_id = request.chapterId
+    
+    # Determine if we should use context at all
+    # None means "no context", so we need to check if it's explicitly "none" or None
+    use_context = request.pageContext is not None or (context_type and context_type != "none")
     
     # Save user message with context info
     user_message = create_chat_message(
         db, thread_id, "user", request.content, 
         page_context=request.pageContext,
-        context_type=context_type,
+        context_type=context_type or "none",
         chapter_id=chapter_id
     )
     
-    # Get document view URL for AI context
+    # Prepare messages for AI (excluding the just-added user message)
+    ai_messages = [
+        {"role": msg.role, "content": msg.content}
+        for msg in thread_with_messages.messages
+    ]
+    
+    # Add the new user message
+    ai_messages.append({"role": "user", "content": request.content})
+    
+    # If use_context is False, don't add any context to AI
+    if not use_context:
+        async def generate_response():
+            """Generate streaming response without document context"""
+            assistant_content = ""
+            
+            try:
+                # Stream AI response without PDF context
+                async for chunk in ai_service.generate_response_stream_no_context(ai_messages):
+                    assistant_content += chunk
+                    yield f"data: {json.dumps({'type': 'chunk', 'content': chunk})}\n\n"
+                
+                # Save complete assistant message
+                assistant_message = create_chat_message(
+                    db, thread_id, "assistant", assistant_content, 
+                    page_context=None,
+                    context_type="none",
+                    chapter_id=None
+                )
+                
+                # Send completion signal
+                yield f"data: {json.dumps({'type': 'complete', 'messageId': assistant_message.id})}\n\n"
+                
+            except Exception as e:
+                # Send error signal
+                yield f"data: {json.dumps({'type': 'error', 'error': str(e)})}\n\n"
+        
+        return StreamingResponse(
+            generate_response(),
+            media_type="text/plain",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "Content-Type": "text/event-stream",
+            }
+        )
+    
+    # Get document view URL for AI context (only if we're using context)
     try:
         if not supabase:
             raise HTTPException(
@@ -424,15 +475,6 @@ async def send_chat_message(
             detail=f"Failed to create signed URL: {str(e)}"
         )
     
-    # Prepare messages for AI (excluding the just-added user message)
-    ai_messages = [
-        {"role": msg.role, "content": msg.content}
-        for msg in thread_with_messages.messages
-    ]
-    
-    # Add the new user message
-    ai_messages.append({"role": "user", "content": request.content})
-    
     # Get current page context (use request pageContext or document's last viewed page)
     current_page = request.pageContext or document.last_viewed_page or 1
     
@@ -453,7 +495,7 @@ async def send_chat_message(
     total_pages = 100  # Default fallback
     
     async def generate_response():
-        """Generate streaming response"""
+        """Generate streaming response with context"""
         assistant_content = ""
         
         try:

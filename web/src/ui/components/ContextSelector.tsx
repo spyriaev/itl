@@ -4,12 +4,12 @@ import { ChapterInfo, DocumentStructureItem } from '../../types/document'
 interface ContextSelectorProps {
   contextItems: DocumentStructureItem[]
   currentPage: number
-  selectedLevel: number | null
-  onChange: (level: number | null) => void
+  selectedLevel: number | null | 'none'
+  onChange: (level: number | null | 'none') => void
   disabled?: boolean
 }
 
-type ContextType = 'page' | number
+type ContextType = 'page' | number | 'none'
 
 export function ContextSelector({
   contextItems,
@@ -19,7 +19,7 @@ export function ContextSelector({
   disabled = false
 }: ContextSelectorProps) {
   const getSelectedItem = () => {
-    if (selectedLevel === null) return null
+    if (selectedLevel === null || selectedLevel === 'none') return null
     return contextItems.find(item => item.level === selectedLevel) || null
   }
 
@@ -42,8 +42,17 @@ export function ContextSelector({
           Context:
         </span>
         <select
-          value={selectedLevel || ''}
-          onChange={(e) => onChange(e.target.value === '' ? null : parseInt(e.target.value))}
+          value={selectedLevel === 'none' ? 'none' : (selectedLevel || '')}
+          onChange={(e) => {
+            const value = e.target.value
+            if (value === '') {
+              onChange(null)
+            } else if (value === 'none') {
+              onChange('none')
+            } else {
+              onChange(parseInt(value))
+            }
+          }}
           disabled={disabled}
           style={{
             flex: 1,
@@ -59,6 +68,9 @@ export function ContextSelector({
             textOverflow: 'ellipsis',
           }}
         >
+          <option value="none" style={{ whiteSpace: 'nowrap' }}>
+            None
+          </option>
           <option value="" style={{ whiteSpace: 'nowrap' }}>
             Current Page
           </option>
@@ -69,7 +81,18 @@ export function ContextSelector({
           ))}
         </select>
       </div>
-      {selectedLevel === null ? (
+      {selectedLevel === 'none' ? (
+        <div style={{ 
+          fontSize: 11, 
+          color: '#6B7280',
+          marginTop: 4,
+          paddingLeft: 4,
+        }}>
+          <span style={{ fontSize: 10 }}>
+            No context
+          </span>
+        </div>
+      ) : selectedLevel === null ? (
         <div style={{ 
           fontSize: 11, 
           color: '#6B7280',

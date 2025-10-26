@@ -160,40 +160,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
       setIsStreaming(true)
       setError(null)
 
-      // Create thread and send first message
-      const newThread = await chatService.startNewConversation(
-        documentId,
-        firstMessage,
-        pageContext,
-        contextType,
-        chapterId,
-        (chunk) => {
-          // Handle streaming for new conversation
-          setMessages(prev => {
-            const lastMessage = prev[prev.length - 1]
-            if (lastMessage && lastMessage.role === 'assistant') {
-              return prev.map(msg => 
-                msg.id === lastMessage.id 
-                  ? { ...msg, content: msg.content + chunk }
-                  : msg
-              )
-            }
-            return prev
-          })
-        },
-        (messageId) => {
-          setIsStreaming(false)
-        },
-        (error) => {
-          setError(error)
-          setIsStreaming(false)
-        }
-      )
-
-      setActiveThread(newThread)
-      setThreads(prev => [newThread, ...prev])
-      
-      // Add messages to state
+      // Add messages to state FIRST before streaming starts
       const userMessage: ChatMessage = {
         id: `temp-user-${Date.now()}`,
         role: 'user',
@@ -204,8 +171,9 @@ export function ChatProvider({ children }: ChatProviderProps) {
         createdAt: new Date().toISOString()
       }
       
+      const assistantMessageId = `temp-assistant-${Date.now()}`
       const assistantMessage: ChatMessage = {
-        id: `temp-assistant-${Date.now()}`,
+        id: assistantMessageId,
         role: 'assistant',
         content: '',
         pageContext,
@@ -215,6 +183,41 @@ export function ChatProvider({ children }: ChatProviderProps) {
       }
       
       setMessages([userMessage, assistantMessage])
+
+      // Create thread and send first message
+      const newThread = await chatService.startNewConversation(
+        documentId,
+        firstMessage,
+        pageContext,
+        contextType,
+        chapterId,
+        (chunk) => {
+          // Handle streaming for new conversation
+          setMessages(prev => prev.map(msg => 
+            msg.id === assistantMessageId 
+              ? { ...msg, content: msg.content + chunk }
+              : msg
+          ))
+        },
+        (messageId) => {
+          // Replace temp message with real message
+          setMessages(prev => prev.map(msg => 
+            msg.id === assistantMessageId 
+              ? { ...msg, id: messageId }
+              : msg
+          ))
+          setIsStreaming(false)
+        },
+        (error) => {
+          setError(error)
+          setIsStreaming(false)
+          // Remove the failed assistant message
+          setMessages(prev => prev.filter(msg => msg.id !== assistantMessageId))
+        }
+      )
+
+      setActiveThread(newThread)
+      setThreads(prev => [newThread, ...prev])
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to start conversation')
       setIsStreaming(false)

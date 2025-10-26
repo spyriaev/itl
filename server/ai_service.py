@@ -175,6 +175,82 @@ class AIService:
         
         return sorted(list(pages))
     
+    async def generate_response_stream_no_context(
+        self, 
+        messages: List[dict]
+    ) -> AsyncGenerator[str, None]:
+        """Generate streaming response from AI API without PDF context"""
+        try:
+            # Build simple system message without PDF context
+            system_message = {
+                "role": "system",
+                "content": """You are an AI assistant helping users with general questions. 
+                
+You do not have access to any PDF document context. Answer questions to the best of your knowledge."""
+            }
+            
+            # Prepare messages for API
+            api_messages = [system_message] + messages
+            
+            # Initialize client for GigaChat if needed
+            if self.provider == "gigachat":
+                try:
+                    access_token = await self.get_gigachat_token()
+                    # Use the correct GigaChat API endpoint
+                    api_base = os.getenv("GIGACHAT_API_BASE", "https://gigachat.devices.sberbank.ru/api/v1")
+                    
+                    self.client = AsyncOpenAI(
+                        api_key=access_token,
+                        base_url=api_base,
+                        http_client=httpx.AsyncClient(
+                            verify=False,  # Disable SSL verification for GigaChat
+                            timeout=httpx.Timeout(30.0)  # 30 second timeout
+                        )
+                    )
+                    
+                    logger.info("GigaChat client initialized successfully")
+                except Exception as token_error:
+                    logger.error(f"Failed to get GigaChat token: {token_error}")
+                    yield f"❌ **GigaChat Error**: Failed to get access token. Please check your GIGACHAT_AUTH_KEY."
+                    return
+            
+            # Stream response from AI provider
+            stream = await self.client.chat.completions.create(
+                model=self.model_name,
+                messages=api_messages,
+                stream=True,
+                temperature=0.7,
+                max_tokens=2000
+            )
+            
+            async for chunk in stream:
+                if chunk.choices[0].delta.content:
+                    yield chunk.choices[0].delta.content
+                    
+        except Exception as e:
+            logger.error(f"Error generating AI response: {e}")
+            
+            # Handle specific API errors
+            if "Insufficient Balance" in str(e) or "402" in str(e):
+                if self.provider == "deepseek":
+                    yield "❌ **API Error**: Insufficient balance on your DeepSeek account. Please:\n\n1. Check your DeepSeek account balance at https://platform.deepseek.com\n2. Add credits to your account\n3. Verify your API key is correct\n\nIf you need a new API key, get one from https://platform.deepseek.com/api_keys"
+                else:
+                    yield "❌ **API Error**: Insufficient balance on your GigaChat account. Please:\n\n1. Check your GigaChat account balance at https://developers.sber.ru\n2. Add credits to your account\n3. Verify your API key is correct"
+            elif "401" in str(e) or "Unauthorized" in str(e):
+                if self.provider == "deepseek":
+                    yield "❌ **API Error**: Invalid DeepSeek API key. Please check your `DEEPSEEK_API_KEY` in the server configuration."
+                else:
+                    yield "❌ **API Error**: Invalid GigaChat authorization key. Please check your `GIGACHAT_AUTH_KEY` in the server configuration."
+            elif "429" in str(e) or "rate limit" in str(e).lower():
+                yield "❌ **API Error**: Rate limit exceeded. Please wait a moment and try again."
+            elif "Connection error" in str(e) or "connection" in str(e).lower():
+                if self.provider == "gigachat":
+                    yield "❌ **Connection Error**: Unable to connect to GigaChat API. This might be due to:\n\n1. Network connectivity issues\n2. GigaChat API server maintenance\n3. Firewall or proxy restrictions\n\nPlease try again in a few moments."
+                else:
+                    yield f"❌ **Connection Error**: {str(e)}"
+            else:
+                yield f"❌ **Error**: {str(e)}"
+    
     async def generate_response_stream(
         self, 
         messages: List[dict], 

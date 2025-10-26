@@ -33,11 +33,11 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
 
   const [inputValue, setInputValue] = useState('')
   const [isComposing, setIsComposing] = useState(false)
-  const [selectedLevel, setSelectedLevel] = useState<number | null>(null)
+  const [selectedLevel, setSelectedLevel] = useState<number | null | 'none'>(null)
   const [chapterInfo, setChapterInfo] = useState<ChapterInfo | null>(null)
   const [documentStructure, setDocumentStructure] = useState<any>(null)
   const [contextItems, setContextItems] = useState<DocumentStructureItem[]>([])
-  const userSelectionRef = useRef<number | null>(null)
+  const userSelectionRef = useRef<number | null | 'none'>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const messageRefs = useRef<Map<string, HTMLDivElement>>(new Map())
@@ -135,7 +135,8 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
   }
 
   // Track user manual selection changes in ContextSelector
-  const handleContextChange = useCallback((level: number | null) => {
+  const handleContextChange = useCallback((level: number | null | 'none') => {
+    console.log('User selected level:', level)
     userSelectionRef.current = level
     setSelectedLevel(level)
   }, [])
@@ -160,11 +161,13 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
           pageTo: deepestItem.pageTo
         })
         
-        // Only update selectedLevel if the user hasn't manually chosen "Current Page"
-        if (selectedLevel !== null) {
-          // User selected a section, update to new section
+        // Don't auto-change user's selection if they chose 'none' or 'null'
+        // Only auto-update if user previously selected a section
+        if (selectedLevel !== null && selectedLevel !== 'none') {
+          // User previously selected a section, update to new section level
           setSelectedLevel(deepestItem.level)
         }
+        // If selectedLevel is null or 'none', don't change it - let user choose manually
       } else {
         setChapterInfo(null)
         setContextItems([])
@@ -182,8 +185,22 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
     setInputValue('')
 
     // Determine context type and chapter ID based on selected level
+    if (selectedLevel === 'none') {
+      // Send without any context
+      try {
+        if (activeThread) {
+          await sendMessage(message, undefined, undefined, undefined)
+        } else {
+          await startNewConversation(documentId, message, undefined, undefined, undefined)
+        }
+      } catch (err) {
+        console.error('Failed to send message:', err)
+      }
+      return
+    }
+
     const selectedItem = contextItems.find(item => item.level === selectedLevel)
-    const contextType = selectedLevel === null ? 'page' : 'section' // TODO: make this dynamic
+    const contextType = selectedLevel === null ? 'page' : 'section'
     const chapterId = selectedItem?.id
 
     try {

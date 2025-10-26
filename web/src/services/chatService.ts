@@ -193,7 +193,7 @@ class ChatService {
       { 
         content: firstMessage, 
         pageContext,
-        contextType: contextType || 'page',
+        contextType,
         chapterId
       },
       onChunk,
