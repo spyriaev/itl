@@ -27,6 +27,8 @@ class Document(Base):
     
     # Relationship to chat threads
     chat_threads = relationship("ChatThread", back_populates="document", cascade="all, delete-orphan")
+    # Relationship to document structure
+    structure = relationship("DocumentStructure", back_populates="document", cascade="all, delete-orphan")
 
 class ChatThread(Base):
     __tablename__ = "chat_threads"
@@ -50,10 +52,13 @@ class ChatMessage(Base):
     role = Column(Text, nullable=False)  # 'user' or 'assistant'
     content = Column(Text, nullable=False)
     page_context = Column(Integer, nullable=True)  # Page number when message was sent
+    chapter_id = Column(UUID(as_uuid=True), ForeignKey("document_structure.id", ondelete="SET NULL"), nullable=True)
+    context_type = Column(Text, default="page")  # 'page', 'chapter', 'section', 'document'
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
-    # Relationship
+    # Relationships
     thread = relationship("ChatThread", back_populates="messages")
+    chapter = relationship("DocumentStructure", foreign_keys=[chapter_id])
 
 # Pydantic models for API requests/responses
 class CreateDocumentRequest(BaseModel):
@@ -99,6 +104,8 @@ class ThreadResponse(BaseModel):
 class CreateMessageRequest(BaseModel):
     content: str
     pageContext: Optional[int] = Field(None, alias="pageContext")
+    contextType: Optional[str] = Field("page", alias="contextType")
+    chapterId: Optional[str] = Field(None, alias="chapterId")
     
     class Config:
         allow_population_by_field_name = True
@@ -108,11 +115,30 @@ class MessageResponse(BaseModel):
     role: str
     content: str
     pageContext: Optional[int] = None
+    contextType: Optional[str] = None
+    chapterId: Optional[str] = None
     createdAt: str
     
     class Config:
         from_attributes = True
         populate_by_name = True
+
+class DocumentStructure(Base):
+    __tablename__ = "document_structure"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    document_id = Column(UUID(as_uuid=True), ForeignKey("documents.id", ondelete="CASCADE"), nullable=False)
+    title = Column(Text, nullable=False)
+    level = Column(Integer, nullable=False, default=1)
+    page_from = Column(Integer, nullable=False)
+    page_to = Column(Integer, nullable=True)
+    parent_id = Column(UUID(as_uuid=True), ForeignKey("document_structure.id", ondelete="CASCADE"), nullable=True)
+    order_index = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    document = relationship("Document", back_populates="structure")
+    parent = relationship("DocumentStructure", remote_side=[id], backref="children")
 
 class ThreadWithMessagesResponse(BaseModel):
     id: str
@@ -145,3 +171,29 @@ class PageQuestionsResponse(BaseModel):
     class Config:
         from_attributes = True
         populate_by_name = True
+
+# Document structure related models
+class DocumentStructureItem(BaseModel):
+    id: str
+    title: str
+    level: int
+    pageFrom: int
+    pageTo: Optional[int]
+    parentId: Optional[str]
+    orderIndex: int
+    children: Optional[List['DocumentStructureItem']] = []
+    
+    class Config:
+        from_attributes = True
+        populate_by_name = True
+
+class DocumentStructureResponse(BaseModel):
+    documentId: str
+    items: List[DocumentStructureItem]
+    
+    class Config:
+        from_attributes = True
+        populate_by_name = True
+
+class ExtractStructureRequest(BaseModel):
+    force: bool = False

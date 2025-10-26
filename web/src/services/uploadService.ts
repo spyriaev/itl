@@ -1,4 +1,5 @@
 import { supabase, uploadPdfToStorage } from '../lib/supabase'
+import { extractDocumentStructure } from './documentService'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
 
@@ -163,7 +164,22 @@ export async function uploadPdfFile(
       checksum
     )
 
-    // Stage 4: Complete
+    // Stage 4: Extract document structure
+    onProgress?.({
+      stage: 'complete',
+      progress: 85,
+      message: 'Extracting document structure...',
+    })
+
+    // Extract document structure from PDF
+    try {
+      await extractDocumentStructure(metadata.id, false)
+    } catch (structureError) {
+      console.error('Failed to extract document structure:', structureError)
+      // Don't fail the upload if structure extraction fails
+    }
+
+    // Stage 5: Complete
     onProgress?.({
       stage: 'complete',
       progress: 100,

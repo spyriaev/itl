@@ -1,7 +1,10 @@
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { useChat } from '../../contexts/ChatContext'
 import { ChatMessage } from './ChatMessage'
 import { ThreadSelector } from './ThreadSelector'
+import { ContextSelector } from './ContextSelector'
+import { ContextType, ChapterInfo, DocumentStructureItem } from '../../types/document'
+import { getChapterForPage, getDocumentStructure } from '../../services/documentService'
 
 interface ChatPanelProps {
   documentId: string
@@ -30,9 +33,17 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
 
   const [inputValue, setInputValue] = useState('')
   const [isComposing, setIsComposing] = useState(false)
+  const [selectedLevel, setSelectedLevel] = useState<number | null>(null)
+  const [chapterInfo, setChapterInfo] = useState<ChapterInfo | null>(null)
+  const [documentStructure, setDocumentStructure] = useState<any>(null)
+  const [contextItems, setContextItems] = useState<DocumentStructureItem[]>([])
+  const userSelectionRef = useRef<number | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const messageRefs = useRef<Map<string, HTMLDivElement>>(new Map())
+  const prevMessagesLengthRef = useRef<number>(0)
+  const renderedMessageIdsRef = useRef<Set<string>>(new Set())
+  const prevTargetMessageIdRef = useRef<string | null>(null)
 
   // Load threads when document changes
   useEffect(() => {
@@ -41,8 +52,15 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
     }
   }, [documentId, loadThreads])
 
+  // Reset rendered messages when switching threads
+  useEffect(() => {
+    renderedMessageIdsRef.current.clear()
+  }, [activeThread?.id])
+
   // Auto-scroll to bottom when new messages arrive or scroll to target message
   useEffect(() => {
+    const wasNavigating = prevTargetMessageIdRef.current !== null
+    
     if (targetMessageId) {
       // Scroll to specific message
       const targetElement = messageRefs.current.get(targetMessageId)
@@ -54,10 +72,15 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
           targetElement.style.animation = ''
         }, 2000)
       }
-    } else {
-      // Normal auto-scroll to bottom
+    } else if (!wasNavigating && messages.length > prevMessagesLengthRef.current) {
+      // Only auto-scroll to bottom when new messages are added
+      // Don't scroll when targetMessageId was just cleared
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
     }
+    
+    // Update refs
+    prevMessagesLengthRef.current = messages.length
+    prevTargetMessageIdRef.current = targetMessageId
   }, [messages, targetMessageId])
 
   // Focus input when panel becomes visible
@@ -67,19 +90,109 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
     }
   }, [isVisible])
 
+  // Load document structure when document loads
+  useEffect(() => {
+    const loadStructure = async () => {
+      if (documentId) {
+        try {
+          const structure = await getDocumentStructure(documentId)
+          setDocumentStructure(structure)
+        } catch (error) {
+          console.error('Failed to load document structure:', error)
+        }
+      }
+    }
+
+    loadStructure()
+  }, [documentId])
+
+  // Find only the specific parent chain for the current page
+  const findContextItemsForPage = (items: DocumentStructureItem[], page: number): DocumentStructureItem[] => {
+    const path: DocumentStructureItem[] = []
+    
+    const findPath = (items: DocumentStructureItem[], page: number): boolean => {
+      for (const item of items) {
+        if (item.pageFrom <= page && (item.pageTo === null || page <= item.pageTo)) {
+          // Add to path if this item contains the page
+          path.push(item)
+          
+          // Try to find deeper items in children
+          if (item.children && item.children.length > 0) {
+            if (findPath(item.children, page)) {
+              return true
+            }
+          }
+          
+          // This is the deepest item on this branch, so stop
+          return true
+        }
+      }
+      return false
+    }
+    
+    findPath(items, page)
+    return path.sort((a, b) => a.level - b.level)
+  }
+
+  // Track user manual selection changes in ContextSelector
+  const handleContextChange = useCallback((level: number | null) => {
+    userSelectionRef.current = level
+    setSelectedLevel(level)
+  }, [])
+
+  // Load context items when page changes
+  useEffect(() => {
+    if (currentPage && documentStructure) {
+      const items = findContextItemsForPage(documentStructure.items, currentPage)
+      
+      // Only keep the deepest level item (the specific section containing the page)
+      const deepestItem = items.length > 0 ? items[items.length - 1] : null
+      
+      if (deepestItem) {
+        const previousItem = contextItems[0]
+        
+        setContextItems([deepestItem])
+        setChapterInfo({
+          id: deepestItem.id,
+          title: deepestItem.title,
+          level: deepestItem.level,
+          pageFrom: deepestItem.pageFrom,
+          pageTo: deepestItem.pageTo
+        })
+        
+        // Only update selectedLevel if the user hasn't manually chosen "Current Page"
+        if (selectedLevel !== null) {
+          // User selected a section, update to new section
+          setSelectedLevel(deepestItem.level)
+        }
+      } else {
+        setChapterInfo(null)
+        setContextItems([])
+        if (selectedLevel !== null) {
+          setSelectedLevel(null)
+        }
+      }
+    }
+  }, [currentPage, documentStructure, selectedLevel])
+
   const handleSendMessage = async () => {
     if (!inputValue.trim() || isStreaming) return
 
     const message = inputValue.trim()
     setInputValue('')
 
+    // Determine context type and chapter ID based on selected level
+    const selectedItem = contextItems.find(item => item.level === selectedLevel)
+    const contextType = selectedLevel === null ? 'page' : 'section' // TODO: make this dynamic
+    const chapterId = selectedItem?.id
+
     try {
       if (activeThread) {
         // Send message to existing thread
-        await sendMessage(message, currentPage)
+        await sendMessage(message, currentPage, contextType, chapterId)
       } else {
         // Start new conversation
-        await startNewConversation(documentId, message, currentPage)
+        await startNewConversation(documentId, message, currentPage, contextType, chapterId)
       }
     } catch (err) {
       console.error('Failed to send message:', err)
@@ -171,7 +284,7 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
           alignItems: 'center',
           gap: 8,
         }}>
-          🤖 AI Assistant
+          Assistant
         </h3>
         <button
           onClick={onToggle}
@@ -270,21 +383,35 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
           </div>
         ) : (
           <>
-            {messages.map((message) => (
-              <div 
-                key={message.id} 
-                className="message-enter"
-                ref={(el) => {
-                  if (el) {
-                    messageRefs.current.set(message.id, el)
-                  } else {
-                    messageRefs.current.delete(message.id)
-                  }
-                }}
-              >
-                <ChatMessage message={message} />
-              </div>
-            ))}
+            {messages.map((message) => {
+              const isNewMessage = !renderedMessageIdsRef.current.has(message.id)
+              const wasNavigating = prevTargetMessageIdRef.current !== null
+              
+              // Determine if message should have enter animation
+              // Don't animate if: already rendered OR navigating to a message when it was added
+              let shouldAnimate = false
+              if (isNewMessage) {
+                renderedMessageIdsRef.current.add(message.id)
+                // Only animate if not navigating
+                shouldAnimate = !wasNavigating
+              }
+              
+              return (
+                <div 
+                  key={message.id} 
+                  className={shouldAnimate ? "message-enter" : ""}
+                  ref={(el) => {
+                    if (el) {
+                      messageRefs.current.set(message.id, el)
+                    } else {
+                      messageRefs.current.delete(message.id)
+                    }
+                  }}
+                >
+                  <ChatMessage message={message} />
+                </div>
+              )
+            })}
             
             {/* Loading indicator */}
             {isStreaming && (
@@ -390,20 +517,17 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
           </button>
         </div>
         
-        {/* Page context indicator */}
-        {currentPage && (
-          <div style={{
-            marginTop: 8,
-            fontSize: 12,
-            color: '#6B7280',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 4,
-          }}>
-            <span>📄</span>
-            <span>Context: Page {currentPage}</span>
-          </div>
-        )}
+        {/* Spacing between input and context */}
+        <div style={{ height: 12 }} />
+        
+        {/* Context selector */}
+        <ContextSelector
+          contextItems={contextItems || []}
+          currentPage={currentPage || 1}
+          selectedLevel={selectedLevel}
+          onChange={handleContextChange}
+          disabled={isStreaming}
+        />
       </div>
 
       {/* CSS for animations */}
@@ -457,3 +581,4 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
     </div>
   )
 }
+

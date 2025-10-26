@@ -2,7 +2,7 @@ from fastapi import FastAPI, Depends, HTTPException, status, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 import os
 import logging
 import json
@@ -14,13 +14,16 @@ from auth import get_current_user_id
 from models import (
     CreateDocumentRequest, DocumentResponse, Base, UpdateProgressRequest,
     CreateThreadRequest, ThreadResponse, CreateMessageRequest, MessageResponse,
-    ThreadWithMessagesResponse, Document, ChatThread, PageQuestionsResponse
+    ThreadWithMessagesResponse, Document, ChatThread, PageQuestionsResponse,
+    DocumentStructureResponse, ExtractStructureRequest
 )
 from repository import (
     create_document, list_documents, get_document_by_id, update_document_progress,
     create_chat_thread, list_chat_threads, get_chat_thread_with_messages,
-    create_chat_message, update_thread_title, get_page_questions
+    create_chat_message, update_thread_title, get_page_questions,
+    save_document_structure, get_document_structure, get_chapter_by_page
 )
+from pdf_utils import extract_pdf_outline
 from ai_service import ai_service
 
 
@@ -382,9 +385,16 @@ async def send_chat_message(
             detail="Document not found"
         )
     
-    # Save user message
+    # Get context type and chapter info
+    context_type = request.contextType or "page"
+    chapter_id = request.chapterId
+    
+    # Save user message with context info
     user_message = create_chat_message(
-        db, thread_id, "user", request.content, request.pageContext
+        db, thread_id, "user", request.content, 
+        page_context=request.pageContext,
+        context_type=context_type,
+        chapter_id=chapter_id
     )
     
     # Get document view URL for AI context
@@ -426,6 +436,19 @@ async def send_chat_message(
     # Get current page context (use request pageContext or document's last viewed page)
     current_page = request.pageContext or document.last_viewed_page or 1
     
+    # Get chapter info if context is chapter/section
+    chapter_info = None
+    if context_type in ["chapter", "section"] and chapter_id:
+        from models import DocumentStructure
+        chapter = db.query(DocumentStructure).filter(DocumentStructure.id == uuid.UUID(chapter_id)).first()
+        if chapter:
+            chapter_info = {
+                "id": str(chapter.id),
+                "title": chapter.title,
+                "pageFrom": chapter.page_from,
+                "pageTo": chapter.page_to
+            }
+    
     # Estimate total pages (this is a rough estimate, could be improved)
     total_pages = 100  # Default fallback
     
@@ -434,16 +457,19 @@ async def send_chat_message(
         assistant_content = ""
         
         try:
-            # Stream AI response
+            # Stream AI response with context type
             async for chunk in ai_service.generate_response_stream(
-                ai_messages, pdf_url, current_page, total_pages
+                ai_messages, pdf_url, current_page, total_pages, context_type, chapter_info
             ):
                 assistant_content += chunk
                 yield f"data: {json.dumps({'type': 'chunk', 'content': chunk})}\n\n"
             
             # Save complete assistant message
             assistant_message = create_chat_message(
-                db, thread_id, "assistant", assistant_content, current_page
+                db, thread_id, "assistant", assistant_content, 
+                page_context=current_page,
+                context_type=context_type,
+                chapter_id=chapter_id
             )
             
             # Send completion signal
@@ -462,6 +488,156 @@ async def send_chat_message(
             "Content-Type": "text/event-stream",
         }
     )
+
+# Document structure endpoints
+@app.post("/api/documents/{document_id}/extract-structure", response_model=DocumentStructureResponse)
+async def extract_document_structure(
+    document_id: str,
+    request: ExtractStructureRequest,
+    user_id: str = Depends(get_current_user_id),
+    db: Session = Depends(get_db)
+):
+    """Extract document structure (TOC) from PDF"""
+    # Check database connectivity
+    if not test_database_connection():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database not available"
+        )
+    
+    # Verify document exists and belongs to user
+    document = get_document_by_id(db, document_id, user_id)
+    if not document:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found"
+        )
+    
+    # Check if structure already exists
+    existing_structure = get_document_structure(db, document_id)
+    if existing_structure and not request.force:
+        return existing_structure
+    
+    try:
+        # Get document view URL
+        if not supabase:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Supabase storage not available"
+            )
+        
+        signed_url_response = supabase.storage.from_('pdfs').create_signed_url(
+            document.storage_key,
+            expires_in=3600
+        )
+        
+        if not signed_url_response.get('signedURL'):
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to create signed URL"
+            )
+        
+        pdf_url = signed_url_response['signedURL']
+        
+        # Extract outline from PDF
+        structure_items = await extract_pdf_outline(pdf_url)
+        
+        if not structure_items:
+            # Return empty structure response
+            return DocumentStructureResponse(
+                documentId=document_id,
+                items=[]
+            )
+        
+        # Save structure to database
+        save_document_structure(db, document_id, structure_items)
+        
+        # Return saved structure
+        return get_document_structure(db, document_id) or DocumentStructureResponse(
+            documentId=document_id,
+            items=[]
+        )
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to extract document structure: {str(e)}"
+        )
+
+@app.get("/api/documents/{document_id}/structure", response_model=DocumentStructureResponse)
+async def get_document_structure_endpoint(
+    document_id: str,
+    user_id: str = Depends(get_current_user_id),
+    db: Session = Depends(get_db)
+):
+    """Get document structure"""
+    # Check database connectivity
+    if not test_database_connection():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database not available"
+        )
+    
+    # Verify document exists and belongs to user
+    document = get_document_by_id(db, document_id, user_id)
+    if not document:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found"
+        )
+    
+    structure = get_document_structure(db, document_id)
+    
+    if not structure:
+        # Return empty structure
+        return DocumentStructureResponse(
+            documentId=document_id,
+            items=[]
+        )
+    
+    return structure
+
+@app.get("/api/documents/{document_id}/pages/{page_number}/chapter")
+async def get_chapter_for_page(
+    document_id: str,
+    page_number: int,
+    level: Optional[int] = None,
+    user_id: str = Depends(get_current_user_id),
+    db: Session = Depends(get_db)
+):
+    """Get chapter/section information for a specific page"""
+    # Check database connectivity
+    if not test_database_connection():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database not available"
+        )
+    
+    # Verify document exists and belongs to user
+    document = get_document_by_id(db, document_id, user_id)
+    if not document:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found"
+        )
+    
+    # If level is specified, get structure at that level, otherwise get the most specific one
+    if level is not None:
+        from repository import get_nearest_chapter
+        chapter = get_nearest_chapter(db, document_id, page_number, level)
+    else:
+        chapter = get_chapter_by_page(db, document_id, page_number)
+    
+    if not chapter:
+        return None
+    
+    return {
+        "id": str(chapter.id),
+        "title": chapter.title,
+        "level": chapter.level,
+        "pageFrom": chapter.page_from,
+        "pageTo": chapter.page_to
+    }
 
 if __name__ == "__main__":
     import uvicorn

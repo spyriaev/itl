@@ -14,6 +14,8 @@ export interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
   pageContext?: number
+  contextType?: string
+  chapterId?: string
   createdAt: string
 }
 
@@ -28,6 +30,8 @@ export interface CreateThreadRequest {
 export interface CreateMessageRequest {
   content: string
   pageContext?: number
+  contextType?: string
+  chapterId?: string
 }
 
 export interface StreamEvent {
@@ -172,6 +176,8 @@ class ChatService {
     documentId: string,
     firstMessage: string,
     pageContext?: number,
+    contextType?: string,
+    chapterId?: string,
     onChunk?: (content: string) => void,
     onComplete?: (messageId: string) => void,
     onError?: (error: string) => void
@@ -184,7 +190,12 @@ class ChatService {
     // Send first message
     await this.sendMessage(
       thread.id,
-      { content: firstMessage, pageContext },
+      { 
+        content: firstMessage, 
+        pageContext,
+        contextType: contextType || 'page',
+        chapterId
+      },
       onChunk,
       onComplete,
       onError

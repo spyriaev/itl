@@ -89,15 +89,24 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
     }, 200)
   }
 
-  // Fetch page questions for all pages after document loads
+  // Track fetching state to avoid duplicate requests
+  const fetchingPagesRef = useRef<Set<number>>(new Set())
+
+  // Fetch page questions for visible pages
   useEffect(() => {
     if (!documentId || numPages === 0) return
 
-    const fetchAllPageQuestions = async () => {
+    const fetchPageQuestions = async (pageNumbers: number[]) => {
       const questionsMap = new Map<number, PageQuestionsData>()
+      const pagesToFetch = pageNumbers.filter(
+        pageNum => !pageQuestionsMap.has(pageNum) && !fetchingPagesRef.current.has(pageNum)
+      )
       
-      // Fetch questions for each page
-      for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+      // Mark pages as being fetched
+      pagesToFetch.forEach(pageNum => fetchingPagesRef.current.add(pageNum))
+      
+      // Fetch questions for specified pages only
+      for (const pageNum of pagesToFetch) {
         try {
           const questionsData = await chatService.getPageQuestions(documentId, pageNum)
           if (questionsData.totalQuestions > 0) {
@@ -105,14 +114,48 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
           }
         } catch (err) {
           console.error(`Failed to fetch questions for page ${pageNum}:`, err)
+        } finally {
+          fetchingPagesRef.current.delete(pageNum)
         }
       }
       
-      setPageQuestionsMap(questionsMap)
+      if (questionsMap.size > 0) {
+        setPageQuestionsMap(prev => new Map([...prev, ...questionsMap]))
+      }
     }
 
-    fetchAllPageQuestions()
-  }, [documentId, numPages])
+    // Determine which pages to fetch
+    let pagesToFetch: number[] = []
+    
+    if (!continuousScroll) {
+      // Single page mode - fetch current page
+      pagesToFetch = [currentPage]
+    } else {
+      // Continuous scroll mode - fetch visible pages
+      if (pageRefs.current.length > 0 && scrollContainerRef.current) {
+        const container = scrollContainerRef.current
+        pageRefs.current.forEach((ref, index) => {
+          if (ref) {
+            const rect = ref.getBoundingClientRect()
+            const containerRect = container.getBoundingClientRect()
+            
+            // Check if page is in viewport
+            if (
+              rect.bottom >= containerRect.top &&
+              rect.top <= containerRect.bottom
+            ) {
+              pagesToFetch.push(index + 1)
+            }
+          }
+        })
+      } else {
+        // Fallback: fetch first 10 pages if refs not ready
+        pagesToFetch = Array.from({ length: Math.min(10, numPages) }, (_, i) => i + 1)
+      }
+    }
+
+    fetchPageQuestions(pagesToFetch)
+  }, [documentId, numPages, currentPage, continuousScroll])
 
   // Handle question click - open chat panel and navigate to message
   const handleQuestionClick = useCallback((threadId: string, messageId: string) => {

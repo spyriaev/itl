@@ -146,19 +146,32 @@ class AIService:
             logger.error(f"Error extracting text from PDF: {e}")
             return f"Error extracting text from pages {page_numbers}: {str(e)}"
     
-    def build_context_pages(self, current_page: int, total_pages: int) -> List[int]:
-        """Build list of page numbers for context (current + surrounding pages)"""
+    def build_context_pages(self, current_page: int, total_pages: int, context_type: str = "page", chapter_info: Optional[dict] = None) -> List[int]:
+        """Build list of page numbers for context based on context type"""
         pages = set()
         
-        # Add current page
-        pages.add(current_page)
-        
-        # Add surrounding pages
-        for i in range(1, self.context_pages + 1):
-            if current_page - i >= 1:
-                pages.add(current_page - i)
-            if current_page + i <= total_pages:
-                pages.add(current_page + i)
+        if context_type == "document":
+            # Include all pages (with limit)
+            max_pages = 50  # Limit to avoid context overflow
+            for i in range(1, min(total_pages, max_pages) + 1):
+                pages.add(i)
+        elif context_type in ["chapter", "section"] and chapter_info:
+            # Include all pages in chapter/section
+            page_from = chapter_info.get("pageFrom", current_page)
+            page_to = chapter_info.get("pageTo", current_page)
+            for page_num in range(page_from, min(page_to + 1, total_pages + 1)):
+                if page_num >= 1:
+                    pages.add(page_num)
+        else:
+            # Default: page context (current + surrounding pages)
+            pages.add(current_page)
+            
+            # Add surrounding pages
+            for i in range(1, self.context_pages + 1):
+                if current_page - i >= 1:
+                    pages.add(current_page - i)
+                if current_page + i <= total_pages:
+                    pages.add(current_page + i)
         
         return sorted(list(pages))
     
@@ -167,20 +180,30 @@ class AIService:
         messages: List[dict], 
         pdf_url: str, 
         current_page: int, 
-        total_pages: int
+        total_pages: int,
+        context_type: str = "page",
+        chapter_info: Optional[dict] = None
     ) -> AsyncGenerator[str, None]:
         """Generate streaming response from AI API with PDF context"""
         try:
             # Extract text from relevant pages
-            context_pages = self.build_context_pages(current_page, total_pages)
+            context_pages = self.build_context_pages(current_page, total_pages, context_type, chapter_info)
             pdf_text = await self.extract_text_from_pdf(pdf_url, context_pages)
+            
+            # Build context description
+            if context_type == "document":
+                context_desc = f"entire document (pages 1-{min(total_pages, 50)})"
+            elif context_type in ["chapter", "section"] and chapter_info:
+                context_desc = f"chapter '{chapter_info.get('title', 'Unknown')}' (pages {chapter_info.get('pageFrom', current_page)}-{chapter_info.get('pageTo', current_page)})"
+            else:
+                context_desc = f"page {current_page}"
             
             # Build system message with PDF context
             system_message = {
                 "role": "system",
                 "content": f"""You are an AI reading assistant helping users understand PDF documents. 
                 
-Current context: You are viewing page {current_page} of {total_pages} pages.
+Current context: You are viewing {context_desc} in a document with {total_pages} pages.
 
 Document content from pages {', '.join(map(str, context_pages))}:
 {pdf_text}

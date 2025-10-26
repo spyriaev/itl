@@ -15,8 +15,8 @@ interface ChatContextType {
   loadThreads: (documentId: string) => Promise<void>
   selectThread: (threadId: string) => Promise<void>
   createNewThread: (documentId: string, title?: string) => Promise<ChatThread>
-  sendMessage: (content: string, pageContext?: number) => Promise<void>
-  startNewConversation: (documentId: string, firstMessage: string, pageContext?: number) => Promise<void>
+  sendMessage: (content: string, pageContext?: number, contextType?: string, chapterId?: string) => Promise<void>
+  startNewConversation: (documentId: string, firstMessage: string, pageContext?: number, contextType?: string, chapterId?: string) => Promise<void>
   navigateToMessage: (threadId: string, messageId: string) => Promise<void>
   clearError: () => void
 }
@@ -82,7 +82,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
     }
   }, [])
 
-  const sendMessage = useCallback(async (content: string, pageContext?: number) => {
+  const sendMessage = useCallback(async (content: string, pageContext?: number, contextType?: string, chapterId?: string) => {
     if (!activeThread) {
       setError('No active thread')
       return
@@ -98,6 +98,8 @@ export function ChatProvider({ children }: ChatProviderProps) {
         role: 'user',
         content,
         pageContext,
+        contextType,
+        chapterId,
         createdAt: new Date().toISOString()
       }
       setMessages(prev => [...prev, userMessage])
@@ -116,7 +118,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
       // Stream the response
       await chatService.sendMessage(
         activeThread.id,
-        { content, pageContext },
+        { content, pageContext, contextType, chapterId },
         (chunk) => {
           // Update the streaming assistant message
           setMessages(prev => prev.map(msg => 
@@ -150,7 +152,9 @@ export function ChatProvider({ children }: ChatProviderProps) {
   const startNewConversation = useCallback(async (
     documentId: string, 
     firstMessage: string, 
-    pageContext?: number
+    pageContext?: number,
+    contextType?: string,
+    chapterId?: string
   ) => {
     try {
       setIsStreaming(true)
@@ -161,6 +165,8 @@ export function ChatProvider({ children }: ChatProviderProps) {
         documentId,
         firstMessage,
         pageContext,
+        contextType,
+        chapterId,
         (chunk) => {
           // Handle streaming for new conversation
           setMessages(prev => {
@@ -193,6 +199,8 @@ export function ChatProvider({ children }: ChatProviderProps) {
         role: 'user',
         content: firstMessage,
         pageContext,
+        contextType,
+        chapterId,
         createdAt: new Date().toISOString()
       }
       
@@ -201,6 +209,8 @@ export function ChatProvider({ children }: ChatProviderProps) {
         role: 'assistant',
         content: '',
         pageContext,
+        contextType,
+        chapterId,
         createdAt: new Date().toISOString()
       }
       
