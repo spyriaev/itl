@@ -38,8 +38,16 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const pageRefs = useRef<(HTMLDivElement | null)[]>([])
   
+  // Track current scale to detect race conditions during zoom operations
+  const currentScaleRef = useRef(scale)
+  
   // Get chat context for navigation
   const { navigateToMessage } = useChat()
+
+  // Update the ref whenever scale changes
+  useEffect(() => {
+    currentScaleRef.current = scale
+  }, [scale])
 
   // Load document info
   useEffect(() => {
@@ -366,6 +374,7 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
   const zoomIn = () => {
     setScale(prev => Math.min(prev + 0.25, 3.0))
     // Clear page heights cache when zooming to recalculate
+    // Race condition protection: old page callbacks will be ignored automatically
     setPageHeights(new Map())
     // Update visible range after zoom to adjust for new page sizes
     setTimeout(updateVisiblePageRange, 100)
@@ -374,6 +383,7 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
   const zoomOut = () => {
     setScale(prev => Math.max(prev - 0.25, 0.5))
     // Clear page heights cache when zooming to recalculate
+    // Race condition protection: old page callbacks will be ignored automatically
     setPageHeights(new Map())
     // Update visible range after zoom to adjust for new page sizes
     setTimeout(updateVisiblePageRange, 100)
@@ -382,6 +392,7 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
   const resetZoom = () => {
     setScale(1.0)
     // Clear page heights cache when zooming to recalculate
+    // Race condition protection: old page callbacks will be ignored automatically
     setPageHeights(new Map())
     // Update visible range after zoom to adjust for new page sizes
     setTimeout(updateVisiblePageRange, 100)
@@ -745,7 +756,19 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
                             renderTextLayer={false}
                             renderAnnotationLayer={false}
                             onLoadSuccess={(page) => {
-                              const viewport = page.getViewport({ scale })
+                              // Get the scale captured in the closure (scale when this Page rendered)
+                              const capturedScale = scale
+                              // Get the current scale (may have changed due to zoom)
+                              const currentScale = currentScaleRef.current
+                              
+                              // Check if the captured scale still matches the current scale
+                              // If not, ignore this callback to prevent race condition during zoom
+                              if (capturedScale !== currentScale) {
+                                console.log(`Ignoring page ${pageNumber} height (captured: ${capturedScale}, current: ${currentScale})`)
+                                return
+                              }
+                              
+                              const viewport = page.getViewport({ scale: capturedScale })
                               const height = viewport.height + 64 // padding + margin
                               setPageHeights(prev => new Map(prev).set(pageNumber, height))
                             }}
