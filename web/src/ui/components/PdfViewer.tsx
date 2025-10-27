@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react'
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { Document, Page, pdfjs } from 'react-pdf'
 import { getDocumentViewUrl, updateViewProgress, DocumentViewInfo } from '../../services/uploadService'
 import { chatService, PageQuestionsData } from '../../services/chatService'
@@ -10,6 +10,10 @@ import 'react-pdf/dist/Page/TextLayer.css'
 
 // Configure PDF.js worker
 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`
+
+// Virtualization settings for memory optimization
+const PAGES_BUFFER = 3 // Number of pages to render before and after visible pages
+const PAGE_HEIGHT_ESTIMATE = 1100 // Estimated height of a page in pixels for virtualization
 
 interface PdfViewerProps {
   documentId: string
@@ -27,6 +31,8 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
   const [isChatVisible, setIsChatVisible] = useState<boolean>(false)
   const [isMobile, setIsMobile] = useState<boolean>(window.innerWidth < 768)
   const [pageQuestionsMap, setPageQuestionsMap] = useState<Map<number, PageQuestionsData>>(new Map())
+  const [pageHeights, setPageHeights] = useState<Map<number, number>>(new Map())
+  const [visiblePageRange, setVisiblePageRange] = useState<{start: number, end: number}>({ start: 1, end: 10 })
   
   // Refs для отслеживания скролла
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -83,9 +89,14 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
     // Инициализируем refs для страниц
     pageRefs.current = new Array(numPages).fill(null)
     
+    // Initialize visible page range
+    const initialEnd = Math.min(numPages, PAGES_BUFFER * 2 + 1)
+    setVisiblePageRange({ start: 1, end: initialEnd })
+    
     // Прокручиваем к последней просмотренной странице
     setTimeout(() => {
       scrollToPage(currentPage)
+      updateVisiblePageRange()
     }, 200)
   }
 
@@ -189,6 +200,33 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
     }
   }, [continuousScroll])
 
+  // Calculate which pages should be rendered based on scroll position
+  const updateVisiblePageRange = useCallback(() => {
+    if (!continuousScroll || !scrollContainerRef.current || numPages === 0) {
+      return
+    }
+
+    const container = scrollContainerRef.current
+    const scrollTop = container.scrollTop
+    const containerHeight = container.clientHeight
+
+    // Calculate which pages are in viewport
+    let estimatedPage = Math.floor(scrollTop / PAGE_HEIGHT_ESTIMATE) + 1
+    estimatedPage = Math.max(1, Math.min(estimatedPage, numPages))
+
+    // Add buffer pages before and after
+    const start = Math.max(1, estimatedPage - PAGES_BUFFER)
+    const end = Math.min(numPages, estimatedPage + PAGES_BUFFER + Math.ceil(containerHeight / PAGE_HEIGHT_ESTIMATE))
+
+    setVisiblePageRange(prev => {
+      if (prev.start !== start || prev.end !== end) {
+        console.log(`Rendering pages ${start} to ${end}`)
+        return { start, end }
+      }
+      return prev
+    })
+  }, [continuousScroll, numPages])
+
   // Функция для определения видимой страницы при скролле
   const updateVisiblePage = useCallback(() => {
     if (!continuousScroll || !scrollContainerRef.current || pageRefs.current.length === 0) {
@@ -199,7 +237,6 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
     const containerRect = container.getBoundingClientRect()
     const containerTop = containerRect.top
     const containerBottom = containerRect.bottom
-    const containerHeight = containerRect.height
 
     let mostVisiblePage = 1
     let maxVisibleArea = 0
@@ -218,8 +255,6 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
         // Вычисляем процент видимости страницы
         const pageHeight = pageRect.height
         const visibilityRatio = visibleHeight / pageHeight
-        
-        console.log(`Page ${index + 1}: visibility ratio = ${visibilityRatio.toFixed(2)}`)
 
         if (visibilityRatio > maxVisibleArea) {
           maxVisibleArea = visibilityRatio
@@ -233,7 +268,10 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
       setCurrentPage(mostVisiblePage)
       saveProgress(mostVisiblePage)
     }
-  }, [continuousScroll, currentPage, saveProgress])
+
+    // Update visible page range for virtualization
+    updateVisiblePageRange()
+  }, [continuousScroll, currentPage, saveProgress, updateVisiblePageRange])
 
   const goToPrevPage = () => {
     if (currentPage > 1) {
@@ -275,18 +313,28 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
     if (!container || !continuousScroll) return
 
     const handleScroll = () => {
-      console.log('Scroll event triggered')
       updateVisiblePage()
     }
 
     // Добавляем обработчик с throttling для производительности
     let timeoutId: NodeJS.Timeout
+    let rafId: number | null = null
+    
     const throttledHandleScroll = () => {
-      clearTimeout(timeoutId)
-      timeoutId = setTimeout(handleScroll, 50) // Уменьшили задержку для более отзывчивого отслеживания
+      // Cancel any pending animation frame
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId)
+      }
+      
+      // Use requestAnimationFrame for smoother updates
+      rafId = requestAnimationFrame(() => {
+        clearTimeout(timeoutId)
+        timeoutId = setTimeout(handleScroll, 100) // Increased for better performance
+        rafId = null
+      })
     }
 
-    container.addEventListener('scroll', throttledHandleScroll)
+    container.addEventListener('scroll', throttledHandleScroll, { passive: true })
     
     // Также добавляем обработчик для изменения размера окна
     const handleResize = () => {
@@ -298,6 +346,9 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
       container.removeEventListener('scroll', throttledHandleScroll)
       window.removeEventListener('resize', handleResize)
       clearTimeout(timeoutId)
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId)
+      }
     }
   }, [updateVisiblePage, continuousScroll])
 
@@ -314,14 +365,26 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
 
   const zoomIn = () => {
     setScale(prev => Math.min(prev + 0.25, 3.0))
+    // Clear page heights cache when zooming to recalculate
+    setPageHeights(new Map())
+    // Update visible range after zoom to adjust for new page sizes
+    setTimeout(updateVisiblePageRange, 100)
   }
 
   const zoomOut = () => {
     setScale(prev => Math.max(prev - 0.25, 0.5))
+    // Clear page heights cache when zooming to recalculate
+    setPageHeights(new Map())
+    // Update visible range after zoom to adjust for new page sizes
+    setTimeout(updateVisiblePageRange, 100)
   }
 
   const resetZoom = () => {
     setScale(1.0)
+    // Clear page heights cache when zooming to recalculate
+    setPageHeights(new Map())
+    // Update visible range after zoom to adjust for new page sizes
+    setTimeout(updateVisiblePageRange, 100)
   }
 
   if (loading) {
@@ -637,7 +700,7 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
             transition: 'margin-right 0.3s ease-out',
           }}>
         {continuousScroll ? (
-          /* Continuous Scroll Mode - All pages stacked vertically */
+          /* Continuous Scroll Mode - Virtualized rendering for memory efficiency */
           <div style={{
             display: 'flex',
             flexDirection: 'column',
@@ -652,42 +715,71 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
               onLoadError={(error) => setError('Failed to load PDF document')}
             >
               {numPages > 0 ? (
-                Array.from({ length: numPages }, (_, index) => (
-                  <div
-                    key={index + 1}
-                    ref={(el) => pageRefs.current[index] = el}
-                    style={{
-                      backgroundColor: 'white',
-                      borderRadius: 8,
-                      boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
-                      padding: 16,
-                      marginBottom: 8,
-                    }}
-                  >
-                    <Page
-                      pageNumber={index + 1}
-                      scale={scale}
-                      renderTextLayer={false}
-                      renderAnnotationLayer={false}
-                    />
-                    {/* Page number indicator */}
-                    <div style={{
-                      textAlign: 'center',
-                      marginTop: 8,
-                      fontSize: 12,
-                      color: '#6B7280',
-                      fontWeight: 500,
-                    }}>
-                      Page {index + 1} of {numPages}
+                Array.from({ length: numPages }, (_, index) => {
+                  const pageNumber = index + 1
+                  const isInRange = pageNumber >= visiblePageRange.start && pageNumber <= visiblePageRange.end
+                  const knownHeight = pageHeights.get(pageNumber) || PAGE_HEIGHT_ESTIMATE
+
+                  return (
+                    <div
+                      key={pageNumber}
+                      ref={(el) => pageRefs.current[index] = el}
+                      style={{
+                        backgroundColor: 'white',
+                        borderRadius: 8,
+                        boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
+                        padding: 16,
+                        marginBottom: 8,
+                        minHeight: isInRange ? 'auto' : `${knownHeight}px`,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      {isInRange ? (
+                        <>
+                          <Page
+                            pageNumber={pageNumber}
+                            scale={scale}
+                            renderTextLayer={false}
+                            renderAnnotationLayer={false}
+                            onLoadSuccess={(page) => {
+                              const viewport = page.getViewport({ scale })
+                              const height = viewport.height + 64 // padding + margin
+                              setPageHeights(prev => new Map(prev).set(pageNumber, height))
+                            }}
+                          />
+                          {/* Page number indicator */}
+                          <div style={{
+                            textAlign: 'center',
+                            marginTop: 8,
+                            fontSize: 12,
+                            color: '#6B7280',
+                            fontWeight: 500,
+                          }}>
+                            Page {pageNumber} of {numPages}
+                          </div>
+                          
+                          {/* Related questions for this page */}
+                          <PageRelatedQuestions
+                            questionsData={pageQuestionsMap.get(pageNumber) || null}
+                            onQuestionClick={handleQuestionClick}
+                          />
+                        </>
+                      ) : (
+                        <div style={{
+                          textAlign: 'center',
+                          fontSize: 14,
+                          color: '#9CA3AF',
+                          padding: '20px',
+                        }}>
+                          Page {pageNumber}
+                        </div>
+                      )}
                     </div>
-                    
-                    {/* Related questions for this page */}
-                    <PageRelatedQuestions
-                      questionsData={pageQuestionsMap.get(index + 1) || null}
-                      onQuestionClick={handleQuestionClick}
-                    />
-                  </div>
-                ))
+                  )
+                })
               ) : (
                 <div style={{
                   backgroundColor: 'white',
