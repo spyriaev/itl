@@ -41,6 +41,9 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
   // Track current scale to detect race conditions during zoom operations
   const currentScaleRef = useRef(scale)
   
+  // Store timeout ID for updateVisiblePageRange to prevent accumulation
+  const updateVisiblePageRangeTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  
   // Get chat context for navigation
   const { navigateToMessage } = useChat()
 
@@ -371,13 +374,26 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
     return () => clearInterval(interval)
   }, [continuousScroll, updateVisiblePage])
 
+  // Cleanup timeout on component unmount
+  useEffect(() => {
+    return () => {
+      if (updateVisiblePageRangeTimeoutRef.current) {
+        clearTimeout(updateVisiblePageRangeTimeoutRef.current)
+      }
+    }
+  }, [])
+
   const zoomIn = () => {
     setScale(prev => Math.min(prev + 0.25, 3.0))
     // Clear page heights cache when zooming to recalculate
     // Race condition protection: old page callbacks will be ignored automatically
     setPageHeights(new Map())
+    // Clear any existing timeout before setting a new one
+    if (updateVisiblePageRangeTimeoutRef.current) {
+      clearTimeout(updateVisiblePageRangeTimeoutRef.current)
+    }
     // Update visible range after zoom to adjust for new page sizes
-    setTimeout(updateVisiblePageRange, 100)
+    updateVisiblePageRangeTimeoutRef.current = setTimeout(updateVisiblePageRange, 100)
   }
 
   const zoomOut = () => {
@@ -385,8 +401,12 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
     // Clear page heights cache when zooming to recalculate
     // Race condition protection: old page callbacks will be ignored automatically
     setPageHeights(new Map())
+    // Clear any existing timeout before setting a new one
+    if (updateVisiblePageRangeTimeoutRef.current) {
+      clearTimeout(updateVisiblePageRangeTimeoutRef.current)
+    }
     // Update visible range after zoom to adjust for new page sizes
-    setTimeout(updateVisiblePageRange, 100)
+    updateVisiblePageRangeTimeoutRef.current = setTimeout(updateVisiblePageRange, 100)
   }
 
   const resetZoom = () => {
@@ -394,8 +414,12 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
     // Clear page heights cache when zooming to recalculate
     // Race condition protection: old page callbacks will be ignored automatically
     setPageHeights(new Map())
+    // Clear any existing timeout before setting a new one
+    if (updateVisiblePageRangeTimeoutRef.current) {
+      clearTimeout(updateVisiblePageRangeTimeoutRef.current)
+    }
     // Update visible range after zoom to adjust for new page sizes
-    setTimeout(updateVisiblePageRange, 100)
+    updateVisiblePageRangeTimeoutRef.current = setTimeout(updateVisiblePageRange, 100)
   }
 
   if (loading) {
