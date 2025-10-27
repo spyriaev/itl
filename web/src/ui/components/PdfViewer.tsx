@@ -11,9 +11,21 @@ import 'react-pdf/dist/Page/TextLayer.css'
 // Configure PDF.js worker
 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`
 
-// Virtualization settings for memory optimization
-const PAGES_BUFFER = 3 // Number of pages to render before and after visible pages
+// Suppress warning about cancelled text layer tasks
+const originalWarn = console.warn
+console.warn = (...args: any[]) => {
+  if (args[0]?.toString().includes('TextLayer task cancelled')) {
+    // Suppress this specific warning
+    return
+  }
+  originalWarn.apply(console, args)
+}
+
+// Virtualization settings for memory optimization  
+const PAGES_BUFFER = 10 // Number of pages to render before and after visible pages (increased to reduce text layer cancellation)
 const PAGE_HEIGHT_ESTIMATE = 1100 // Estimated height of a page in pixels for virtualization
+const CLEANUP_INTERVAL = 30000 // Interval to clean up old page data (30 seconds)
+const MAX_CACHE_PAGES = PAGES_BUFFER * 4 // Maximum pages to keep in memory (4x buffer size)
 
 interface PdfViewerProps {
   documentId: string
@@ -94,6 +106,46 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
     })(),
     [documentId]
   )
+
+  // Clean up old page data to prevent memory leaks
+  const cleanupOldHeights = useCallback(() => {
+    setPageHeights(prev => {
+      const currentRange = visiblePageRange
+      const startCleanup = Math.max(1, currentRange.start - MAX_CACHE_PAGES)
+      const endCleanup = Math.min(numPages, currentRange.end + MAX_CACHE_PAGES)
+      
+      const cleaned = new Map()
+      for (let i = startCleanup; i <= endCleanup; i++) {
+        if (prev.has(i)) {
+          cleaned.set(i, prev.get(i)!)
+        }
+      }
+      
+      if (cleaned.size < prev.size) {
+        console.log(`Cleaned up ${prev.size - cleaned.size} pages from memory`)
+      }
+      
+      return cleaned
+    })
+  }, [visiblePageRange, numPages])
+
+  // Clean up old page questions data
+  const cleanupOldQuestions = useCallback(() => {
+    setPageQuestionsMap(prev => {
+      const currentRange = visiblePageRange
+      const startCleanup = Math.max(1, currentRange.start - MAX_CACHE_PAGES)
+      const endCleanup = Math.min(numPages, currentRange.end + MAX_CACHE_PAGES)
+      
+      const cleaned = new Map()
+      for (let i = startCleanup; i <= endCleanup; i++) {
+        if (prev.has(i)) {
+          cleaned.set(i, prev.get(i)!)
+        }
+      }
+      
+      return cleaned
+    })
+  }, [visiblePageRange, numPages])
 
   const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
     setNumPages(numPages)
@@ -383,11 +435,32 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
     }
   }, [])
 
+  // Periodic cleanup of old page data
+  useEffect(() => {
+    const interval = setInterval(() => {
+      cleanupOldHeights()
+      cleanupOldQuestions()
+    }, CLEANUP_INTERVAL)
+    
+    return () => clearInterval(interval)
+  }, [cleanupOldHeights, cleanupOldQuestions])
+
+  // Cleanup on component unmount
+  useEffect(() => {
+    return () => {
+      setPageHeights(new Map())
+      setPageQuestionsMap(new Map())
+      setVisiblePageRange({ start: 1, end: 10 })
+    }
+  }, [])
+
   const zoomIn = () => {
     setScale(prev => Math.min(prev + 0.25, 3.0))
     // Clear page heights cache when zooming to recalculate
     // Race condition protection: old page callbacks will be ignored automatically
     setPageHeights(new Map())
+    // Don't clear questions cache to preserve text layer
+    // setPageQuestionsMap(new Map())
     // Clear any existing timeout before setting a new one
     if (updateVisiblePageRangeTimeoutRef.current) {
       clearTimeout(updateVisiblePageRangeTimeoutRef.current)
@@ -401,6 +474,8 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
     // Clear page heights cache when zooming to recalculate
     // Race condition protection: old page callbacks will be ignored automatically
     setPageHeights(new Map())
+    // Don't clear questions cache to preserve text layer
+    // setPageQuestionsMap(new Map())
     // Clear any existing timeout before setting a new one
     if (updateVisiblePageRangeTimeoutRef.current) {
       clearTimeout(updateVisiblePageRangeTimeoutRef.current)
@@ -414,6 +489,8 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
     // Clear page heights cache when zooming to recalculate
     // Race condition protection: old page callbacks will be ignored automatically
     setPageHeights(new Map())
+    // Don't clear questions cache to preserve text layer
+    // setPageQuestionsMap(new Map())
     // Clear any existing timeout before setting a new one
     if (updateVisiblePageRangeTimeoutRef.current) {
       clearTimeout(updateVisiblePageRangeTimeoutRef.current)
@@ -775,10 +852,23 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
                       {isInRange ? (
                         <>
                           <Page
+                            key={`page-${pageNumber}`}
                             pageNumber={pageNumber}
                             scale={scale}
-                            renderTextLayer={false}
-                            renderAnnotationLayer={false}
+                            renderTextLayer={true}
+                            renderAnnotationLayer={true}
+                            loading={
+                              <div style={{
+                                width: '100%',
+                                height: '500px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: '#9CA3AF',
+                              }}>
+                                Loading page {pageNumber}...
+                              </div>
+                            }
                             onLoadSuccess={(page) => {
                               // Get the scale captured in the closure (scale when this Page rendered)
                               const capturedScale = scale
@@ -857,8 +947,8 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
               <Page
                 pageNumber={currentPage}
                 scale={scale}
-                renderTextLayer={false}
-                renderAnnotationLayer={false}
+                renderTextLayer={true}
+                renderAnnotationLayer={true}
               />
             </Document>
           </div>
