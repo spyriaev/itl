@@ -152,16 +152,18 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
     // Инициализируем refs для страниц
     pageRefs.current = new Array(numPages).fill(null)
     
-    // Initialize visible page range centered around the current page (saved position)
+    // Initialize visible page range centered around the saved page position
+    // Use documentInfo.lastViewedPage directly to avoid race condition with currentPage state
     // This prevents flickering by rendering the correct pages from the start
-    const start = Math.max(1, currentPage - PAGES_BUFFER)
-    const end = Math.min(numPages, currentPage + PAGES_BUFFER)
+    const savedPage = documentInfo?.lastViewedPage || 1
+    const start = Math.max(1, savedPage - PAGES_BUFFER)
+    const end = Math.min(numPages, savedPage + PAGES_BUFFER)
     setVisiblePageRange({ start, end })
     
     // Прокручиваем к последней просмотренной странице
     // Use requestAnimationFrame for smoother, immediate scroll without visible delay
     requestAnimationFrame(() => {
-      scrollToPage(currentPage)
+      scrollToPage(savedPage)
       // Update visible page range after scroll is complete
       requestAnimationFrame(() => {
         updateVisiblePageRange()
