@@ -15,6 +15,7 @@ interface ChatMessageProps {
 export function ChatMessage({ message }: ChatMessageProps) {
   const isUser = message.role === 'user'
   const isAssistant = message.role === 'assistant'
+  const isEmptyAssistant = isAssistant && !message.content
 
   const formatTime = (timestamp: string) => {
     return new Date(timestamp).toLocaleTimeString([], { 
@@ -43,7 +44,44 @@ export function ChatMessage({ message }: ChatMessageProps) {
         wordWrap: 'break-word',
         position: 'relative',
       }}>
-        {isAssistant ? (
+        {isEmptyAssistant ? (
+          // Show loading indicator for empty assistant messages
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            color: '#6B7280',
+          }}>
+            <div style={{
+              display: 'flex',
+              gap: 3,
+            }}>
+              <div style={{
+                width: 6,
+                height: 6,
+                backgroundColor: '#6B7280',
+                borderRadius: '50%',
+                animation: 'pulse 1.4s ease-in-out infinite both',
+              }} />
+              <div style={{
+                width: 6,
+                height: 6,
+                backgroundColor: '#6B7280',
+                borderRadius: '50%',
+                animation: 'pulse 1.4s ease-in-out infinite both',
+                animationDelay: '0.2s',
+              }} />
+              <div style={{
+                width: 6,
+                height: 6,
+                backgroundColor: '#6B7280',
+                borderRadius: '50%',
+                animation: 'pulse 1.4s ease-in-out infinite both',
+                animationDelay: '0.4s',
+              }} />
+            </div>
+          </div>
+        ) : isAssistant ? (
           <ReactMarkdown 
             remarkPlugins={[remarkGfm]}
             components={{
@@ -114,6 +152,20 @@ export function ChatMessage({ message }: ChatMessageProps) {
           </>
         )}
       </div>
+
+      {/* CSS for loading animation */}
+      <style>{`
+        @keyframes pulse {
+          0%, 80%, 100% {
+            transform: scale(0);
+            opacity: 0.5;
+          }
+          40% {
+            transform: scale(1);
+            opacity: 1;
+          }
+        }
+      `}</style>
     </div>
   )
 }
