@@ -1,6 +1,6 @@
 # AI Reader Server (Python FastAPI)
 
-A Python FastAPI server for the AI Reader application that handles document management with JWT authentication and PostgreSQL database integration.
+A Python FastAPI server for the AI Reader application that handles document management with JWT authentication, PostgreSQL database integration, and AI-powered chat features.
 
 ## Features
 
@@ -8,6 +8,8 @@ A Python FastAPI server for the AI Reader application that handles document mana
 - **JWT Authentication**: Secure authentication using Supabase JWT tokens
 - **PostgreSQL Database**: Database operations using SQLAlchemy ORM
 - **Document Management**: Create and list documents with file validation
+- **AI Chat System**: Chat with documents using AI (DeepSeek or GigaChat)
+- **Mock AI Service**: Test without API keys (development mode)
 - **CORS Support**: Cross-origin resource sharing enabled
 - **Health Checks**: Database connectivity monitoring
 
@@ -63,9 +65,23 @@ PORT=8080
 # PostgreSQL Database (Supabase)
 DATABASE_URL=postgresql://postgres:your_password@db.sjrfppeisxmglrozufoy.supabase.co:6543/postgres
 
+# Supabase Configuration
+SUPABASE_URL=https://sjrfppeisxmglrozufoy.supabase.co
+SUPABASE_SERVICE_KEY=your_service_role_key_here
+
 # Authentication (Required for JWT validation)
 SUPABASE_JWT_SECRET=your_jwt_secret_here
+
+# AI Service Configuration
+AI_PROVIDER=deepseek  # or "gigachat"
+DEEPSEEK_API_KEY=your_deepseek_api_key
+DEEPSEEK_API_BASE=https://api.deepseek.com
+
+# Mock AI Service (for testing without API keys)
+USE_MOCK_AI=false  # Set to "true" to use mock service
 ```
+
+See `env.example` for detailed configuration.
 
 ## API Endpoints
 
@@ -75,6 +91,20 @@ SUPABASE_JWT_SECRET=your_jwt_secret_here
 ### Document Management
 - **POST** `/api/documents` - Create a new document (requires authentication)
 - **GET** `/api/documents` - List user documents with pagination (requires authentication)
+- **GET** `/api/documents/{id}/view` - Get signed URL for viewing document
+- **PATCH** `/api/documents/{id}/progress` - Update viewing progress
+
+### AI Chat
+- **POST** `/api/documents/{id}/chat/threads` - Create chat thread
+- **GET** `/api/documents/{id}/chat/threads` - List chat threads
+- **GET** `/api/chat/threads/{id}/messages` - Get thread with messages
+- **POST** `/api/chat/threads/{id}/messages` - Send message and stream AI response
+- **GET** `/api/documents/{id}/pages/{page}/questions` - Get questions for page
+
+### Document Structure
+- **POST** `/api/documents/{id}/extract-structure` - Extract document TOC
+- **GET** `/api/documents/{id}/structure` - Get document structure
+- **GET** `/api/documents/{id}/pages/{page}/chapter` - Get chapter info for page
 
 ## Authentication
 
@@ -90,15 +120,19 @@ Authorization: Bearer <your-jwt-token>
 
 ```
 server/
-├── main.py              # FastAPI application and routes
-├── auth.py              # JWT authentication logic
-├── models.py            # SQLAlchemy models and Pydantic schemas
-├── repository.py        # Database operations
-├── database.py          # Database connection setup
-├── requirements.txt     # Python dependencies
-├── run-dev.sh          # Development run script
-├── env.example         # Environment variables template
-└── README.md           # This file
+├── main.py                  # FastAPI application and routes
+├── auth.py                  # JWT authentication logic
+├── models.py                # SQLAlchemy models and Pydantic schemas
+├── repository.py            # Database operations
+├── database.py              # Database connection setup
+├── ai_service.py            # Real AI service (DeepSeek/GigaChat)
+├── ai_service_mock.py       # Mock AI service for testing
+├── pdf_utils.py             # PDF processing utilities
+├── requirements.txt         # Python dependencies
+├── run-dev.sh              # Development run script
+├── env.example             # Environment variables template
+├── MOCK_AI_SERVICE.md      # Mock service documentation
+└── README.md               # This file
 ```
 
 ### Dependencies
@@ -109,6 +143,37 @@ server/
 - **psycopg2-binary**: PostgreSQL adapter
 - **python-jose**: JWT token handling
 - **Pydantic**: Data validation and serialization
+- **openai**: OpenAI API client
+- **PyMuPDF**: PDF processing
+- **httpx**: Async HTTP client
+
+## Mock AI Service
+
+The server includes a mock AI service for testing without API keys. This is useful for development and demonstration.
+
+### Using Mock AI Service
+
+1. **Set environment variable**:
+   ```bash
+   export USE_MOCK_AI=true
+   ```
+
+2. **Or update `.env` file**:
+   ```bash
+   USE_MOCK_AI=true
+   ```
+
+3. **Restart the server**
+
+The mock service will:
+- ✅ Generate realistic responses without real API calls
+- ✅ Support streaming responses (word-by-word)
+- ✅ Work without internet connection
+- ✅ Not consume API quotas
+
+### Documentation
+
+See `MOCK_AI_SERVICE.md` for detailed documentation on the mock service.
 
 ### Running Tests
 

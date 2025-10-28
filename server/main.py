@@ -24,7 +24,14 @@ from repository import (
     save_document_structure, get_document_structure, get_chapter_by_page
 )
 from pdf_utils import extract_pdf_outline
-from ai_service import ai_service
+
+# Import AI service (real or mock based on environment variable)
+if os.getenv("USE_MOCK_AI", "").lower() in ["true", "1", "yes"]:
+    print("🔧 Using MOCK AI Service for testing")
+    from ai_service_mock import ai_service
+else:
+    print("🧠 Using REAL AI Service")
+    from ai_service import ai_service
 
 
 # Create FastAPI app
