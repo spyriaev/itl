@@ -465,46 +465,43 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
   const zoomIn = () => {
     setScale(prev => Math.min(prev + 0.25, 3.0))
     // Clear page heights cache when zooming to recalculate
-    // Race condition protection: old page callbacks will be ignored automatically
     setPageHeights(new Map())
-    // Don't clear questions cache to preserve text layer
-    // setPageQuestionsMap(new Map())
-    // Clear any existing timeout before setting a new one
+    // Update visible range immediately and after a brief delay for re-render
+    updateVisiblePageRange()
     if (updateVisiblePageRangeTimeoutRef.current) {
       clearTimeout(updateVisiblePageRangeTimeoutRef.current)
     }
-    // Update visible range after zoom to adjust for new page sizes
-    updateVisiblePageRangeTimeoutRef.current = setTimeout(updateVisiblePageRange, 100)
+    updateVisiblePageRangeTimeoutRef.current = setTimeout(() => {
+      updateVisiblePageRange()
+    }, 50)
   }
 
   const zoomOut = () => {
     setScale(prev => Math.max(prev - 0.25, 0.5))
     // Clear page heights cache when zooming to recalculate
-    // Race condition protection: old page callbacks will be ignored automatically
     setPageHeights(new Map())
-    // Don't clear questions cache to preserve text layer
-    // setPageQuestionsMap(new Map())
-    // Clear any existing timeout before setting a new one
+    // Update visible range immediately and after a brief delay for re-render
+    updateVisiblePageRange()
     if (updateVisiblePageRangeTimeoutRef.current) {
       clearTimeout(updateVisiblePageRangeTimeoutRef.current)
     }
-    // Update visible range after zoom to adjust for new page sizes
-    updateVisiblePageRangeTimeoutRef.current = setTimeout(updateVisiblePageRange, 100)
+    updateVisiblePageRangeTimeoutRef.current = setTimeout(() => {
+      updateVisiblePageRange()
+    }, 50)
   }
 
   const resetZoom = () => {
     setScale(1.0)
     // Clear page heights cache when zooming to recalculate
-    // Race condition protection: old page callbacks will be ignored automatically
     setPageHeights(new Map())
-    // Don't clear questions cache to preserve text layer
-    // setPageQuestionsMap(new Map())
-    // Clear any existing timeout before setting a new one
+    // Update visible range immediately and after a brief delay for re-render
+    updateVisiblePageRange()
     if (updateVisiblePageRangeTimeoutRef.current) {
       clearTimeout(updateVisiblePageRangeTimeoutRef.current)
     }
-    // Update visible range after zoom to adjust for new page sizes
-    updateVisiblePageRangeTimeoutRef.current = setTimeout(updateVisiblePageRange, 100)
+    updateVisiblePageRangeTimeoutRef.current = setTimeout(() => {
+      updateVisiblePageRange()
+    }, 50)
   }
 
   if (loading) {
@@ -860,7 +857,7 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
                       {isInRange ? (
                         <>
                           <Page
-                            key={`page-${pageNumber}`}
+                            key={`page-${pageNumber}-scale-${scale}`}
                             pageNumber={pageNumber}
                             scale={scale}
                             renderTextLayer={true}
@@ -953,6 +950,7 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
               onLoadError={(error) => setError('Failed to load PDF document')}
             >
               <Page
+                key={`page-${currentPage}-scale-${scale}`}
                 pageNumber={currentPage}
                 scale={scale}
                 renderTextLayer={true}
