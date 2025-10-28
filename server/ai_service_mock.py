@@ -158,6 +158,10 @@ class MockAIService:
         """
         logger.debug(f"🤖 Mock: Generating response without context")
         
+        # Имитируем задержку обработки запроса (3 секунды)
+        logger.debug("⏳ Mock: Simulating AI processing delay...")
+        await asyncio.sleep(3)
+        
         # Получаем последнее сообщение пользователя
         last_message = messages[-1]["content"] if messages else "Не могу понять ваш вопрос"
         
@@ -197,6 +201,10 @@ class MockAIService:
             Токены ответа по мере генерации
         """
         logger.debug(f"🤖 Mock: Generating response with context (page {current_page}, context: {context_type})")
+        
+        # Имитируем задержку обработки запроса (3 секунды)
+        logger.debug("⏳ Mock: Simulating AI processing delay...")
+        await asyncio.sleep(3)
         
         # Получаем последнее сообщение пользователя
         last_message = messages[-1]["content"] if messages else "Не могу понять ваш вопрос"
