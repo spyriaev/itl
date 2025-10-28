@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { Document, Page, pdfjs } from 'react-pdf'
+import type { PDFDocumentProxy } from 'pdfjs-dist'
 import { getDocumentViewUrl, updateViewProgress, DocumentViewInfo } from '../../services/uploadService'
 import { chatService, PageQuestionsData } from '../../services/chatService'
 import { ChatProvider, useChat } from '../../contexts/ChatContext'
@@ -10,6 +11,18 @@ import 'react-pdf/dist/Page/TextLayer.css'
 
 // Configure PDF.js worker
 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`
+
+// Configure PDF.js for better memory management
+const pdfOptions = {
+  // Disable font caching to save memory
+  disableFontFace: false,
+  // Enable automatic cleanup
+  enableXfa: false,
+  // Limit image cache
+  maxImageSize: 5242880, // 5MB max per image
+  // Use standard font data from CDN to avoid bundling
+  standardFontDataUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/standard_fonts/`,
+}
 
 // Suppress warning about cancelled text layer tasks
 const originalWarn = console.warn
@@ -56,6 +69,9 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
   // Store timeout ID for updateVisiblePageRange to prevent accumulation
   const updateVisiblePageRangeTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   
+  // Store PDF document instance for cleanup
+  const pdfDocumentRef = useRef<PDFDocumentProxy | null>(null)
+  
   // Get chat context for navigation
   const { navigateToMessage } = useChat()
 
@@ -70,6 +86,21 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
       try {
         setLoading(true)
         setError(null)
+        
+        // Clean up previous document when switching
+        if (pdfDocumentRef.current) {
+          console.log('Destroying previous PDF document...')
+          await pdfDocumentRef.current.destroy().catch((err) => {
+            console.error('Error destroying previous PDF document:', err)
+          })
+          pdfDocumentRef.current = null
+        }
+        
+        // Clear all cached data
+        setPageHeights(new Map())
+        setPageQuestionsMap(new Map())
+        setNumPages(0)
+        
         const info = await getDocumentViewUrl(documentId)
         setDocumentInfo(info)
         setCurrentPage(info.lastViewedPage)
@@ -147,7 +178,11 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
     })
   }, [visiblePageRange, numPages])
 
-  const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
+  const onDocumentLoadSuccess = useCallback((pdf: PDFDocumentProxy) => {
+    // Store PDF document instance for cleanup
+    pdfDocumentRef.current = pdf
+    
+    const numPages = pdf.numPages
     setNumPages(numPages)
     // Инициализируем refs для страниц
     pageRefs.current = new Array(numPages).fill(null)
@@ -163,13 +198,23 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
     // Прокручиваем к последней просмотренной странице
     // Use requestAnimationFrame for smoother, immediate scroll without visible delay
     requestAnimationFrame(() => {
-      scrollToPage(savedPage)
-      // Update visible page range after scroll is complete
-      requestAnimationFrame(() => {
-        updateVisiblePageRange()
-      })
+      // scrollToPage will be available when this runs
+      const pageRef = pageRefs.current[savedPage - 1]
+      if (pageRef && scrollContainerRef.current) {
+        const container = scrollContainerRef.current
+        const containerRect = container.getBoundingClientRect()
+        const pageRect = pageRef.getBoundingClientRect()
+        
+        // Вычисляем позицию для центрирования страницы
+        const scrollTop = pageRef.offsetTop - containerRect.height / 2 + pageRect.height / 2
+        
+        container.scrollTo({
+          top: Math.max(0, scrollTop),
+          behavior: 'auto'
+        })
+      }
     })
-  }
+  }, [documentInfo?.lastViewedPage])
 
   // Track fetching state to avoid duplicate requests
   const fetchingPagesRef = useRef<Set<number>>(new Set())
@@ -453,12 +498,26 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
     return () => clearInterval(interval)
   }, [cleanupOldHeights, cleanupOldQuestions])
 
-  // Cleanup on component unmount
+  // Comprehensive cleanup on component unmount
   useEffect(() => {
     return () => {
+      console.log('Cleaning up PDF viewer resources...')
+      
+      // Destroy PDF.js document instance to free memory
+      if (pdfDocumentRef.current) {
+        pdfDocumentRef.current.destroy().catch((err) => {
+          console.error('Error destroying PDF document:', err)
+        })
+        pdfDocumentRef.current = null
+      }
+      
+      // Clear all state to free memory
       setPageHeights(new Map())
       setPageQuestionsMap(new Map())
       setVisiblePageRange({ start: 1, end: 10 })
+      
+      // Clear page refs
+      pageRefs.current = []
     }
   }, [])
 
@@ -830,6 +889,7 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
               file={documentInfo.url}
               onLoadSuccess={onDocumentLoadSuccess}
               onLoadError={(error) => setError('Failed to load PDF document')}
+              options={pdfOptions}
             >
               {numPages > 0 ? (
                 Array.from({ length: numPages }, (_, index) => {
@@ -948,6 +1008,7 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
               file={documentInfo.url}
               onLoadSuccess={onDocumentLoadSuccess}
               onLoadError={(error) => setError('Failed to load PDF document')}
+              options={pdfOptions}
             >
               <Page
                 key={`page-${currentPage}-scale-${scale}`}
