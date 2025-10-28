@@ -48,20 +48,21 @@ export function FileUpload({ onUploadComplete }: FileUploadProps) {
     }
   }
 
-  const handleFileSelect = (file: File) => {
+  const handleFileSelect = async (file: File) => {
     setError(null)
     setSelectedFile(file)
+    
+    // Automatically upload the file
+    await handleUpload(file)
   }
 
-  const handleUpload = async () => {
-    if (!selectedFile) return
-
+  const handleUpload = async (file: File) => {
     setIsUploading(true)
     setError(null)
     setProgress(null)
 
     try {
-      await uploadPdfFile(selectedFile, (p) => {
+      await uploadPdfFile(file, (p) => {
         setProgress(p)
       })
 
@@ -90,18 +91,18 @@ export function FileUpload({ onUploadComplete }: FileUploadProps) {
   }
 
   return (
-    <div style={{ maxWidth: 600, margin: '0 auto' }}>
+    <div style={{ maxWidth: 900, margin: '0 auto', marginBottom: 48 }}>
       <div
         onDragEnter={handleDragEnter}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         style={{
-          border: `2px dashed ${isDragging ? '#4F46E5' : '#D1D5DB'}`,
-          borderRadius: 12,
-          padding: 48,
+          border: `2px dashed ${isDragging ? '#4F46E5' : '#E5E7EB'}`,
+          borderRadius: 8,
+          padding: '80px 48px',
           textAlign: 'center',
-          backgroundColor: isDragging ? '#EEF2FF' : '#F9FAFB',
+          backgroundColor: isDragging ? '#F9FAFB' : 'white',
           transition: 'all 0.2s ease',
           cursor: isUploading ? 'not-allowed' : 'pointer',
         }}
@@ -116,54 +117,16 @@ export function FileUpload({ onUploadComplete }: FileUploadProps) {
           disabled={isUploading}
         />
 
-        <div style={{ fontSize: 48, marginBottom: 16 }}>📄</div>
+        <img src="/icons/lucide-FileUp-Outlined.svg" alt="" style={{ width: 56, height: 56, marginBottom: 24, opacity: 0.6 }} />
         
-        <h3 style={{ margin: '0 0 8px 0', fontSize: 18, fontWeight: 600, color: '#111827' }}>
-          Drop PDF file here or click to browse
+        <h3 style={{ margin: '0 0 8px 0', fontSize: 16, fontWeight: 400, color: '#111827' }}>
+          Перетащите PDF-файл сюда или нажмите, чтобы выбрать
         </h3>
         
-        <p style={{ margin: 0, fontSize: 14, color: '#6B7280' }}>
-          Maximum file size: 200MB
+        <p style={{ margin: 0, fontSize: 14, color: '#6B7280', fontWeight: 400 }}>
+          Максимальный размер файла: 200 МБ
         </p>
       </div>
-
-      {selectedFile && !isUploading && (
-        <div style={{
-          marginTop: 24,
-          padding: 20,
-          backgroundColor: '#F3F4F6',
-          borderRadius: 8,
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <div style={{ fontWeight: 600, color: '#111827', marginBottom: 4 }}>
-                {selectedFile.name}
-              </div>
-              <div style={{ fontSize: 14, color: '#6B7280' }}>
-                {formatFileSize(selectedFile.size)}
-              </div>
-            </div>
-            <button
-              onClick={handleUpload}
-              style={{
-                padding: '10px 24px',
-                backgroundColor: '#4F46E5',
-                color: 'white',
-                border: 'none',
-                borderRadius: 6,
-                fontSize: 14,
-                fontWeight: 600,
-                cursor: 'pointer',
-                transition: 'background-color 0.2s',
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#4338CA'}
-              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#4F46E5'}
-            >
-              Upload
-            </button>
-          </div>
-        </div>
-      )}
 
       {isUploading && progress && (
         <div style={{ marginTop: 24 }}>

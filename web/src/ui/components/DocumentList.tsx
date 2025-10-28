@@ -48,9 +48,9 @@ export function DocumentList({ refreshTrigger, onDocumentClick }: DocumentListPr
       return 'Invalid date'
     }
     
-    return date.toLocaleDateString('en-US', {
+    return date.toLocaleDateString('ru-RU', {
       year: 'numeric',
-      month: 'short',
+      month: 'long',
       day: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
@@ -115,88 +115,112 @@ export function DocumentList({ refreshTrigger, onDocumentClick }: DocumentListPr
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 16,
+        marginBottom: 24,
+        paddingTop: 24,
+        borderTop: '1px solid #E5E7EB',
       }}>
-        <h2 style={{ margin: 0, fontSize: 20, fontWeight: 600, color: '#111827' }}>
-          Your Documents ({documents.length})
+        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: '#111827' }}>
+          Ваши документы ({documents.length})
         </h2>
         <button
           onClick={loadDocuments}
           style={{
             padding: '8px 16px',
-            backgroundColor: '#F3F4F6',
+            backgroundColor: 'white',
             color: '#374151',
             border: '1px solid #D1D5DB',
             borderRadius: 6,
             fontSize: 14,
-            fontWeight: 500,
+            fontWeight: 400,
             cursor: 'pointer',
-            transition: 'background-color 0.2s',
+            transition: 'all 0.2s',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
           }}
-          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#E5E7EB'}
-          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#F3F4F6'}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = '#F9FAFB'
+            e.currentTarget.style.borderColor = '#9CA3AF'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = 'white'
+            e.currentTarget.style.borderColor = '#D1D5DB'
+          }}
         >
-          🔄 Refresh
+          <img src="/icons/lucide-RefreshCcw-Outlined.svg" alt="" style={{ width: 16, height: 16 }} />
+          Обновить
         </button>
       </div>
 
-      <div style={{ display: 'grid', gap: 16 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {documents.map((doc) => (
           <div
             key={doc.id}
             style={{
-              padding: 20,
+              padding: '16px 20px',
               backgroundColor: 'white',
-              border: '1px solid #E5E7EB',
-              borderRadius: 12,
-              transition: 'box-shadow 0.2s',
+              border: '1px solid #F3F4F6',
+              borderRadius: 8,
+              transition: 'background-color 0.2s',
               cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 16,
             }}
-            onMouseEnter={(e) => e.currentTarget.style.boxShadow = '0 4px 6px -1px rgb(0 0 0 / 0.1)'}
-            onMouseLeave={(e) => e.currentTarget.style.boxShadow = 'none'}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#F9FAFB'}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
             onClick={() => onDocumentClick(doc.id)}
           >
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
-              <div style={{ fontSize: 40, lineHeight: 1 }}>📄</div>
+            <img src="/icons/lucide-FileText-Outlined.svg" alt="" style={{ width: 24, height: 24, flexShrink: 0, opacity: 0.6 }} />
+            
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <h3 style={{
+                margin: '0 0 8px 0',
+                fontSize: 14,
+                fontWeight: 400,
+                color: '#374151',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}>
+                {doc.title || 'Untitled Document'}
+              </h3>
               
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <h3 style={{
-                  margin: '0 0 8px 0',
-                  fontSize: 16,
-                  fontWeight: 600,
-                  color: '#111827',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
+              <div style={{
+                display: 'flex',
+                gap: 16,
+                fontSize: 13,
+                color: '#6B7280',
+                alignItems: 'center',
+              }}>
+                <span>
+                  {formatFileSize(doc.sizeBytes)}
+                </span>
+                <span>
+                  {formatDate(doc.createdAt)}
+                </span>
+                <span style={{
+                  padding: '2px 10px',
+                  backgroundColor: doc.status === 'uploaded' ? '#374151' : '#DBEAFE',
+                  color: doc.status === 'uploaded' ? '#FFFFFF' : '#1E40AF',
+                  borderRadius: 12,
+                  fontSize: 12,
+                  fontWeight: 500,
                 }}>
-                  {doc.title || 'Untitled Document'}
-                </h3>
-                
-                <div style={{
-                  display: 'flex',
-                  gap: 16,
-                  fontSize: 14,
-                  color: '#6B7280',
-                  flexWrap: 'wrap',
-                }}>
-                  <span>
-                    📦 {formatFileSize(doc.sizeBytes)}
-                  </span>
-                  <span>
-                    📅 {formatDate(doc.createdAt)}
-                  </span>
-                  <span style={{
-                    padding: '2px 8px',
-                    backgroundColor: doc.status === 'uploaded' ? '#D1FAE5' : '#FEE2E2',
-                    color: doc.status === 'uploaded' ? '#065F46' : '#991B1B',
-                    borderRadius: 4,
-                    fontSize: 12,
-                    fontWeight: 600,
-                  }}>
-                    {doc.status}
-                  </span>
-                </div>
+                  {doc.status === 'uploaded' ? 'загружено' : doc.status === 'processing' ? 'обрабатывается' : doc.status}
+                </span>
               </div>
+            </div>
+
+            <div style={{
+              fontSize: 18,
+              color: '#9CA3AF',
+              cursor: 'pointer',
+              flexShrink: 0,
+              lineHeight: 1,
+              transform: 'rotate(90deg)',
+            }}>
+              ⋯
             </div>
           </div>
         ))}

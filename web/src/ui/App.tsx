@@ -35,15 +35,14 @@ function AppContent() {
   return (
     <div style={{
       minHeight: '100vh',
-      backgroundColor: '#F9FAFB',
+      backgroundColor: '#FFFFFF',
       fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
     }}>
       {/* Header */}
       <header style={{
         backgroundColor: 'white',
-        borderBottom: '1px solid #E5E7EB',
         padding: '20px 0',
-        marginBottom: 48,
+        marginBottom: 40,
       }}>
         <div style={{
           maxWidth: 1200,
@@ -53,27 +52,18 @@ function AppContent() {
           justifyContent: 'space-between',
           alignItems: 'center',
         }}>
-          <div>
-            <h1 style={{
-              margin: 0,
-              fontSize: 28,
-              fontWeight: 700,
-              color: '#111827',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 12,
-            }}>
-              <span>📚</span>
-              Innesi Reader
-            </h1>
-            <p style={{
-              margin: '8px 0 0 0',
-              fontSize: 14,
-              color: '#6B7280',
-            }}>
-              {viewMode === 'library' ? 'Upload and manage your PDF documents' : 'Reading PDF document'}
-            </p>
-          </div>
+          <h1 style={{
+            margin: 0,
+            fontSize: 20,
+            fontWeight: 400,
+            color: '#3B82F6',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+          }}>
+            <img src="/icons/lucide-FileText-Outlined.svg" alt="" style={{ width: 20, height: 20 }} />
+            Innesi Reader
+          </h1>
           <UserMenu />
         </div>
       </header>
@@ -88,26 +78,13 @@ function AppContent() {
           {viewMode === 'library' ? (
             <>
               {/* Upload Section */}
-              <section style={{ marginBottom: 48 }}>
-                <h2 style={{
-                  margin: '0 0 24px 0',
-                  fontSize: 20,
-                  fontWeight: 600,
-                  color: '#111827',
-                  textAlign: 'center',
-                }}>
-                  Upload PDF Document
-                </h2>
-                <FileUpload onUploadComplete={handleUploadComplete} />
-              </section>
+              <FileUpload onUploadComplete={handleUploadComplete} />
 
               {/* Documents Section */}
-              <section>
-                <DocumentList 
-                  refreshTrigger={refreshTrigger} 
-                  onDocumentClick={handleDocumentClick}
-                />
-              </section>
+              <DocumentList 
+                refreshTrigger={refreshTrigger} 
+                onDocumentClick={handleDocumentClick}
+              />
             </>
           ) : (
             /* Reader Mode - PdfViewer will handle the full screen display */
