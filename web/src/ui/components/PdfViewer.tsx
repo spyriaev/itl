@@ -35,10 +35,11 @@ console.warn = (...args: any[]) => {
 }
 
 // Virtualization settings for memory optimization  
-const PAGES_BUFFER = 10 // Number of pages to render before and after visible pages (increased to reduce text layer cancellation)
+const PAGES_BUFFER = 15 // Number of pages to render before and after visible pages (increased to reduce text layer cancellation)
 const PAGE_HEIGHT_ESTIMATE = 1100 // Estimated height of a page in pixels for virtualization
 const CLEANUP_INTERVAL = 30000 // Interval to clean up old page data (30 seconds)
 const MAX_CACHE_PAGES = PAGES_BUFFER * 4 // Maximum pages to keep in memory (4x buffer size)
+const SCROLL_THROTTLE_MS = 50 // Reduced throttle for faster range updates during scrolling
 
 interface PdfViewerProps {
   documentId: string
@@ -71,6 +72,10 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
   
   // Store PDF document instance for cleanup
   const pdfDocumentRef = useRef<PDFDocumentProxy | null>(null)
+  
+  // Track scroll velocity for dynamic buffering
+  const lastScrollTopRef = useRef(0)
+  const lastScrollTimeRef = useRef(Date.now())
   
   // Get chat context for navigation
   const { navigateToMessage } = useChat()
@@ -325,18 +330,31 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
     const container = scrollContainerRef.current
     const scrollTop = container.scrollTop
     const containerHeight = container.clientHeight
+    
+    // Calculate scroll velocity for dynamic buffering
+    const now = Date.now()
+    const timeDelta = now - lastScrollTimeRef.current
+    const scrollDelta = Math.abs(scrollTop - lastScrollTopRef.current)
+    const scrollVelocity = timeDelta > 0 ? scrollDelta / timeDelta : 0
+    
+    lastScrollTopRef.current = scrollTop
+    lastScrollTimeRef.current = now
+    
+    // Dynamically adjust buffer based on scroll velocity
+    // Faster scrolling = larger buffer to prevent unmounting
+    const dynamicBuffer = scrollVelocity > 0.5 ? PAGES_BUFFER + 5 : PAGES_BUFFER
 
     // Calculate which pages are in viewport
     let estimatedPage = Math.floor(scrollTop / PAGE_HEIGHT_ESTIMATE) + 1
     estimatedPage = Math.max(1, Math.min(estimatedPage, numPages))
 
-    // Add buffer pages before and after
-    const start = Math.max(1, estimatedPage - PAGES_BUFFER)
-    const end = Math.min(numPages, estimatedPage + PAGES_BUFFER + Math.ceil(containerHeight / PAGE_HEIGHT_ESTIMATE))
+    // Add buffer pages before and after with dynamic buffer size
+    const start = Math.max(1, estimatedPage - dynamicBuffer)
+    const end = Math.min(numPages, estimatedPage + dynamicBuffer + Math.ceil(containerHeight / PAGE_HEIGHT_ESTIMATE))
 
     setVisiblePageRange(prev => {
       if (prev.start !== start || prev.end !== end) {
-        console.log(`Rendering pages ${start} to ${end}`)
+        console.log(`Rendering pages ${start} to ${end} (buffer: ${dynamicBuffer})`)
         return { start, end }
       }
       return prev
@@ -445,7 +463,7 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
       // Use requestAnimationFrame for smoother updates
       rafId = requestAnimationFrame(() => {
         clearTimeout(timeoutId)
-        timeoutId = setTimeout(handleScroll, 100) // Increased for better performance
+        timeoutId = setTimeout(handleScroll, SCROLL_THROTTLE_MS) // Reduced for better responsiveness
         rafId = null
       })
     }
