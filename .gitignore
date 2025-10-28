@@ -19,7 +19,7 @@ build/
 .env.*.local
 *.log
 # Python cache files
-__pycache__/
+/server/__pycache__/
 *.py[cod]
 *$py.class
 *.so

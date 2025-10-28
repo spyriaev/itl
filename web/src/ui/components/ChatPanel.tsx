@@ -401,6 +401,11 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
         ) : (
           <>
             {messages.map((message) => {
+              // Skip empty assistant messages - they'll be shown as "AI is thinking..."
+              if (message.role === 'assistant' && !message.content) {
+                return null
+              }
+              
               const isNewMessage = !renderedMessageIdsRef.current.has(message.id)
               const wasNavigating = prevTargetMessageIdRef.current !== null
               
@@ -430,45 +435,17 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
               )
             })}
             
-            {/* Loading indicator */}
-            {isStreaming && (
+            {/* Loading indicator - only show when streaming and last message is empty assistant */}
+            {isStreaming && messages.length > 0 && (() => {
+              const lastMessage = messages[messages.length - 1]
+              return lastMessage.role === 'assistant' && !lastMessage.content
+            })() && (
               <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
                 padding: '12px 16px',
-                color: '#6B7280',
                 fontSize: 14,
-              }}>
-                <div style={{
-                  display: 'flex',
-                  gap: 4,
-                }}>
-                  <div style={{
-                    width: 6,
-                    height: 6,
-                    backgroundColor: '#6B7280',
-                    borderRadius: '50%',
-                    animation: 'pulse 1.4s ease-in-out infinite both',
-                  }} />
-                  <div style={{
-                    width: 6,
-                    height: 6,
-                    backgroundColor: '#6B7280',
-                    borderRadius: '50%',
-                    animation: 'pulse 1.4s ease-in-out infinite both',
-                    animationDelay: '0.2s',
-                  }} />
-                  <div style={{
-                    width: 6,
-                    height: 6,
-                    backgroundColor: '#6B7280',
-                    borderRadius: '50%',
-                    animation: 'pulse 1.4s ease-in-out infinite both',
-                    animationDelay: '0.4s',
-                  }} />
-                </div>
-                <span>AI is thinking...</span>
+                textAlign: 'left',
+              }} className="thinking-text">
+                AI is thinking...
               </div>
             )}
             
@@ -592,6 +569,33 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
           }
           100% {
             background-color: transparent;
+          }
+        }
+        
+        .thinking-text {
+          background: linear-gradient(
+            90deg,
+            #6B7280 0%,
+            #6B7280 35%,
+            #9CA3AF 40%,
+            #FFFFFF 50%,
+            #9CA3AF 60%,
+            #6B7280 65%,
+            #6B7280 100%
+          );
+          background-size: 250% 100%;
+          background-clip: text;
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          animation: shimmer 3s linear infinite;
+        }
+        
+        @keyframes shimmer {
+          0% {
+            background-position: 150% center;
+          }
+          100% {
+            background-position: -150% center;
           }
         }
       `}</style>

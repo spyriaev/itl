@@ -160,7 +160,7 @@ class MockAIService:
         
         # Имитируем задержку обработки запроса (3 секунды)
         logger.debug("⏳ Mock: Simulating AI processing delay...")
-        await asyncio.sleep(3)
+        await asyncio.sleep(20)
         
         # Получаем последнее сообщение пользователя
         last_message = messages[-1]["content"] if messages else "Не могу понять ваш вопрос"
@@ -204,7 +204,7 @@ class MockAIService:
         
         # Имитируем задержку обработки запроса (3 секунды)
         logger.debug("⏳ Mock: Simulating AI processing delay...")
-        await asyncio.sleep(3)
+        await asyncio.sleep(20)
         
         # Получаем последнее сообщение пользователя
         last_message = messages[-1]["content"] if messages else "Не могу понять ваш вопрос"
