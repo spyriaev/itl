@@ -18,50 +18,32 @@ export function UserMenu() {
   }
 
   return (
-    <div style={{ position: "relative" }}>
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          border: "none",
-          background: "transparent",
-          cursor: "pointer",
-          padding: 0,
-        }}
-      >
-        <div
-          style={{
-            width: 40,
-            height: 40,
-            borderRadius: "50%",
-            backgroundColor: "#e0e7ff",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: 14,
-            fontWeight: 500,
-            color: "#2d66f5",
-            overflow: "hidden",
-          }}
-        >
-          {user.photoURL ? (
-            <img
-              src={user.photoURL || "/placeholder.svg"}
-              alt={user.email || "User"}
-              style={{ width: "100%", height: "100%", objectFit: "cover" }}
-            />
-          ) : (
-            getInitials(user.email || "U")
-          )}
-        </div>
+    <div className="user-menu">
+      <button className="user-menu-trigger" onClick={() => setIsOpen(!isOpen)}>
+        {user.photoURL ? (
+          <img src={user.photoURL || "/placeholder.svg"} alt={user.email || "User"} className="user-avatar" />
+        ) : (
+          <div
+            className="user-avatar"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 14,
+              fontWeight: 500,
+              color: "#2d66f5",
+              backgroundColor: "#e0e7ff",
+            }}
+          >
+            {getInitials(user.email || "U")}
+          </div>
+        )}
         <svg
           width="16"
           height="16"
           viewBox="0 0 24 24"
           fill="none"
-          stroke="#565e6c"
+          stroke="currentColor"
           strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -87,20 +69,7 @@ export function UserMenu() {
             }}
             onClick={() => setIsOpen(false)}
           />
-          <div
-            style={{
-              position: "absolute",
-              top: "calc(100% + 8px)",
-              right: 0,
-              backgroundColor: "#ffffff",
-              border: "1px solid #dee1e6",
-              borderRadius: 8,
-              boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)",
-              minWidth: 200,
-              zIndex: 1000,
-              overflow: "hidden",
-            }}
-          >
+          <div className="user-menu-dropdown">
             <div
               style={{
                 padding: "12px 16px",
@@ -126,26 +95,21 @@ export function UserMenu() {
                 {user.email}
               </div>
             </div>
-            <button
-              onClick={handleSignOut}
-              style={{
-                width: "100%",
-                padding: "12px 16px",
-                border: "none",
-                background: "transparent",
-                textAlign: "left",
-                cursor: "pointer",
-                fontSize: 14,
-                color: "#171a1f",
-                transition: "background-color 0.2s ease",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = "#f8f9fa"
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = "transparent"
-              }}
-            >
+            <button className="user-menu-item" onClick={handleSignOut}>
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                <polyline points="16 17 21 12 16 7"></polyline>
+                <line x1="21" y1="12" x2="9" y2="12"></line>
+              </svg>
               Sign out
             </button>
           </div>

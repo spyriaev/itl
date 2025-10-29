@@ -55,8 +55,6 @@ export function FileUpload({ onUploadComplete }: FileUploadProps) {
   const handleFileSelect = async (file: File) => {
     setError(null)
     setSelectedFile(file)
-
-    // Automatically upload the file
     await handleUpload(file)
   }
 
@@ -70,7 +68,6 @@ export function FileUpload({ onUploadComplete }: FileUploadProps) {
         setProgress(p)
       })
 
-      // Upload complete
       setSelectedFile(null)
       if (fileInputRef.current) {
         fileInputRef.current.value = ""
@@ -89,36 +86,16 @@ export function FileUpload({ onUploadComplete }: FileUploadProps) {
   }
 
   return (
-    <div
-      style={{
-        maxWidth: 1100,
-        margin: "0 auto",
-        marginBottom: 48,
-      }}
-    >
-      <div
-        style={{
-          backgroundColor: "#ffffff",
-          borderRadius: 12,
-          padding: "48px 32px",
-          marginBottom: 24,
-        }}
-      >
+    <div>
+      <div className="upload-area">
         <div
+          className={`upload-dropzone ${isDragging ? "drag-active" : ""}`}
           onDragEnter={handleDragEnter}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
-          style={{
-            border: `2px dashed ${isDragging ? "#2d66f5" : "#bcc1ca"}`,
-            borderRadius: 12,
-            padding: "80px 48px",
-            textAlign: "center",
-            backgroundColor: isDragging ? "#f1f8fd" : "transparent",
-            transition: "all 0.2s ease",
-            cursor: isUploading ? "not-allowed" : "pointer",
-          }}
           onClick={() => !isUploading && fileInputRef.current?.click()}
+          style={{ cursor: isUploading ? "not-allowed" : "pointer" }}
         >
           <input
             ref={fileInputRef}
@@ -129,59 +106,23 @@ export function FileUpload({ onUploadComplete }: FileUploadProps) {
             disabled={isUploading}
           />
 
-          <div style={{ marginBottom: 24 }}>
-            <svg
-              width="64"
-              height="64"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="#2d66f5"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              style={{ margin: "0 auto", display: "block" }}
-            >
-              <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"></path>
-              <polyline points="16 16 12 12 8 16"></polyline>
-              <line x1="12" y1="12" x2="12" y2="21"></line>
-            </svg>
-          </div>
-
-          <h3
-            style={{
-              margin: "0 0 8px 0",
-              fontSize: 18,
-              fontWeight: 400,
-              color: "#171a1f",
-              lineHeight: 1.5,
-            }}
+          <svg
+            className="upload-icon"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
           >
-            Drag and drop here to upload.
-          </h3>
+            <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"></path>
+            <polyline points="16 16 12 12 8 16"></polyline>
+            <line x1="12" y1="12" x2="12" y2="21"></line>
+          </svg>
 
-          <p
-            style={{
-              margin: "0 0 16px 0",
-              fontSize: 16,
-              color: "#565e6c",
-              fontWeight: 400,
-              lineHeight: 1.5,
-            }}
-          >
-            Choose files or folders from your computer.
-          </p>
-
-          <p
-            style={{
-              margin: 0,
-              fontSize: 13,
-              color: "#9095a0",
-              fontWeight: 400,
-              fontStyle: "italic",
-            }}
-          >
-            Support .pdf, up to 25 MB
-          </p>
+          <div className="upload-text-primary">Drag and drop here to upload.</div>
+          <div className="upload-text-secondary">Choose files or folders from your computer.</div>
+          <div className="upload-text-hint">Support .pdf, up to 25 MB</div>
         </div>
 
         {isUploading && progress && (
@@ -254,37 +195,14 @@ export function FileUpload({ onUploadComplete }: FileUploadProps) {
       </div>
 
       {showInfo && (
-        <div
-          style={{
-            backgroundColor: "#ffffff",
-            borderRadius: 12,
-            padding: "24px 32px",
-            position: "relative",
-          }}
-        >
-          <button
-            onClick={() => setShowInfo(false)}
-            style={{
-              position: "absolute",
-              top: 16,
-              right: 16,
-              width: 24,
-              height: 24,
-              border: "none",
-              background: "transparent",
-              cursor: "pointer",
-              padding: 0,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
+        <div className="info-card">
+          <button className="info-card-close" onClick={() => setShowInfo(false)}>
             <svg
               width="16"
               height="16"
               viewBox="0 0 24 24"
               fill="none"
-              stroke="#9095a0"
+              stroke="currentColor"
               strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -294,81 +212,44 @@ export function FileUpload({ onUploadComplete }: FileUploadProps) {
             </svg>
           </button>
 
-          <h4
-            style={{
-              margin: "0 0 20px 0",
-              fontSize: 14,
-              fontWeight: 400,
-              color: "#9095a0",
-              textTransform: "uppercase",
-              letterSpacing: "0.5px",
-            }}
-          >
-            MORE OF WHAT YOU CAN DO:
-          </h4>
+          <div className="info-card-title">MORE OF WHAT YOU CAN DO:</div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
-              <div
-                style={{
-                  width: 20,
-                  height: 20,
-                  flexShrink: 0,
-                  marginTop: 2,
-                }}
+          <div className="info-card-items">
+            <div className="info-card-item">
+              <svg
+                className="info-card-icon"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
               >
-                <svg
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="#2d66f5"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
-                  <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
-                </svg>
-              </div>
-              <div>
-                <span style={{ fontSize: 15, color: "#171a1f", fontWeight: 500 }}>Take Your Files Anywhere</span>
-                <span style={{ fontSize: 15, color: "#6e7787", fontWeight: 400 }}>
-                  {" "}
-                  for easy access on all your devices
-                </span>
+                <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
+                <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
+              </svg>
+              <div className="info-card-content">
+                <span className="info-card-item-title">Take Your Files Anywhere</span>{" "}
+                <span className="info-card-item-description">for easy access on all your devices</span>
               </div>
             </div>
 
-            <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
-              <div
-                style={{
-                  width: 20,
-                  height: 20,
-                  flexShrink: 0,
-                  marginTop: 2,
-                }}
+            <div className="info-card-item">
+              <svg
+                className="info-card-icon"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
               >
-                <svg
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="#2d66f5"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                  <polyline points="14 2 14 8 20 8"></polyline>
-                </svg>
-              </div>
-              <div>
-                <span style={{ fontSize: 15, color: "#171a1f", fontWeight: 500 }}>Supported Files</span>
-                <span style={{ fontSize: 15, color: "#6e7787", fontWeight: 400 }}>
-                  {" "}
-                  upload PDF files with a maximum size of 25 MB
-                </span>
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+              </svg>
+              <div className="info-card-content">
+                <span className="info-card-item-title">Supported Files</span>{" "}
+                <span className="info-card-item-description">upload PDF files with a maximum size of 25 MB</span>
               </div>
             </div>
           </div>
