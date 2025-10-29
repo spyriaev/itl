@@ -138,7 +138,7 @@ importers:
         specifier: 16.0.0
         version: 16.0.0(@babel/core@7.28.5)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(sass@1.93.2)
       next-themes:
-        specifier: ^0.4.6
+        specifier: latest
         version: 0.4.6(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
       pdfjs-dist:
         specifier: latest
