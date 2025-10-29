@@ -14,7 +14,6 @@ export function FileUpload({ onUploadComplete }: FileUploadProps) {
   const [progress, setProgress] = useState<UploadProgress | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
-  const [showInfo, setShowInfo] = useState(true)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleDragEnter = (e: React.DragEvent) => {
@@ -193,68 +192,6 @@ export function FileUpload({ onUploadComplete }: FileUploadProps) {
           </div>
         )}
       </div>
-
-      {showInfo && (
-        <div className="info-card">
-          <button className="info-card-close" onClick={() => setShowInfo(false)}>
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <line x1="18" y1="6" x2="6" y2="18"></line>
-              <line x1="6" y1="6" x2="18" y2="18"></line>
-            </svg>
-          </button>
-
-          <div className="info-card-title">MORE OF WHAT YOU CAN DO:</div>
-
-          <div className="info-card-items">
-            <div className="info-card-item">
-              <svg
-                className="info-card-icon"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
-                <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
-              </svg>
-              <div className="info-card-content">
-                <span className="info-card-item-title">Take Your Files Anywhere</span>{" "}
-                <span className="info-card-item-description">for easy access on all your devices</span>
-              </div>
-            </div>
-
-            <div className="info-card-item">
-              <svg
-                className="info-card-icon"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                <polyline points="14 2 14 8 20 8"></polyline>
-              </svg>
-              <div className="info-card-content">
-                <span className="info-card-item-title">Supported Files</span>{" "}
-                <span className="info-card-item-description">upload PDF files with a maximum size of 25 MB</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
