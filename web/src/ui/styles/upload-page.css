@@ -279,13 +279,42 @@ body {
   border-radius: 16px;
   padding: 0;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-  overflow: hidden;
 }
 
 /* Document Table */
 .document-table {
   width: 100%;
   border-collapse: collapse;
+  table-layout: fixed; /* allow controlled column widths and prevent overflow */
+}
+
+/* Prevent header text from overflowing when space is tight */
+.document-table-header th {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Column widths: Name flexes most; others compact */
+.document-table th:nth-child(1),
+.document-table td:nth-child(1) {
+  width: 58%;
+}
+
+.document-table th:nth-child(2),
+.document-table td:nth-child(2) {
+  width: 14%;
+}
+
+.document-table th:nth-child(3),
+.document-table td:nth-child(3) {
+  width: 18%;
+}
+
+.document-table th:nth-child(4),
+.document-table td:nth-child(4) {
+  width: 10%;
+  text-align: right;
 }
 
 .document-table-header {
@@ -354,11 +383,9 @@ body {
 .document-name {
   font-weight: 400;
   color: #171a1f;
-  /* Add text overflow handling for long file names */
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 100%;
 }
 
 .document-size {

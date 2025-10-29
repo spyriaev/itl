@@ -12,6 +12,7 @@ export function DocumentList({ refreshTrigger, onDocumentClick }: DocumentListPr
   const [documents, setDocuments] = useState<DocumentMetadata[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isMobile, setIsMobile] = useState(false)
 
   const loadDocuments = async () => {
     try {
@@ -29,6 +30,28 @@ export function DocumentList({ refreshTrigger, onDocumentClick }: DocumentListPr
   useEffect(() => {
     loadDocuments()
   }, [refreshTrigger])
+
+  useEffect(() => {
+    const mql = window.matchMedia('(max-width: 480px)')
+    const handler = (e: MediaQueryListEvent | MediaQueryList) => {
+      // both types have .matches
+      // @ts-ignore - narrow for runtime
+      setIsMobile(!!e.matches)
+    }
+    handler(mql)
+    if (typeof mql.addEventListener === 'function') {
+      mql.addEventListener('change', handler as (e: MediaQueryListEvent) => void)
+      return () => mql.removeEventListener('change', handler as (e: MediaQueryListEvent) => void)
+    } else {
+      // Safari <14 fallback
+      // @ts-ignore
+      mql.addListener(handler)
+      return () => {
+        // @ts-ignore
+        mql.removeListener(handler)
+      }
+    }
+  }, [])
 
   const formatFileSize = (bytes: number | null | undefined): string => {
     if (bytes === null || bytes === undefined || bytes < 0) {
@@ -145,52 +168,105 @@ export function DocumentList({ refreshTrigger, onDocumentClick }: DocumentListPr
         </button>
       </div>
 
-      {/* Document Table */}
-      <div className="document-list-container">
-        <table className="document-table">
-          <thead className="document-table-header">
-            <tr>
-              <th>Name</th>
-              <th>Size</th>
-              <th>Last modified</th>
-              <th>Questions</th>
-            </tr>
-          </thead>
-          <tbody className="document-table-body">
-            {documents.map((doc) => (
-              <tr key={doc.id} onClick={() => onDocumentClick(doc.id)}>
-                <td>
-                  <div className="document-name-cell">
-                    <svg
-                      className="document-icon"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                      <polyline points="14 2 14 8 20 8"></polyline>
-                      <line x1="16" y1="13" x2="8" y2="13"></line>
-                      <line x1="16" y1="17" x2="8" y2="17"></line>
-                      <polyline points="10 9 9 9 8 9"></polyline>
-                    </svg>
-                    <span className="document-name">{doc.title || "Untitled Document"}</span>
-                  </div>
-                </td>
-                <td className="document-size">{formatFileSize(doc.sizeBytes)}</td>
-                <td className="document-date">{formatDate(doc.createdAt)}</td>
-                <td>
-                  {doc.status === "uploaded" && (
+      {/* List */}
+      {isMobile ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {documents.map((doc) => (
+            <button
+              key={doc.id}
+              onClick={() => onDocumentClick(doc.id)}
+              style={{
+                textAlign: 'left',
+                padding: 12,
+                border: '1px solid #EEF0F3',
+                borderRadius: 12,
+                backgroundColor: 'white',
+                display: 'flex',
+                gap: 12,
+                alignItems: 'flex-start',
+                cursor: 'pointer',
+              }}
+            >
+              <svg
+                className="document-icon"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                style={{ flexShrink: 0 }}
+              >
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+                <line x1="16" y1="13" x2="8" y2="13"></line>
+                <line x1="16" y1="17" x2="8" y2="17"></line>
+                <polyline points="10 9 9 9 8 9"></polyline>
+              </svg>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span className="document-name" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {doc.title || 'Untitled Document'}
+                  </span>
+                  {doc.status === 'uploaded' && (
                     <span className="document-questions-badge">{Math.floor(Math.random() * 10) + 1}</span>
                   )}
-                </td>
+                </div>
+                <div style={{ display: 'flex', gap: 12, marginTop: 8, color: '#6e7787', fontSize: 13 }}>
+                  <span>Size: {formatFileSize(doc.sizeBytes)}</span>
+                  <span>Modified: {formatDate(doc.createdAt)}</span>
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div className="document-list-container">
+          <table className="document-table">
+            <thead className="document-table-header">
+              <tr>
+                <th>Name</th>
+                <th>Size</th>
+                <th>Last modified</th>
+                <th>Questions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody className="document-table-body">
+              {documents.map((doc) => (
+                <tr key={doc.id} onClick={() => onDocumentClick(doc.id)}>
+                  <td>
+                    <div className="document-name-cell">
+                      <svg
+                        className="document-icon"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                        <polyline points="10 9 9 9 8 9"></polyline>
+                      </svg>
+                      <span className="document-name">{doc.title || "Untitled Document"}</span>
+                    </div>
+                  </td>
+                  <td className="document-size">{formatFileSize(doc.sizeBytes)}</td>
+                  <td className="document-date">{formatDate(doc.createdAt)}</td>
+                  <td>
+                    {doc.status === "uploaded" && (
+                      <span className="document-questions-badge">{Math.floor(Math.random() * 10) + 1}</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   )
 }
