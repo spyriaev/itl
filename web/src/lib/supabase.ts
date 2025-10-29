@@ -29,6 +29,3 @@ export async function uploadPdfToStorage(file: File, storageKey: string): Promis
 
   return data.path
 }
-
-
-

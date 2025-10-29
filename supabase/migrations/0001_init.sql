@@ -33,4 +33,3 @@ create table if not exists public.document_chunks (
 
 create index if not exists document_chunks_doc_idx on public.document_chunks(doc_id, chunk_order);
 create index if not exists document_chunks_embed_idx on public.document_chunks using ivfflat (embedding vector_cosine_ops) with (lists = 100);
-

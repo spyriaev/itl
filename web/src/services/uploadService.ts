@@ -271,5 +271,3 @@ export async function updateViewProgress(documentId: string, page: number): Prom
     throw new Error(error.error || 'Failed to update progress')
   }
 }
-
-

@@ -11,5 +11,3 @@ ALTER TABLE public.documents
 
 -- Add a comment to document the change
 COMMENT ON COLUMN public.documents.owner_id IS 'UUID of the user who owns this document. Required after authentication implementation.';
-
-

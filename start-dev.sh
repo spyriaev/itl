@@ -78,5 +78,3 @@ echo ""
 
 # Wait for all background processes
 wait
-
-

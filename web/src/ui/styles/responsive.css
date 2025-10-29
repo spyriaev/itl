@@ -1,0 +1,100 @@
+/* Added responsive styles for tablet and mobile */
+
+/* Tablet styles */
+@media (max-width: 1024px) {
+  header > div {
+    padding: 0 24px !important;
+  }
+
+  main {
+    padding: 32px 24px !important;
+  }
+
+  h2 {
+    font-size: 28px !important;
+  }
+}
+
+/* Mobile styles */
+@media (max-width: 768px) {
+  header > div {
+    padding: 0 16px !important;
+  }
+
+  header h1 {
+    font-size: 20px !important;
+  }
+
+  header > div > div:first-child {
+    gap: 8px !important;
+  }
+
+  header > div > div:first-child > div {
+    width: 32px !important;
+    height: 32px !important;
+  }
+
+  header > div > div:first-child > div svg {
+    width: 18px !important;
+    height: 18px !important;
+  }
+
+  main {
+    padding: 24px 16px !important;
+  }
+
+  main > div > div:first-child {
+    flex-direction: column;
+    align-items: flex-start !important;
+    gap: 16px !important;
+  }
+
+  h2 {
+    font-size: 24px !important;
+  }
+
+  /* Upload area adjustments */
+  .file-upload-container > div:first-child {
+    padding: 32px 16px !important;
+  }
+
+  .file-upload-container > div:first-child > div {
+    padding: 48px 24px !important;
+  }
+
+  .file-upload-container > div:first-child > div h3 {
+    font-size: 16px !important;
+  }
+
+  .file-upload-container > div:first-child > div p {
+    font-size: 14px !important;
+  }
+
+  /* Info card adjustments */
+  .file-upload-container > div:last-child {
+    padding: 20px 16px !important;
+  }
+
+  .file-upload-container > div:last-child > div:last-child {
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 480px) {
+  header h1 {
+    font-size: 18px !important;
+  }
+
+  h2 {
+    font-size: 20px !important;
+  }
+
+  .file-upload-container > div:first-child > div {
+    padding: 40px 16px !important;
+  }
+
+  .file-upload-container > div:first-child > div svg {
+    width: 48px !important;
+    height: 48px !important;
+  }
+}

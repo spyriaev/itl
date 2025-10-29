@@ -338,5 +338,3 @@ dividerStyle.textContent = `
   }
 `
 document.head.appendChild(dividerStyle)
-
-

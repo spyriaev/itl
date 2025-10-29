@@ -117,4 +117,3 @@ export function PageRelatedQuestions({ questionsData, onQuestionClick }: PageRel
     </div>
   )
 }
-

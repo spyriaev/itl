@@ -8,7 +8,7 @@
 
 ### Пример использования в коде:
 
-```tsx
+\`\`\`tsx
 // В React компоненте
 <img src="/icons/document.svg" alt="document" style={{ width: 24, height: 24 }} />
 
@@ -19,7 +19,7 @@
 .icon {
   background-image: url('/icons/document.svg');
 }
-```
+\`\`\`
 
 ## Пути
 
@@ -30,4 +30,3 @@
 
 - `/public/icons/` - статические файлы, доступны по прямому URL
 - `/src/assets/icons/` - импортируются в код, обрабатываются Vite
-

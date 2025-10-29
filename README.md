@@ -19,21 +19,21 @@ This repository contains all the functionality for Supabase CLI.
 
 Available via [NPM](https://www.npmjs.com) as dev dependency. To install:
 
-```bash
+\`\`\`bash
 npm i supabase --save-dev
-```
+\`\`\`
 
 To install the beta release channel:
 
-```bash
+\`\`\`bash
 npm i supabase@beta --save-dev
-```
+\`\`\`
 
 When installing with yarn 4, you need to disable experimental fetch with the following nodejs config.
 
-```
+\`\`\`
 NODE_OPTIONS=--no-experimental-fetch yarn add supabase
-```
+\`\`\`
 
 > **Note**
 For Bun versions below v1.0.17, you must add `supabase` as a [trusted dependency](https://bun.sh/guides/install/trusted) before running `bun add -D supabase`.
@@ -43,22 +43,22 @@ For Bun versions below v1.0.17, you must add `supabase` as a [trusted dependency
 
   Available via [Homebrew](https://brew.sh). To install:
 
-  ```sh
+  \`\`\`sh
   brew install supabase/tap/supabase
-  ```
+  \`\`\`
 
   To install the beta release channel:
   
-  ```sh
+  \`\`\`sh
   brew install supabase/tap/supabase-beta
   brew link --overwrite supabase-beta
-  ```
+  \`\`\`
   
   To upgrade:
 
-  ```sh
+  \`\`\`sh
   brew upgrade supabase
-  ```
+  \`\`\`
 </details>
 
 <details>
@@ -66,16 +66,16 @@ For Bun versions below v1.0.17, you must add `supabase` as a [trusted dependency
 
   Available via [Scoop](https://scoop.sh). To install:
 
-  ```powershell
+  \`\`\`powershell
   scoop bucket add supabase https://github.com/supabase/scoop-bucket.git
   scoop install supabase
-  ```
+  \`\`\`
 
   To upgrade:
 
-  ```powershell
+  \`\`\`powershell
   scoop update supabase
-  ```
+  \`\`\`
 </details>
 
 <details>
@@ -87,35 +87,35 @@ For Bun versions below v1.0.17, you must add `supabase` as a [trusted dependency
 
   To install:
 
-  ```sh
+  \`\`\`sh
   brew install supabase/tap/supabase
-  ```
+  \`\`\`
 
   To upgrade:
 
-  ```sh
+  \`\`\`sh
   brew upgrade supabase
-  ```
+  \`\`\`
 
   #### via Linux packages
 
   Linux packages are provided in [Releases](https://github.com/supabase/cli/releases). To install, download the `.apk`/`.deb`/`.rpm`/`.pkg.tar.zst` file depending on your package manager and run the respective commands.
 
-  ```sh
+  \`\`\`sh
   sudo apk add --allow-untrusted <...>.apk
-  ```
+  \`\`\`
 
-  ```sh
+  \`\`\`sh
   sudo dpkg -i <...>.deb
-  ```
+  \`\`\`
 
-  ```sh
+  \`\`\`sh
   sudo rpm -i <...>.rpm
-  ```
+  \`\`\`
 
-  ```sh
+  \`\`\`sh
   sudo pacman -U <...>.pkg.tar.zst
-  ```
+  \`\`\`
 </details>
 
 <details>
@@ -123,15 +123,15 @@ For Bun versions below v1.0.17, you must add `supabase` as a [trusted dependency
 
   You can also install the CLI via [go modules](https://go.dev/ref/mod#go-install) without the help of package managers.
 
-  ```sh
+  \`\`\`sh
   go install github.com/supabase/cli@latest
-  ```
+  \`\`\`
 
   Add a symlink to the binary in `$PATH` for easier access:
 
-  ```sh
+  \`\`\`sh
   ln -s "$(go env GOPATH)/bin/cli" /usr/bin/supabase
-  ```
+  \`\`\`
 
   This works on other non-standard Linux distros.
 </details>
@@ -142,24 +142,24 @@ For Bun versions below v1.0.17, you must add `supabase` as a [trusted dependency
   Available via [pkgx](https://pkgx.sh/). Package script [here](https://github.com/pkgxdev/pantry/blob/main/projects/supabase.com/cli/package.yml).
   To install in your working directory:
 
-  ```bash
+  \`\`\`bash
   pkgx install supabase
-  ```
+  \`\`\`
 
   Available via [Nixpkgs](https://nixos.org/). Package script [here](https://github.com/NixOS/nixpkgs/blob/master/pkgs/development/tools/supabase-cli/default.nix).
 </details>
 
 ### Run the CLI
 
-```bash
+\`\`\`bash
 supabase bootstrap
-```
+\`\`\`
 
 Or using npx:
 
-```bash
+\`\`\`bash
 npx supabase bootstrap
-```
+\`\`\`
 
 The bootstrap command will guide you through the process of setting up a Supabase project using one of the [starter](https://github.com/supabase-community/supabase-samples/blob/main/samples.json) templates.
 
@@ -177,7 +177,7 @@ However, due to dependencies on other service images, we cannot guarantee that s
 
 To run from source:
 
-```sh
+\`\`\`sh
 # Go >= 1.22
 go run . help
-```
+\`\`\`

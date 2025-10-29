@@ -13,30 +13,30 @@ React + Vite + TypeScript application for AI Reader with PDF upload functionalit
 ## Setup
 
 1. Install dependencies:
-```bash
+\`\`\`bash
 npm install
-```
+\`\`\`
 
 2. Create `.env` file with required variables:
-```
+\`\`\`
 VITE_SUPABASE_URL=https://sjrfppeisxmglrozufoy.supabase.co
 VITE_SUPABASE_ANON_KEY=your_anon_key_here
 VITE_API_URL=http://localhost:8080
-```
+\`\`\`
 
 3. Start development server:
-```bash
+\`\`\`bash
 npm run dev
-```
+\`\`\`
 
 Application runs on http://localhost:5173
 
 ## Build
 
-```bash
+\`\`\`bash
 npm run build
 npm run preview
-```
+\`\`\`
 
 ## Environment Variables
 

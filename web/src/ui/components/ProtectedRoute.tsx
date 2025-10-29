@@ -61,5 +61,3 @@ spinnerStyle.textContent = `
   }
 `
 document.head.appendChild(spinnerStyle)
-
-

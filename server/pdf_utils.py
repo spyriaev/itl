@@ -134,4 +134,3 @@ def convert_page_number(page_str: str, num_pages: int) -> int:
     except (ValueError, TypeError):
         # If conversion fails, return 1 as fallback
         return 1
-

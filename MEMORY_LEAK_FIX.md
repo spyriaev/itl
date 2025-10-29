@@ -20,7 +20,7 @@
 
 **File:** `web/src/ui/components/PdfViewer.tsx`
 
-```typescript
+\`\`\`typescript
 // Configure PDF.js for better memory management
 const pdfOptions = {
   // Disable font caching to save memory
@@ -32,7 +32,7 @@ const pdfOptions = {
   // Use standard font data from CDN to avoid bundling
   standardFontDataUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/standard_fonts/`,
 }
-```
+\`\`\`
 
 These options are passed to the `<Document>` component to limit memory usage for images and use external font data.
 
@@ -40,26 +40,26 @@ These options are passed to the `<Document>` component to limit memory usage for
 
 Added a ref to store the PDF.js document instance:
 
-```typescript
+\`\`\`typescript
 // Store PDF document instance for cleanup
 const pdfDocumentRef = useRef<PDFDocumentProxy | null>(null)
-```
+\`\`\`
 
 This reference is populated when the document loads:
 
-```typescript
+\`\`\`typescript
 const onDocumentLoadSuccess = useCallback((pdf: PDFDocumentProxy) => {
   // Store PDF document instance for cleanup
   pdfDocumentRef.current = pdf
   // ... rest of the code
 }, [documentInfo?.lastViewedPage])
-```
+\`\`\`
 
 ### 3. Destroy PDF on Component Unmount
 
 Added comprehensive cleanup that explicitly destroys the PDF.js document:
 
-```typescript
+\`\`\`typescript
 // Comprehensive cleanup on component unmount
 useEffect(() => {
   return () => {
@@ -82,13 +82,13 @@ useEffect(() => {
     pageRefs.current = []
   }
 }, [])
-```
+\`\`\`
 
 ### 4. Cleanup When Switching Documents
 
 Added cleanup in the document loading effect to destroy the previous document before loading a new one:
 
-```typescript
+\`\`\`typescript
 // Load document info
 useEffect(() => {
   const loadDocument = async () => {
@@ -122,20 +122,20 @@ useEffect(() => {
 
   loadDocument()
 }, [documentId])
-```
+\`\`\`
 
 ### 5. Apply Options to Both Document Components
 
 The `pdfOptions` configuration is now applied to both the continuous scroll and single-page view modes:
 
-```typescript
+\`\`\`typescript
 <Document
   file={documentInfo.url}
   onLoadSuccess={onDocumentLoadSuccess}
   onLoadError={(error) => setError('Failed to load PDF document')}
   options={pdfOptions}
 >
-```
+\`\`\`
 
 ## Expected Impact
 

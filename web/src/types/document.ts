@@ -23,4 +23,3 @@ export interface ChapterInfo {
 }
 
 export type ContextType = 'page' | 'chapter' | 'section' | 'document'
-

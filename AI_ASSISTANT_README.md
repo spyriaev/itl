@@ -34,25 +34,25 @@ The AI Reading Assistant is a powerful feature that helps users understand and i
 ## Setup
 
 1. **Install Dependencies**:
-   ```bash
+   \`\`\`bash
    ./setup-ai-assistant.sh
-   ```
+   \`\`\`
 
 2. **Configure Environment**:
    - Add your DeepSeek API key to `server/.env`:
-     ```
+     \`\`\`
      DEEPSEEK_API_KEY=sk-your-key-here
      DEEPSEEK_API_BASE=https://api.deepseek.com
      CHAT_CONTEXT_PAGES=2
-     ```
+     \`\`\`
 
 3. **Run Database Migration**:
-   ```bash
+   \`\`\`bash
    supabase db reset
-   ```
+   \`\`\`
 
 4. **Start Services**:
-   ```bash
+   \`\`\`bash
    # Backend
    cd server && source venv/bin/activate && python main.py
    
@@ -61,7 +61,7 @@ The AI Reading Assistant is a powerful feature that helps users understand and i
    
    # Supabase
    supabase start
-   ```
+   \`\`\`
 
 ## Usage
 
@@ -126,9 +126,9 @@ The AI assistant uses a smart context strategy:
 ### Debug Mode
 
 Enable debug logging by setting:
-```bash
+\`\`\`bash
 export LOG_LEVEL=DEBUG
-```
+\`\`\`
 
 ## Security
 
@@ -158,21 +158,21 @@ export LOG_LEVEL=DEBUG
 2. Register for GigaChat API access
 3. Get your **Client ID** and **Client Secret** from the dashboard
 4. Generate authorization key using the provided script:
-   ```bash
+   \`\`\`bash
    cd server && python generate_gigachat_key.py your_client_id your_client_secret
-   ```
+   \`\`\`
 5. Use the generated base64 string as `GIGACHAT_AUTH_KEY`
 
 ## Switching AI Providers
 
 To switch between AI providers, simply change the `AI_PROVIDER` environment variable:
 
-```bash
+\`\`\`bash
 # For DeepSeek
 AI_PROVIDER=deepseek
 
 # For GigaChat  
 AI_PROVIDER=gigachat
-```
+\`\`\`
 
 Then restart the server. The system will automatically use the appropriate provider and configuration.

@@ -22,43 +22,43 @@ A Python FastAPI server for the AI Reader application that handles document mana
 ## Quick Start
 
 1. **Clone and navigate to server directory**:
-   ```bash
+   \`\`\`bash
    cd server
-   ```
+   \`\`\`
 
 2. **Create virtual environment**:
-   ```bash
+   \`\`\`bash
    python3 -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
+   \`\`\`
 
 3. **Install dependencies**:
-   ```bash
+   \`\`\`bash
    # Use the automated installer (recommended)
    ./install-deps.sh
    
    # Or install manually
    pip install -r requirements.txt
-   ```
+   \`\`\`
 
 4. **Configure environment**:
-   ```bash
+   \`\`\`bash
    cp env.example .env
    # Edit .env with your actual values
-   ```
+   \`\`\`
 
 5. **Run the server**:
-   ```bash
+   \`\`\`bash
    ./run-dev.sh
    # Or manually:
    uvicorn main:app --reload --port 8080
-   ```
+   \`\`\`
 
 ## Environment Variables
 
 Create a `.env` file with the following variables:
 
-```bash
+\`\`\`bash
 # Server Configuration
 PORT=8080
 
@@ -79,7 +79,7 @@ DEEPSEEK_API_BASE=https://api.deepseek.com
 
 # Mock AI Service (for testing without API keys)
 USE_MOCK_AI=false  # Set to "true" to use mock service
-```
+\`\`\`
 
 See `env.example` for detailed configuration.
 
@@ -110,15 +110,15 @@ See `env.example` for detailed configuration.
 
 The API uses JWT Bearer tokens for authentication. Include the token in the Authorization header:
 
-```
+\`\`\`
 Authorization: Bearer <your-jwt-token>
-```
+\`\`\`
 
 ## Development
 
 ### Project Structure
 
-```
+\`\`\`
 server/
 ├── main.py                  # FastAPI application and routes
 ├── auth.py                  # JWT authentication logic
@@ -133,7 +133,7 @@ server/
 ├── env.example             # Environment variables template
 ├── MOCK_AI_SERVICE.md      # Mock service documentation
 └── README.md               # This file
-```
+\`\`\`
 
 ### Dependencies
 
@@ -154,14 +154,14 @@ The server includes a mock AI service for testing without API keys. This is usef
 ### Using Mock AI Service
 
 1. **Set environment variable**:
-   ```bash
+   \`\`\`bash
    export USE_MOCK_AI=true
-   ```
+   \`\`\`
 
 2. **Or update `.env` file**:
-   ```bash
+   \`\`\`bash
    USE_MOCK_AI=true
-   ```
+   \`\`\`
 
 3. **Restart the server**
 
@@ -177,7 +177,7 @@ See `MOCK_AI_SERVICE.md` for detailed documentation on the mock service.
 
 ### Running Tests
 
-```bash
+\`\`\`bash
 # Test server setup
 python3 test_server.py
 
@@ -186,7 +186,7 @@ pip install pytest pytest-asyncio httpx
 
 # Run tests
 pytest
-```
+\`\`\`
 
 ## Production Deployment
 
@@ -194,9 +194,9 @@ For production deployment:
 
 1. **Set production environment variables**
 2. **Use a production ASGI server**:
-   ```bash
+   \`\`\`bash
    uvicorn main:app --host 0.0.0.0 --port 8080 --workers 4
-   ```
+   \`\`\`
 3. **Configure reverse proxy** (nginx/Apache)
 4. **Set up SSL/TLS certificates**
 5. **Configure database connection pooling**
@@ -207,13 +207,13 @@ For production deployment:
 
 If you encounter `pg_config executable not found` errors:
 
-```bash
+\`\`\`bash
 # Install PostgreSQL development headers
 brew install postgresql
 
 # Or use the automated installer
 ./install-deps.sh
-```
+\`\`\`
 
 ### Database Connection Issues
 - Verify DATABASE_URL format: `postgresql://user:password@host:port/database`

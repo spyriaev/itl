@@ -58,4 +58,3 @@ export default IconExample
 Заменить: <div style={{ ... }}>👤</div>
 На: <img src="/icons/user.svg" alt="" style={{ width: 36, height: 36 }} />
 */
-

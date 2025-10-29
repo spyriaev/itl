@@ -602,4 +602,3 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
     </div>
   )
 }
-

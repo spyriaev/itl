@@ -142,5 +142,3 @@ create policy "Users can delete their own PDFs"
 -- This ensures each user has their own isolated folder in the bucket
 -- auth.uid() returns the authenticated user's ID
 -- All policies check that the user_id matches the authenticated user
-
-

@@ -338,4 +338,3 @@ mock_ai_service = MockAIService()
 # Для совместимости
 AIService = MockAIService
 ai_service = mock_ai_service
-

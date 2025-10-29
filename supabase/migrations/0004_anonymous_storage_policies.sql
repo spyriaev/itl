@@ -74,4 +74,3 @@ create policy "Anyone can view documents"
 -- 3. Restrict who can view/delete documents
 -- 4. Use authenticated uploads with proper user_id folder structure
 --
-

@@ -98,5 +98,3 @@ echo -e "${GREEN}🏗️  Starting FastAPI server...${NC}"
 echo ""
 
 uvicorn main:app --reload --port ${PORT:-8080}
-
-

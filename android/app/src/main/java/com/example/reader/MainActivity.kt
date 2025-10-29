@@ -25,4 +25,3 @@ class MainActivity : ComponentActivity() {
 fun Hello() {
     Text(text = "AI Reader Android")
 }
-

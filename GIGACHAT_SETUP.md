@@ -10,14 +10,14 @@
    - Это НЕ готовый ключ авторизации
    - Это два отдельных значения: Client ID и Client Secret
 4. Создайте ключ авторизации, закодировав `Client ID:Client Secret` в base64:
-   ```bash
+   \`\`\`bash
    echo -n "your_client_id:your_client_secret" | base64
-   ```
+   \`\`\`
    
    Или используйте готовый скрипт:
-   ```bash
+   \`\`\`bash
    cd server && python generate_gigachat_key.py your_client_id your_client_secret
-   ```
+   \`\`\`
 5. Используйте полученную base64 строку как ключ авторизации
 
 **⚠️ ВАЖНО**: Текущий ключ в .env файле неправильный! Нужно получить правильные Client ID и Client Secret.
@@ -26,7 +26,7 @@
 
 В файле `server/.env` добавьте:
 
-```bash
+\`\`\`bash
 # Переключиться на GigaChat
 AI_PROVIDER=gigachat
 
@@ -35,27 +35,27 @@ GIGACHAT_AUTH_KEY=your_authorization_key_here
 
 # API базовый URL (по умолчанию уже настроен)
 GIGACHAT_API_BASE=https://gigachat.devices.sberbank.ru/api/v1
-```
+\`\`\`
 
 ### 3. Тестирование
 
 Запустите тест конфигурации:
 
-```bash
+\`\`\`bash
 cd server && source venv/bin/activate && python test_ai_providers.py
-```
+\`\`\`
 
 Для тестирования кэширования токенов:
 
-```bash
+\`\`\`bash
 cd server && source venv/bin/activate && python test_token_caching.py
-```
+\`\`\`
 
 ### 4. Перезапуск сервера
 
-```bash
+\`\`\`bash
 cd server && source venv/bin/activate && python main.py
-```
+\`\`\`
 
 ## Особенности GigaChat
 
@@ -69,15 +69,15 @@ cd server && source venv/bin/activate && python main.py
 
 Чтобы переключиться обратно на DeepSeek:
 
-```bash
+\`\`\`bash
 AI_PROVIDER=deepseek
-```
+\`\`\`
 
 И наоборот для GigaChat:
 
-```bash
+\`\`\`bash
 AI_PROVIDER=gigachat
-```
+\`\`\`
 
 ## Устранение неполадок
 

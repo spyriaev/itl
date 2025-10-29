@@ -54,19 +54,19 @@ Migrations are located in the `migrations/` directory:
 
 To apply migrations to the cloud database:
 
-```bash
+\`\`\`bash
 # Set your access token
 export SUPABASE_ACCESS_TOKEN="your_token_here"
 
 # Push migrations
 supabase db push
-```
+\`\`\`
 
 ## Local Development
 
 To run Supabase locally:
 
-```bash
+\`\`\`bash
 # Start local Supabase
 supabase start
 
@@ -75,7 +75,7 @@ supabase db reset
 
 # Stop local instance
 supabase stop
-```
+\`\`\`
 
 ## Environment Variables
 
@@ -89,7 +89,7 @@ Required environment variables are documented in `.env.example` files:
 
 ## Useful Commands
 
-```bash
+\`\`\`bash
 # Check project status
 supabase status
 
@@ -104,5 +104,4 @@ supabase migration new migration_name
 
 # Diff remote and local schemas
 supabase db diff
-```
-
+\`\`\`

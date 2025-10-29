@@ -228,5 +228,3 @@ export function DocumentList({ refreshTrigger, onDocumentClick }: DocumentListPr
     </div>
   )
 }
-
-
