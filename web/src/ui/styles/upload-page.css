@@ -596,10 +596,11 @@ body {
   }
 
   .documents-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 16px;
+    flex-direction: row; /* keep in one line */
+    align-items: center;
+    gap: 12px;
     margin-bottom: 24px;
+    flex-wrap: nowrap;
   }
 
   .documents-title {
@@ -607,7 +608,6 @@ body {
   }
 
   .documents-actions {
-    width: 100%;
     justify-content: flex-end;
   }
 
