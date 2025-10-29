@@ -117,9 +117,11 @@ function AppContent() {
                 </div>
               </div>
 
-              <FileUpload onUploadComplete={handleUploadComplete} />
+              <div className="upload-area">
+                <FileUpload onUploadComplete={handleUploadComplete} />
 
-              <DocumentList refreshTrigger={refreshTrigger} onDocumentClick={handleDocumentClick} />
+                <DocumentList refreshTrigger={refreshTrigger} onDocumentClick={handleDocumentClick} />
+              </div>
             </>
           ) : (
             currentDocumentId && <PdfViewer documentId={currentDocumentId} onClose={handleCloseReader} />

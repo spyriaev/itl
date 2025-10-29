@@ -86,16 +86,15 @@ export function FileUpload({ onUploadComplete }: FileUploadProps) {
 
   return (
     <div>
-      <div className="upload-area">
-        <div
-          className={`upload-dropzone ${isDragging ? "drag-active" : ""}`}
-          onDragEnter={handleDragEnter}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-          onClick={() => !isUploading && fileInputRef.current?.click()}
-          style={{ cursor: isUploading ? "not-allowed" : "pointer" }}
-        >
+      <div
+        className={`upload-dropzone ${isDragging ? "drag-active" : ""}`}
+        onDragEnter={handleDragEnter}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        onClick={() => !isUploading && fileInputRef.current?.click()}
+        style={{ cursor: isUploading ? "not-allowed" : "pointer" }}
+      >
           <input
             ref={fileInputRef}
             type="file"
@@ -191,7 +190,6 @@ export function FileUpload({ onUploadComplete }: FileUploadProps) {
             ✓ Upload complete!
           </div>
         )}
-      </div>
     </div>
   )
 }

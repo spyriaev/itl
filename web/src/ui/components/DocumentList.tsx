@@ -127,7 +127,7 @@ export function DocumentList({ refreshTrigger, onDocumentClick }: DocumentListPr
   }
 
   return (
-    <div>
+    <div style={{ marginTop: 24 }}>
       {/* Refresh Button */}
       <div className="refresh-button-container">
         <button onClick={loadDocuments} className="refresh-button">
