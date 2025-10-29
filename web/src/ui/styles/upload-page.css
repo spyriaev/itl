@@ -354,6 +354,11 @@ body {
 .document-name {
   font-weight: 400;
   color: #171a1f;
+  /* Add text overflow handling for long file names */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
 }
 
 .document-size {
@@ -741,34 +746,60 @@ body {
     border-radius: 12px;
   }
 
+  /* Convert table to card-based layout on mobile */
   .document-table-header {
     display: none;
   }
 
   .document-table-body tr {
-    display: flex;
-    flex-direction: column;
-    padding: 16px;
-    gap: 8px;
+    display: block;
+    padding: 20px 16px;
+    border-bottom: 1px solid #f3f4f6;
+  }
+
+  .document-table-body tr:last-child {
+    border-bottom: none;
   }
 
   .document-table-body td {
     padding: 0;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+    display: block;
   }
 
   .document-table-body td:first-child {
     padding-left: 0;
+    margin-bottom: 12px;
   }
 
   .document-table-body td:last-child {
     padding-right: 0;
+    margin-top: 12px;
   }
 
+  /* Improve document name cell for mobile with long name handling */
   .document-name-cell {
     flex: 1;
+    min-width: 0;
+    gap: 12px;
+  }
+
+  .document-name {
+    white-space: normal;
+    word-break: break-word;
+    overflow-wrap: break-word;
+    line-height: 1.4;
+    max-width: 100%;
+  }
+
+  /* Create mobile metadata row layout */
+  .document-table-body td:nth-child(2),
+  .document-table-body td:nth-child(3) {
+    display: inline-block;
+    width: auto;
+    font-size: 13px;
+    color: #6e7787;
+    margin-right: 16px;
+    margin-bottom: 0;
   }
 
   .document-size::before {
@@ -785,8 +816,36 @@ body {
     margin-right: 4px;
   }
 
+  /* Position questions badge on mobile */
+  .document-table-body td:nth-child(4) {
+    margin-top: 0;
+    display: inline-block;
+  }
+
   .refresh-button {
     width: 100%;
     justify-content: center;
+  }
+}
+
+/* Add tablet-specific styles for better medium screen experience */
+@media (max-width: 768px) and (min-width: 481px) {
+  .document-name {
+    max-width: 300px;
+  }
+
+  .document-table-header th:nth-child(2),
+  .document-table-header th:nth-child(3) {
+    display: none;
+  }
+
+  .document-table-body td:nth-child(2),
+  .document-table-body td:nth-child(3) {
+    display: none;
+  }
+
+  .document-name-cell {
+    flex: 1;
+    min-width: 0;
   }
 }
