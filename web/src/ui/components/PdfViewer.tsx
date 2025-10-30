@@ -59,7 +59,8 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
   const [error, setError] = useState<string | null>(null)
   const [continuousScroll, setContinuousScroll] = useState<boolean>(true) // По умолчанию включен непрерывный режим
   const [isChatVisible, setIsChatVisible] = useState<boolean>(false)
-  const [isMobile, setIsMobile] = useState<boolean>(window.innerWidth < 768)
+  const [isMobile, setIsMobile] = useState<boolean>(window.innerWidth < 1024)
+  const [isTablet, setIsTablet] = useState<boolean>(window.innerWidth >= 640 && window.innerWidth < 1024)
   const [pageQuestionsMap, setPageQuestionsMap] = useState<Map<number, PageQuestionsData>>(new Map())
   const [pageHeights, setPageHeights] = useState<Map<number, number>>(new Map())
   const [visiblePageRange, setVisiblePageRange] = useState<{start: number, end: number}>({ start: 1, end: 10 })
@@ -162,7 +163,8 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
   // Handle window resize
   useEffect(() => {
     const handleResize = () => {
-      setIsMobile(window.innerWidth < 768)
+      setIsMobile(window.innerWidth < 1024)
+      setIsTablet(window.innerWidth >= 640 && window.innerWidth < 1024)
     }
 
     window.addEventListener('resize', handleResize)
@@ -1183,13 +1185,62 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
         {/* End PDF Content */}
 
         {/* Chat Panel */}
-        <ChatPanel
-          documentId={documentId}
-          currentPage={currentPage}
-          isVisible={isChatVisible}
-          onToggle={() => setIsChatVisible(!isChatVisible)}
-          isMobile={isMobile}
-        />
+        {isMobile ? (
+          isChatVisible ? (
+            <div
+              onClick={() => setIsChatVisible(false)}
+              style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                zIndex: 2000,
+                display: 'flex',
+                justifyContent: 'flex-end',
+                backgroundColor: 'rgba(0,0,0,0.35)'
+              }}
+            >
+              {/* Panel справа */}
+              <div
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  width: isTablet ? 'max-content' : '100%',
+                  maxWidth: isTablet ? '90vw' : '100%',
+                  height: '100%',
+                  backgroundColor: 'white',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.2)',
+                  pointerEvents: 'auto',
+                  borderRadius: 0,
+                  overflow: 'hidden',
+                  boxSizing: 'border-box',
+                  margin: 0,
+                  position: 'relative',
+                  minWidth: 0
+                }}
+              >
+                <ChatPanel
+                  documentId={documentId}
+                  currentPage={currentPage}
+                  isVisible={true}
+                  onToggle={() => setIsChatVisible(false)}
+                  isMobile={!isTablet}
+                />
+              </div>
+            </div>
+          ) : null
+        ) : (
+          // Sidebar mode for desktop
+          <ChatPanel
+            documentId={documentId}
+            currentPage={currentPage}
+            isVisible={isChatVisible}
+            onToggle={() => setIsChatVisible(!isChatVisible)}
+            isMobile={false}
+          />
+        )}
       </div>
     </div>
   )
