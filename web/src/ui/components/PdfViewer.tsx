@@ -831,6 +831,63 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
     }, 50)
   }
 
+  const fitToWidth = async () => {
+    if (!pdfDocumentRef.current || !scrollContainerRef.current) {
+      return
+    }
+
+    try {
+      isZoomingRef.current = true
+      
+      // Получаем первую страницу для определения ширины (все страницы обычно имеют одинаковую ширину)
+      const page = await pdfDocumentRef.current.getPage(1)
+      const viewport = page.getViewport({ scale: 1.0 })
+      const pageWidth = viewport.width
+      
+      // Получаем доступную ширину контейнера
+      const container = scrollContainerRef.current
+      const containerRect = container.getBoundingClientRect()
+      const availableWidth = containerRect.width - 48 // Учитываем padding (24px с каждой стороны)
+      
+      // Вычисляем оптимальный scale
+      let optimalScale: number
+      
+      if (isMobile || isTablet) {
+        // Для планшета и мобильных: страница должна полностью помещаться по ширине
+        optimalScale = availableWidth / pageWidth
+      } else {
+        // Для десктопа: страница помещается по ширине, но не слишком широкая
+        // Ограничиваем максимальную ширину страницы (например, 1200px)
+        const maxPageWidth = 1200
+        const targetWidth = Math.min(availableWidth, maxPageWidth)
+        optimalScale = targetWidth / pageWidth
+      }
+      
+      // Ограничиваем scale разумными пределами
+      optimalScale = Math.max(0.5, Math.min(optimalScale, 3.0))
+      
+      setScale(optimalScale)
+      // Clear page heights cache when zooming to recalculate
+      setPageHeights(new Map())
+      
+      // Update visible range immediately and after a brief delay for re-render
+      updateVisiblePageRange()
+      if (updateVisiblePageRangeTimeoutRef.current) {
+        clearTimeout(updateVisiblePageRangeTimeoutRef.current)
+      }
+      updateVisiblePageRangeTimeoutRef.current = setTimeout(() => {
+        updateVisiblePageRange()
+        requestAnimationFrame(() => {
+          updateVisiblePage()
+          setTimeout(() => { isZoomingRef.current = false }, 200)
+        })
+      }, 50)
+    } catch (error) {
+      console.error('Error fitting to width:', error)
+      isZoomingRef.current = false
+    }
+  }
+
   const toggleFullscreen = useCallback(() => {
     if (!document.fullscreenElement) {
       document.documentElement.requestFullscreen().then(() => {
@@ -1231,8 +1288,7 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
         scale={scale}
         onZoomIn={zoomIn}
         onZoomOut={zoomOut}
-        onToggleFullscreen={toggleFullscreen}
-        isFullscreen={isFullscreen}
+        onFitToWidth={fitToWidth}
         isTablet={isTablet}
         isChatVisible={isChatVisible}
         scrollContainerRef={scrollContainerRef}

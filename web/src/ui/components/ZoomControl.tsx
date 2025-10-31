@@ -4,8 +4,7 @@ interface ZoomControlProps {
   scale: number
   onZoomIn: () => void
   onZoomOut: () => void
-  onToggleFullscreen?: () => void
-  isFullscreen?: boolean
+  onFitToWidth?: () => void
   isTablet?: boolean
   isChatVisible?: boolean
   scrollContainerRef?: React.RefObject<HTMLDivElement>
@@ -16,8 +15,7 @@ export function ZoomControl({
   scale,
   onZoomIn,
   onZoomOut,
-  onToggleFullscreen,
-  isFullscreen = false,
+  onFitToWidth,
   isTablet = false,
   isChatVisible = false,
   scrollContainerRef,
@@ -179,10 +177,10 @@ export function ZoomControl({
         }}
       />
 
-      {/* Fullscreen Toggle */}
-      {onToggleFullscreen && (
+      {/* Fit to Width Button */}
+      {onFitToWidth && (
         <button
-          onClick={onToggleFullscreen}
+          onClick={onFitToWidth}
           style={{
             background: 'none',
             border: 'none',
@@ -196,7 +194,8 @@ export function ZoomControl({
           }}
           onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.7')}
           onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
-          aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+          aria-label="Fit to width"
+          title="Подобрать ширину"
         >
           <svg
             width="20"
@@ -208,23 +207,9 @@ export function ZoomControl({
             strokeLinecap="round"
             strokeLinejoin="round"
           >
-            {isFullscreen ? (
-              // Exit fullscreen icon (arrows pointing inward)
-              <>
-                <polyline points="22 11 18 11 18 7 14 7 14 3" />
-                <polyline points="2 13 6 13 6 17 10 17 10 21" />
-                <polyline points="10 3 10 7 6 7 6 11 2 11" />
-                <polyline points="14 21 14 17 18 17 18 13 22 13" />
-              </>
-            ) : (
-              // Enter fullscreen icon (arrows pointing outward)
-              <>
-                <polyline points="15 3 21 3 21 9" />
-                <polyline points="9 21 3 21 3 15" />
-                <polyline points="21 15 21 21 15 21" />
-                <polyline points="3 9 3 3 9 3" />
-              </>
-            )}
+            <rect x="3" y="3" width="18" height="18" rx="2" />
+            <line x1="9" y1="3" x2="9" y2="21" />
+            <line x1="3" y1="9" x2="21" y2="9" />
           </svg>
         </button>
       )}
