@@ -6,6 +6,7 @@ import { chatService, PageQuestionsData } from '../../services/chatService'
 import { ChatProvider, useChat } from '../../contexts/ChatContext'
 import { ChatPanel } from './ChatPanel'
 import { PageRelatedQuestions } from './PageRelatedQuestions'
+import { ZoomControl } from './ZoomControl'
 import 'react-pdf/dist/Page/AnnotationLayer.css'
 import 'react-pdf/dist/Page/TextLayer.css'
 
@@ -59,6 +60,7 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
   const [error, setError] = useState<string | null>(null)
   const [continuousScroll, setContinuousScroll] = useState<boolean>(true) // По умолчанию включен непрерывный режим
   const [isChatVisible, setIsChatVisible] = useState<boolean>(false)
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false)
   const [isMobile, setIsMobile] = useState<boolean>(window.innerWidth < 1024)
   const [isTablet, setIsTablet] = useState<boolean>(window.innerWidth >= 640 && window.innerWidth < 1024)
   const [pageQuestionsMap, setPageQuestionsMap] = useState<Map<number, PageQuestionsData>>(new Map())
@@ -579,22 +581,19 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
     let rafId: number | null = null
     
     const throttledHandleScroll = () => {
-      // Cancel any pending animation frame
       if (rafId !== null) {
         cancelAnimationFrame(rafId)
       }
       
-      // Use requestAnimationFrame for smoother updates
       rafId = requestAnimationFrame(() => {
         clearTimeout(timeoutId)
-        timeoutId = setTimeout(handleScroll, SCROLL_THROTTLE_MS) // Reduced for better responsiveness
+        timeoutId = setTimeout(handleScroll, SCROLL_THROTTLE_MS)
         rafId = null
       })
     }
 
     container.addEventListener('scroll', throttledHandleScroll, { passive: true })
     
-    // Также добавляем обработчик для изменения размера окна
     const handleResize = () => {
       setTimeout(handleScroll, 100)
     }
@@ -715,6 +714,34 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
     }, 50)
   }
 
+  const toggleFullscreen = useCallback(() => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().then(() => {
+        setIsFullscreen(true)
+      }).catch((err) => {
+        console.error('Error attempting to enable fullscreen:', err)
+      })
+    } else {
+      document.exitFullscreen().then(() => {
+        setIsFullscreen(false)
+      }).catch((err) => {
+        console.error('Error attempting to exit fullscreen:', err)
+      })
+    }
+  }, [])
+
+  // Listen for fullscreen changes
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement)
+    }
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange)
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange)
+    }
+  }, [])
+
   if (loading) {
     return (
       <div style={{
@@ -810,205 +837,44 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
       display: 'flex',
       flexDirection: 'column',
     }}>
-      {/* Header Controls */}
-      <div style={{
-        backgroundColor: 'white',
-        padding: '16px 24px',
-        borderBottom: '1px solid #E5E7EB',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        boxShadow: '0 1px 3px 0 rgb(0 0 0 / 0.1)',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <button
-            onClick={onClose}
-            style={{
-              padding: '8px 12px',
-              backgroundColor: '#F3F4F6',
-              color: '#374151',
-              border: '1px solid #D1D5DB',
-              borderRadius: 6,
-              fontSize: 14,
-              fontWeight: 500,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-            }}
-          >
-            ← Back to Library
-          </button>
-          <h2 style={{
-            margin: 0,
-            fontSize: 18,
-            fontWeight: 600,
-            color: '#111827',
-            maxWidth: 300,
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-          }}>
-            {documentInfo.title}
-          </h2>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          {/* Page Navigation - Only show in single page mode */}
-          {!continuousScroll && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <button
-                onClick={goToPrevPage}
-                disabled={currentPage <= 1}
-                style={{
-                  padding: '6px 10px',
-                  backgroundColor: currentPage <= 1 ? '#F9FAFB' : '#F3F4F6',
-                  color: currentPage <= 1 ? '#9CA3AF' : '#374151',
-                  border: '1px solid #D1D5DB',
-                  borderRadius: 4,
-                  fontSize: 14,
-                  cursor: currentPage <= 1 ? 'not-allowed' : 'pointer',
-                }}
-              >
-                ←
-              </button>
-              <span style={{ fontSize: 14, color: '#374151', minWidth: 80, textAlign: 'center' }}>
-                Page {currentPage} of {numPages}
-              </span>
-              <button
-                onClick={goToNextPage}
-                disabled={currentPage >= numPages}
-                style={{
-                  padding: '6px 10px',
-                  backgroundColor: currentPage >= numPages ? '#F9FAFB' : '#F3F4F6',
-                  color: currentPage >= numPages ? '#9CA3AF' : '#374151',
-                  border: '1px solid #D1D5DB',
-                  borderRadius: 4,
-                  fontSize: 14,
-                  cursor: currentPage >= numPages ? 'not-allowed' : 'pointer',
-                }}
-              >
-                →
-              </button>
-            </div>
-          )}
-
-          {/* Page count indicator for continuous scroll mode */}
-          {continuousScroll && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 14, color: '#374151', fontWeight: 500 }}>
-                📄 Page {currentPage} of {numPages}
-              </span>
-              <button
-                onClick={() => scrollToPage(currentPage)}
-                style={{
-                  padding: '4px 8px',
-                  backgroundColor: '#F3F4F6',
-                  color: '#374151',
-                  border: '1px solid #D1D5DB',
-                  borderRadius: 4,
-                  fontSize: 12,
-                  cursor: 'pointer',
-                }}
-                title="Scroll to current page"
-              >
-                📍
-              </button>
-            </div>
-          )}
-
-          {/* Zoom Controls */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <button
-              onClick={zoomOut}
-              style={{
-                padding: '6px 10px',
-                backgroundColor: '#F3F4F6',
-                color: '#374151',
-                border: '1px solid #D1D5DB',
-                borderRadius: 4,
-                fontSize: 14,
-                cursor: 'pointer',
-              }}
-            >
-              −
-            </button>
-            <span style={{ fontSize: 14, color: '#374151', minWidth: 50, textAlign: 'center' }}>
-              {Math.round(scale * 100)}%
-            </span>
-            <button
-              onClick={zoomIn}
-              style={{
-                padding: '6px 10px',
-                backgroundColor: '#F3F4F6',
-                color: '#374151',
-                border: '1px solid #D1D5DB',
-                borderRadius: 4,
-                fontSize: 14,
-                cursor: 'pointer',
-              }}
-            >
-              +
-            </button>
-            <button
-              onClick={resetZoom}
-              style={{
-                padding: '6px 10px',
-                backgroundColor: '#F3F4F6',
-                color: '#374151',
-                border: '1px solid #D1D5DB',
-                borderRadius: 4,
-                fontSize: 12,
-                cursor: 'pointer',
-              }}
-            >
-              Reset
-            </button>
-          </div>
-
-          {/* Scroll Mode Toggle */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <button
-              onClick={toggleContinuousScroll}
-              style={{
-                padding: '6px 12px',
-                backgroundColor: continuousScroll ? '#3B82F6' : '#F3F4F6',
-                color: continuousScroll ? 'white' : '#374151',
-                border: '1px solid #D1D5DB',
-                borderRadius: 4,
-                fontSize: 12,
-                cursor: 'pointer',
-                fontWeight: 500,
-              }}
-            >
-              {continuousScroll ? '📄 Continuous' : '📖 Single Page'}
-            </button>
-          </div>
-
-          {/* Chat Toggle */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <button
-              onClick={() => setIsChatVisible(!isChatVisible)}
-              style={{
-                padding: '6px 12px',
-                backgroundColor: isChatVisible ? '#10B981' : '#F3F4F6',
-                color: isChatVisible ? 'white' : '#374151',
-                border: '1px solid #D1D5DB',
-                borderRadius: 4,
-                fontSize: 12,
-                cursor: 'pointer',
-                fontWeight: 500,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 4,
-              }}
-            >
-              <span>🤖</span>
-              <span>{isChatVisible ? 'Hide AI' : 'Show AI'}</span>
-            </button>
-          </div>
-        </div>
-      </div>
+      {/* Floating Back Button */}
+      <button
+        onClick={onClose}
+        style={{
+          position: 'fixed',
+          top: 24,
+          left: 24,
+          zIndex: 2000,
+          width: 40,
+          height: 40,
+          borderRadius: '50%',
+          backgroundColor: '#F0F4FF',
+          border: 'none',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.3), 0 4px 6px -2px rgb(0 0 0 / 0.2)',
+          transition: 'opacity 0.2s',
+          padding: 0,
+        }}
+        onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.9')}
+        onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
+        aria-label="Back to Library"
+      >
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="#2563EB"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <polyline points="15 18 9 12 15 6" />
+        </svg>
+      </button>
 
       {/* Main Content Area */}
       <div style={{
@@ -1243,6 +1109,17 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
         )}
       </div>
 
+      {/* Floating Zoom Control */}
+      <ZoomControl
+        scale={scale}
+        onZoomIn={zoomIn}
+        onZoomOut={zoomOut}
+        onToggleFullscreen={toggleFullscreen}
+        isFullscreen={isFullscreen}
+        isTablet={isTablet}
+        isChatVisible={isChatVisible}
+      />
+
       {/* Floating Open AI Assistant button (hidden when chat is visible) */}
       {!isChatVisible && (
         <button
@@ -1258,17 +1135,34 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
             borderRadius: '50%',
             border: 'none',
             cursor: 'pointer',
-            backgroundColor: '#10B981',
-            color: 'white',
-            boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.2)',
+            backgroundColor: '#2563EB',
+            boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.3), 0 4px 6px -2px rgb(0 0 0 / 0.2)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontSize: 22,
+            transition: 'opacity 0.2s',
           }}
+          onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.9')}
+          onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
           title="Open AI Assistant"
         >
-          🤖
+          <svg
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="white"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-6-6z" />
+            <polyline points="14 2 14 8 20 8" />
+            <line x1="8" y1="10" x2="16" y2="10" />
+            <line x1="8" y1="13" x2="14" y2="13" />
+            <line x1="8" y1="16" x2="12" y2="16" />
+            <path d="M18 19c-1 0-1 1-2 1s-2-1-2-1" />
+          </svg>
         </button>
       )}
     </div>

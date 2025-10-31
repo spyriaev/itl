@@ -239,33 +239,7 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
   ]
 
   if (!isVisible) {
-    return (
-      <button
-        onClick={onToggle}
-        style={{
-          position: 'fixed',
-          top: '50%',
-          right: isMobile ? 16 : 20,
-          transform: 'translateY(-50%)',
-          width: isMobile ? 56 : 48,
-          height: isMobile ? 56 : 48,
-          backgroundColor: '#3B82F6',
-          color: 'white',
-          border: 'none',
-          borderRadius: '50%',
-          fontSize: isMobile ? 24 : 20,
-          cursor: 'pointer',
-          boxShadow: '0 4px 12px rgba(59, 130, 246, 0.4)',
-          zIndex: 1000,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-        title="Open AI Assistant"
-      >
-        💬
-      </button>
-    )
+    return null
   }
 
   return (
