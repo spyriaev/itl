@@ -66,6 +66,7 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
   const [pageQuestionsMap, setPageQuestionsMap] = useState<Map<number, PageQuestionsData>>(new Map())
   const [pageHeights, setPageHeights] = useState<Map<number, number>>(new Map())
   const [visiblePageRange, setVisiblePageRange] = useState<{start: number, end: number}>({ start: 1, end: 10 })
+  const [assistantButtonPosition, setAssistantButtonPosition] = useState<{right: number | string, bottom: number | string}>({ right: 24, bottom: 24 })
   
   // Refs для отслеживания скролла
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -85,8 +86,8 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
   const lastScrollTimeRef = useRef(Date.now())
   const scrollDirectionRef = useRef<'down' | 'up'>('down')
   
-  // Get chat context for navigation
-  const { navigateToMessage } = useChat()
+  // Get chat context for navigation and assistant state
+  const { navigateToMessage, isStreaming } = useChat()
  
   // Cooldown для форс-восстановления, чтобы не зациклиться пока страницы ещё не смонтировались
   const lastForceRestoreRef = useRef(0)
@@ -566,6 +567,122 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
       }, 100)
     }
   }
+
+  // Вычисление позиции кнопки ассистента на основе ширины страницы
+  useEffect(() => {
+    // На мобильных и планшетах - всегда справа внизу
+    if (isMobile || isTablet) {
+      setAssistantButtonPosition({ right: isMobile ? 16 : 24, bottom: 24 })
+      return
+    }
+
+    // На десктопе - позиционируем справа от страницы
+    const updateButtonPosition = () => {
+      if (!scrollContainerRef.current || !pageRefs.current.length) {
+        // Если страницы еще не загружены, используем дефолтную позицию
+        setAssistantButtonPosition({ right: 24, bottom: 24 })
+        return
+      }
+
+      // Находим первую видимую страницу или используем контейнер для определения правого края
+      let pageRight: number | null = null
+      
+      // Сначала пытаемся найти видимую страницу
+      for (let i = 0; i < pageRefs.current.length; i++) {
+        const pageRef = pageRefs.current[i]
+        if (pageRef) {
+          const pageRect = pageRef.getBoundingClientRect()
+          if (pageRect.width > 0 && pageRect.height > 0) {
+            // Находим самый правый край всех видимых страниц
+            if (pageRight === null || pageRect.right > pageRight) {
+              pageRight = pageRect.right
+            }
+          }
+        }
+      }
+
+      if (pageRight !== null) {
+        const windowWidth = window.innerWidth
+        
+        // Кнопка должна быть справа от страницы с отступом 32px (чтобы точно была за пределами)
+        // pageRight - координата правого края страницы от левого края окна
+        // windowWidth - pageRight - расстояние от правого края страницы до правого края окна
+        const offsetFromPage = 32 // отступ от правого края страницы
+        const buttonRight = windowWidth - pageRight - offsetFromPage
+        
+        // Если места недостаточно, размещаем справа внизу экрана
+        const minRight = 24
+        const finalRight = buttonRight < minRight ? minRight : buttonRight
+        
+        setAssistantButtonPosition({ right: finalRight, bottom: 24 })
+      } else {
+        // Если страница не найдена, используем дефолтную позицию
+        setAssistantButtonPosition({ right: 24, bottom: 24 })
+      }
+    }
+
+    // Обновляем позицию при изменении масштаба, скролле или изменении размера окна
+    updateButtonPosition()
+    
+    const handleResize = () => {
+      setTimeout(updateButtonPosition, 100)
+    }
+    
+    const handleScroll = () => {
+      requestAnimationFrame(updateButtonPosition)
+    }
+
+    window.addEventListener('resize', handleResize)
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.addEventListener('scroll', handleScroll, { passive: true })
+    }
+
+    return () => {
+      window.removeEventListener('resize', handleResize)
+      if (scrollContainerRef.current) {
+        scrollContainerRef.current.removeEventListener('scroll', handleScroll)
+      }
+    }
+  }, [scale, continuousScroll, currentPage, visiblePageRange, isMobile, isTablet])
+  
+  // Отдельный эффект для обновления позиции при открытии/закрытии чата
+  useEffect(() => {
+    if (isMobile || isTablet) return
+    
+    // Ждем завершения анимации перехода (300ms + небольшой запас)
+    const timeoutId = setTimeout(() => {
+      if (!scrollContainerRef.current || !pageRefs.current.length) return
+
+      // Находим самый правый край всех видимых страниц
+      let pageRight: number | null = null
+      for (let i = 0; i < pageRefs.current.length; i++) {
+        const pageRef = pageRefs.current[i]
+        if (pageRef) {
+          const pageRect = pageRef.getBoundingClientRect()
+          if (pageRect.width > 0 && pageRect.height > 0) {
+            if (pageRight === null || pageRect.right > pageRight) {
+              pageRight = pageRect.right
+            }
+          }
+        }
+      }
+
+      if (pageRight !== null) {
+        const windowWidth = window.innerWidth
+        
+        // Кнопка должна быть справа от страницы с отступом 32px
+        const offsetFromPage = 32 // отступ от правого края страницы
+        const buttonRight = windowWidth - pageRight - offsetFromPage
+        
+        // Если места недостаточно, размещаем справа внизу экрана
+        const minRight = 24
+        const finalRight = buttonRight < minRight ? minRight : buttonRight
+        setAssistantButtonPosition({ right: finalRight, bottom: 24 })
+      }
+    }, 350)
+
+    return () => clearTimeout(timeoutId)
+  }, [isChatVisible, isMobile, isTablet])
 
   // Обработчик скролла для отслеживания видимой страницы
   useEffect(() => {
@@ -1118,53 +1235,93 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
         isFullscreen={isFullscreen}
         isTablet={isTablet}
         isChatVisible={isChatVisible}
+        scrollContainerRef={scrollContainerRef}
+        isMobile={isMobile}
       />
 
       {/* Floating Open AI Assistant button (hidden when chat is visible) */}
       {!isChatVisible && (
-        <button
-          aria-label="Open AI Assistant"
-          onClick={() => setIsChatVisible(true)}
+        <div
           style={{
             position: 'fixed',
-            bottom: 24,
-            right: isMobile ? 16 : 24,
+            bottom: assistantButtonPosition.bottom,
+            right: assistantButtonPosition.right,
             zIndex: 3000,
             width: 52,
             height: 52,
-            borderRadius: '50%',
-            border: 'none',
-            cursor: 'pointer',
-            backgroundColor: '#2563EB',
-            boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.3), 0 4px 6px -2px rgb(0 0 0 / 0.2)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            transition: 'opacity 0.2s',
           }}
-          onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.9')}
-          onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
-          title="Open AI Assistant"
         >
-          <svg
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="white"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
+          {/* Light ray animation */}
+          {isStreaming && (
+            <div
+              style={{
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                width: '100%',
+                height: '100%',
+                transform: 'translate(-50%, -50%)',
+                borderRadius: '50%',
+                background: 'conic-gradient(from 0deg, transparent 0deg, rgba(37, 99, 235, 0.7) 90deg, transparent 180deg, rgba(59, 130, 246, 0.7) 270deg, transparent 360deg)',
+                animation: 'rotate-light 2s linear infinite',
+                pointerEvents: 'none',
+              }}
+            />
+          )}
+          <button
+            aria-label="Open AI Assistant"
+            onClick={() => setIsChatVisible(true)}
+            style={{
+              position: 'relative',
+              width: '100%',
+              height: '100%',
+              borderRadius: '50%',
+              border: 'none',
+              cursor: 'pointer',
+              backgroundColor: '#2563EB',
+              boxShadow: isStreaming 
+                ? '0 0 20px rgba(37, 99, 235, 0.5), 0 10px 15px -3px rgb(0 0 0 / 0.3), 0 4px 6px -2px rgb(0 0 0 / 0.2)'
+                : '0 10px 15px -3px rgb(0 0 0 / 0.3), 0 4px 6px -2px rgb(0 0 0 / 0.2)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'opacity 0.2s, right 0.3s ease, bottom 0.3s ease, box-shadow 0.3s ease',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.9')}
+            onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
+            title="Open AI Assistant"
           >
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-6-6z" />
-            <polyline points="14 2 14 8 20 8" />
-            <line x1="8" y1="10" x2="16" y2="10" />
-            <line x1="8" y1="13" x2="14" y2="13" />
-            <line x1="8" y1="16" x2="12" y2="16" />
-            <path d="M18 19c-1 0-1 1-2 1s-2-1-2-1" />
-          </svg>
-        </button>
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+                <line x1="16" y1="13" x2="8" y2="13"></line>
+                <line x1="16" y1="17" x2="8" y2="17"></line>
+                <polyline points="10 9 9 9 8 9"></polyline>
+              </svg>
+          </button>
+        </div>
       )}
+      
+      {/* Add CSS animation for light rotation */}
+      <style>{`
+        @keyframes rotate-light {
+          from {
+            transform: translate(-50%, -50%) rotate(0deg);
+          }
+          to {
+            transform: translate(-50%, -50%) rotate(360deg);
+          }
+        }
+      `}</style>
     </div>
   )
 }

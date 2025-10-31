@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 
 interface ZoomControlProps {
   scale: number
@@ -8,6 +8,8 @@ interface ZoomControlProps {
   isFullscreen?: boolean
   isTablet?: boolean
   isChatVisible?: boolean
+  scrollContainerRef?: React.RefObject<HTMLDivElement>
+  isMobile?: boolean
 }
 
 export function ZoomControl({
@@ -18,19 +20,63 @@ export function ZoomControl({
   isFullscreen = false,
   isTablet = false,
   isChatVisible = false,
+  scrollContainerRef,
+  isMobile = false,
 }: ZoomControlProps) {
   const zoomPercentage = Math.round(scale * 100)
+  const [leftPosition, setLeftPosition] = useState<string | number>('50%')
   
   // На планшете при открытом ассистенте ZoomControl должен быть под панелью
   const zIndex = isTablet && isChatVisible ? 1500 : 2000
+
+  // Вычисляем позицию зум контрола
+  useEffect(() => {
+    const updatePosition = () => {
+      // Если ассистент открыт на десктопе и есть доступ к контейнеру страницы
+      if (isChatVisible && !isMobile && !isTablet && scrollContainerRef?.current) {
+        const container = scrollContainerRef.current
+        const containerRect = container.getBoundingClientRect()
+        
+        // Вычисляем центр контейнера страницы
+        const containerCenter = containerRect.left + containerRect.width / 2
+        
+        setLeftPosition(containerCenter)
+      } else {
+        // По умолчанию - центр экрана
+        setLeftPosition('50%')
+      }
+    }
+
+    updatePosition()
+    
+    // Обновляем при изменении размера окна
+    const handleResize = () => {
+      setTimeout(updatePosition, 100)
+    }
+    
+    window.addEventListener('resize', handleResize)
+    
+    // Если ассистент открыт, обновляем позицию после завершения анимации
+    if (isChatVisible && !isMobile && !isTablet) {
+      const timeoutId = setTimeout(updatePosition, 350)
+      return () => {
+        window.removeEventListener('resize', handleResize)
+        clearTimeout(timeoutId)
+      }
+    }
+    
+    return () => {
+      window.removeEventListener('resize', handleResize)
+    }
+  }, [isChatVisible, isMobile, isTablet, scrollContainerRef])
 
   return (
     <div
       style={{
         position: 'fixed',
         top: 24,
-        left: '50%',
-        transform: 'translateX(-50%)',
+        left: leftPosition,
+        transform: typeof leftPosition === 'number' ? `translateX(-50%)` : 'translateX(-50%)',
         zIndex: zIndex,
         display: 'flex',
         alignItems: 'center',
@@ -39,6 +85,7 @@ export function ZoomControl({
         padding: '8px 12px',
         borderRadius: 8,
         boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.3), 0 4px 6px -2px rgb(0 0 0 / 0.2)',
+        transition: 'left 0.3s ease',
       }}
     >
       {/* Zoom Out Button */}
