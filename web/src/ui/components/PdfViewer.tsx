@@ -1027,18 +1027,17 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
           bottom: 0,
           left: "50%",
           transform: `translateX(-50%) translateY(${isControlsVisible ? "0" : "100%"})`,
-          backgroundColor: "rgba(0, 0, 0, 0.75)",
-          backdropFilter: "blur(10px)",
-          padding: isMobile ? "12px 20px" : "16px 24px",
-          borderRadius: "12px 12px 0 0",
+          backgroundColor: "#171a1f",
+          padding: isMobile ? "10px 16px" : "12px 20px",
+          borderRadius: "8px 8px 0 0",
           display: "flex",
           alignItems: "center",
-          gap: isMobile ? 12 : 16,
-          boxShadow: "0 -4px 12px rgba(0, 0, 0, 0.3)",
+          gap: isMobile ? 8 : 12,
+          boxShadow: "0 -2px 8px rgba(0, 0, 0, 0.2)",
           transition: "transform 0.3s ease-in-out, opacity 0.3s ease-in-out",
           opacity: isControlsVisible ? 1 : 0,
           zIndex: 100,
-          minWidth: isMobile ? "90%" : "auto",
+          minWidth: isMobile ? "auto" : "auto",
           justifyContent: "center",
         }}
       >
@@ -1047,46 +1046,33 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
           onClick={zoomOut}
           disabled={scale <= 0.5}
           style={{
-            width: isMobile ? 36 : 40,
-            height: isMobile ? 36 : 40,
-            backgroundColor: scale <= 0.5 ? "rgba(255, 255, 255, 0.2)" : "rgba(255, 255, 255, 0.9)",
-            color: scale <= 0.5 ? "rgba(255, 255, 255, 0.5)" : "#374151",
+            width: isMobile ? 32 : 36,
+            height: isMobile ? 32 : 36,
+            backgroundColor: "transparent",
+            color: scale <= 0.5 ? "rgba(255, 255, 255, 0.3)" : "#ffffff",
             border: "none",
-            borderRadius: 8,
-            fontSize: isMobile ? 18 : 20,
+            borderRadius: 4,
+            fontSize: isMobile ? 16 : 18,
             cursor: scale <= 0.5 ? "not-allowed" : "pointer",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            fontWeight: "bold",
-            transition: "all 0.2s ease",
-          }}
-          onMouseEnter={(e) => {
-            if (scale > 0.5) {
-              e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 1)"
-              e.currentTarget.style.transform = "scale(1.05)"
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (scale > 0.5) {
-              e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.9)"
-              e.currentTarget.style.transform = "scale(1)"
-            }
+            transition: "opacity 0.2s ease",
+            opacity: scale <= 0.5 ? 0.3 : 1,
           }}
         >
-          −
+          🔍−
         </button>
 
         {/* Zoom Percentage Display */}
         <div
           style={{
-            backgroundColor: "rgba(255, 255, 255, 0.9)",
-            color: "#374151",
-            padding: isMobile ? "8px 16px" : "10px 20px",
-            borderRadius: 8,
+            backgroundColor: "transparent",
+            color: "#ffffff",
+            padding: isMobile ? "6px 12px" : "8px 16px",
             fontSize: isMobile ? 13 : 14,
-            fontWeight: 600,
-            minWidth: isMobile ? 60 : 70,
+            fontWeight: 500,
+            minWidth: isMobile ? 50 : 60,
             textAlign: "center",
           }}
         >
@@ -1098,42 +1084,31 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
           onClick={zoomIn}
           disabled={scale >= 3.0}
           style={{
-            width: isMobile ? 36 : 40,
-            height: isMobile ? 36 : 40,
-            backgroundColor: scale >= 3.0 ? "rgba(255, 255, 255, 0.2)" : "rgba(255, 255, 255, 0.9)",
-            color: scale >= 3.0 ? "rgba(255, 255, 255, 0.5)" : "#374151",
+            width: isMobile ? 32 : 36,
+            height: isMobile ? 32 : 36,
+            backgroundColor: "transparent",
+            color: scale >= 3.0 ? "rgba(255, 255, 255, 0.3)" : "#ffffff",
             border: "none",
-            borderRadius: 8,
-            fontSize: isMobile ? 18 : 20,
+            borderRadius: 4,
+            fontSize: isMobile ? 16 : 18,
             cursor: scale >= 3.0 ? "not-allowed" : "pointer",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            fontWeight: "bold",
-            transition: "all 0.2s ease",
-          }}
-          onMouseEnter={(e) => {
-            if (scale < 3.0) {
-              e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 1)"
-              e.currentTarget.style.transform = "scale(1.05)"
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (scale < 3.0) {
-              e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.9)"
-              e.currentTarget.style.transform = "scale(1)"
-            }
+            transition: "opacity 0.2s ease",
+            opacity: scale >= 3.0 ? 0.3 : 1,
           }}
         >
-          +
+          🔍+
         </button>
 
         {/* Divider */}
         <div
           style={{
             width: 1,
-            height: isMobile ? 24 : 28,
-            backgroundColor: "rgba(255, 255, 255, 0.3)",
+            height: isMobile ? 20 : 24,
+            backgroundColor: "rgba(255, 255, 255, 0.2)",
+            margin: "0 4px",
           }}
         />
 
@@ -1147,26 +1122,18 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
             }
           }}
           style={{
-            width: isMobile ? 36 : 40,
-            height: isMobile ? 36 : 40,
-            backgroundColor: "rgba(255, 255, 255, 0.9)",
-            color: "#374151",
+            width: isMobile ? 32 : 36,
+            height: isMobile ? 32 : 36,
+            backgroundColor: "transparent",
+            color: "#ffffff",
             border: "none",
-            borderRadius: 8,
+            borderRadius: 4,
             fontSize: isMobile ? 16 : 18,
             cursor: "pointer",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            transition: "all 0.2s ease",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 1)"
-            e.currentTarget.style.transform = "scale(1.05)"
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.9)"
-            e.currentTarget.style.transform = "scale(1)"
+            transition: "opacity 0.2s ease",
           }}
           title="Toggle Fullscreen"
         >
