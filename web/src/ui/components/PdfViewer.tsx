@@ -63,7 +63,7 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
   const [visiblePageRange, setVisiblePageRange] = useState<{ start: number; end: number }>({ start: 1, end: 10 })
 
   const [isControlsVisible, setIsControlsVisible] = useState<boolean>(true)
-  const [lastScrollY, setLastScrollY] = useState<number>(0)
+  const [isZoomMenuVisible, setIsZoomMenuVisible] = useState<boolean>(true)
 
   // Refs для отслеживания скролла
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -81,6 +81,10 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
   // Track scroll velocity for dynamic buffering
   const lastScrollTopRef = useRef(0)
   const lastScrollTimeRef = useRef(Date.now())
+
+  // Track scroll for zoom menu visibility
+  const lastZoomMenuScrollTopRef = useRef(0)
+  const zoomMenuHideTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   // Get chat context for navigation
   const { navigateToMessage } = useChat()
@@ -418,44 +422,99 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
     updateVisiblePageRange()
   }, [continuousScroll, currentPage, saveProgress, updateVisiblePageRange])
 
+  // Separate scroll handler for zoom menu visibility
   useEffect(() => {
     const container = scrollContainerRef.current
     if (!container) return
 
+    // Initialize scroll position
+    lastZoomMenuScrollTopRef.current = container.scrollTop
+
     const handleScroll = () => {
-      const currentScrollY = container.scrollTop
+      const currentScrollTop = container.scrollTop
+      const lastScrollTop = lastZoomMenuScrollTopRef.current
+      const scrollDelta = currentScrollTop - lastScrollTop
 
-      // Show controls when scrolling up, hide when scrolling down
-      if (currentScrollY < lastScrollY) {
-        // Scrolling up - show controls
-        setIsControlsVisible(true)
-      } else if (currentScrollY > lastScrollY && currentScrollY > 100) {
-        // Scrolling down and past threshold - hide controls
-        setIsControlsVisible(false)
+      // Clear any pending hide timeout
+      if (zoomMenuHideTimeoutRef.current) {
+        clearTimeout(zoomMenuHideTimeoutRef.current)
+        zoomMenuHideTimeoutRef.current = null
       }
 
-      // Always show controls at the top of the document
-      if (currentScrollY < 50) {
-        setIsControlsVisible(true)
+      // Always show zoom menu at the top
+      if (currentScrollTop < 50) {
+        setIsZoomMenuVisible(true)
+        lastZoomMenuScrollTopRef.current = currentScrollTop
+        return
       }
 
-      setLastScrollY(currentScrollY)
+      // Determine scroll direction with smaller threshold
+      if (Math.abs(scrollDelta) > 1) {
+        if (scrollDelta < 0) {
+          // Scrolling up
+          setIsZoomMenuVisible(true)
+        } else {
+          // Scrolling down - hide after small delay
+          zoomMenuHideTimeoutRef.current = setTimeout(() => {
+            setIsZoomMenuVisible(false)
+          }, 100)
+        }
+      }
+
+      lastZoomMenuScrollTopRef.current = currentScrollTop
     }
 
-    // Throttle scroll handler for performance
-    let timeoutId: NodeJS.Timeout
+    // Handle wheel events for immediate response
+    const handleWheel = (e: WheelEvent) => {
+      const container = scrollContainerRef.current
+      if (!container) return
+
+      const currentScrollTop = container.scrollTop
+
+      // Always show at the top
+      if (currentScrollTop < 50) {
+        setIsZoomMenuVisible(true)
+        return
+      }
+
+      // Clear hide timeout if scrolling up
+      if (zoomMenuHideTimeoutRef.current) {
+        clearTimeout(zoomMenuHideTimeoutRef.current)
+        zoomMenuHideTimeoutRef.current = null
+      }
+
+      // Lower threshold for better responsiveness
+      if (e.deltaY > 3) {
+        // Scrolling down - immediate hide
+        setIsZoomMenuVisible(false)
+      } else if (e.deltaY < -3) {
+        // Scrolling up - immediate show
+        setIsZoomMenuVisible(true)
+      }
+    }
+
+    // Use requestAnimationFrame for smoother handling
+    let rafId: number | null = null
     const throttledHandleScroll = () => {
-      clearTimeout(timeoutId)
-      timeoutId = setTimeout(handleScroll, 100)
+      if (rafId) {
+        cancelAnimationFrame(rafId)
+      }
+      rafId = requestAnimationFrame(() => {
+        handleScroll()
+        rafId = null
+      })
     }
 
     container.addEventListener("scroll", throttledHandleScroll, { passive: true })
+    container.addEventListener("wheel", handleWheel, { passive: true })
 
     return () => {
       container.removeEventListener("scroll", throttledHandleScroll)
-      clearTimeout(timeoutId)
+      container.removeEventListener("wheel", handleWheel)
+      if (rafId) cancelAnimationFrame(rafId)
+      if (zoomMenuHideTimeoutRef.current) clearTimeout(zoomMenuHideTimeoutRef.current)
     }
-  }, [lastScrollY])
+  }, [])
 
   const goToPrevPage = () => {
     if (currentPage > 1) {
@@ -1024,18 +1083,19 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
       <div
         style={{
           position: "fixed",
-          bottom: 20,
+          bottom: 24,
           left: "50%",
-          transform: `translateX(-50%) translateY(${isControlsVisible ? "0" : "calc(100% + 20px)"})`,
-          backgroundColor: "#171a1f",
-          padding: isMobile ? "10px 16px" : "12px 20px",
-          borderRadius: "8px",
+          transform: `translateX(-50%) translateY(${isZoomMenuVisible ? "0" : "calc(100% + 24px)"})`,
+          backgroundColor: "#15181d",
+          padding: isMobile ? "12px 18px" : "14px 24px",
+          borderRadius: "12px",
           display: "flex",
           alignItems: "center",
-          gap: isMobile ? 8 : 12,
-          boxShadow: "0 4px 12px rgba(0, 0, 0, 0.4)",
+          gap: isMobile ? 12 : 16,
+          boxShadow: "0 6px 20px rgba(0, 0, 0, 0.45)",
           transition: "transform 0.3s ease-in-out, opacity 0.3s ease-in-out",
-          opacity: isControlsVisible ? 1 : 0,
+          opacity: isZoomMenuVisible ? 1 : 0,
+          pointerEvents: isZoomMenuVisible ? "auto" : "none",
           zIndex: 100,
           minWidth: isMobile ? "auto" : "auto",
           justifyContent: "center",
@@ -1049,7 +1109,7 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
             width: isMobile ? 32 : 36,
             height: isMobile ? 32 : 36,
             backgroundColor: "transparent",
-            color: scale <= 0.5 ? "rgba(255, 255, 255, 0.3)" : "#ffffff",
+            color: scale <= 0.5 ? "rgba(255, 255, 255, 0.35)" : "#ffffff",
             border: "none",
             borderRadius: 4,
             fontSize: isMobile ? 16 : 18,
@@ -1058,21 +1118,25 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
             alignItems: "center",
             justifyContent: "center",
             transition: "opacity 0.2s ease",
-            opacity: scale <= 0.5 ? 0.3 : 1,
+            opacity: scale <= 0.5 ? 0.35 : 1,
           }}
         >
-          🔍−
+          <svg width={isMobile ? 22 : 24} height={isMobile ? 22 : 24} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2"/>
+            <path d="M21 21L16.65 16.65" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+            <path d="M8 11H14" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+          </svg>
         </button>
 
         {/* Zoom Percentage Display */}
         <div
           style={{
             backgroundColor: "transparent",
-            color: "#ffffff",
-            padding: isMobile ? "6px 12px" : "8px 16px",
-            fontSize: isMobile ? 13 : 14,
-            fontWeight: 500,
-            minWidth: isMobile ? 50 : 60,
+            color: "#e5e7eb",
+            padding: isMobile ? "0 8px" : "0 12px",
+            fontSize: isMobile ? 14 : 16,
+            fontWeight: 600,
+            minWidth: isMobile ? 48 : 56,
             textAlign: "center",
           }}
         >
@@ -1087,7 +1151,7 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
             width: isMobile ? 32 : 36,
             height: isMobile ? 32 : 36,
             backgroundColor: "transparent",
-            color: scale >= 3.0 ? "rgba(255, 255, 255, 0.3)" : "#ffffff",
+            color: scale >= 3.0 ? "rgba(255, 255, 255, 0.35)" : "#ffffff",
             border: "none",
             borderRadius: 4,
             fontSize: isMobile ? 16 : 18,
@@ -1096,19 +1160,25 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
             alignItems: "center",
             justifyContent: "center",
             transition: "opacity 0.2s ease",
-            opacity: scale >= 3.0 ? 0.3 : 1,
+            opacity: scale >= 3.0 ? 0.35 : 1,
           }}
         >
-          🔍+
+          <svg width={isMobile ? 22 : 24} height={isMobile ? 22 : 24} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2"/>
+            <path d="M21 21L16.65 16.65" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+            <path d="M11 8V14" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+            <path d="M8 11H14" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+          </svg>
         </button>
 
         {/* Divider */}
         <div
           style={{
-            width: 1,
-            height: isMobile ? 20 : 24,
-            backgroundColor: "rgba(255, 255, 255, 0.2)",
-            margin: "0 4px",
+            width: 2,
+            height: isMobile ? 22 : 26,
+            backgroundColor: "rgba(255, 255, 255, 0.18)",
+            margin: isMobile ? "0 6px" : "0 8px",
+            borderRadius: 1,
           }}
         />
 
@@ -1137,7 +1207,12 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
           }}
           title="Toggle Fullscreen"
         >
-          ⛶
+          <svg width={isMobile ? 22 : 24} height={isMobile ? 22 : 24} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M8 3H3V8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M16 3H21V8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M8 21H3V16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M16 21H21V16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
         </button>
       </div>
     </div>
