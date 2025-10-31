@@ -1242,6 +1242,35 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
           />
         )}
       </div>
+
+      {/* Floating Open AI Assistant button (hidden when chat is visible) */}
+      {!isChatVisible && (
+        <button
+          aria-label="Open AI Assistant"
+          onClick={() => setIsChatVisible(true)}
+          style={{
+            position: 'fixed',
+            bottom: 24,
+            right: isMobile ? 16 : 24,
+            zIndex: 3000,
+            width: 52,
+            height: 52,
+            borderRadius: '50%',
+            border: 'none',
+            cursor: 'pointer',
+            backgroundColor: '#10B981',
+            color: 'white',
+            boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.2)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 22,
+          }}
+          title="Open AI Assistant"
+        >
+          🤖
+        </button>
+      )}
     </div>
   )
 }
