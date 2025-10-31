@@ -276,6 +276,18 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
           gap: 8,
         }}>
           Assistant
+          {isStreaming && (
+            <div
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: '50%',
+                backgroundColor: '#3B82F6',
+                boxShadow: '0 0 8px rgba(59, 130, 246, 0.8)',
+                animation: 'pulse-dot 1.5s ease-in-out infinite',
+              }}
+            />
+          )}
         </h3>
         <button
           onClick={onToggle}
@@ -570,6 +582,17 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
           }
           100% {
             background-position: -150% center;
+          }
+        }
+        
+        @keyframes pulse-dot {
+          0%, 100% {
+            opacity: 1;
+            transform: scale(1);
+          }
+          50% {
+            opacity: 0.5;
+            transform: scale(0.8);
           }
         }
       `}</style>
