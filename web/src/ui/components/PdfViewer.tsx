@@ -41,10 +41,6 @@ const CLEANUP_INTERVAL = 30000 // Interval to clean up old page data (30 seconds
 const MAX_CACHE_PAGES = PAGES_BUFFER * 4 // Maximum pages to keep in memory (4x buffer size)
 const SCROLL_THROTTLE_MS = 50 // Reduced throttle for faster range updates during scrolling
 
-// (оценка переносится ниже хуков состояния)
-
-// (будет вставлено ниже хуков состояния)
-
 interface PdfViewerProps {
   documentId: string
   onClose: () => void
@@ -59,8 +55,7 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
   const [error, setError] = useState<string | null>(null)
   const [continuousScroll, setContinuousScroll] = useState<boolean>(true) // По умолчанию включен непрерывный режим
   const [isChatVisible, setIsChatVisible] = useState<boolean>(false)
-  const [isMobile, setIsMobile] = useState<boolean>(window.innerWidth < 1024)
-  const [isTablet, setIsTablet] = useState<boolean>(window.innerWidth >= 640 && window.innerWidth < 1024)
+  const [isMobile, setIsMobile] = useState<boolean>(window.innerWidth < 768)
   const [pageQuestionsMap, setPageQuestionsMap] = useState<Map<number, PageQuestionsData>>(new Map())
   const [pageHeights, setPageHeights] = useState<Map<number, number>>(new Map())
   const [visiblePageRange, setVisiblePageRange] = useState<{start: number, end: number}>({ start: 1, end: 10 })
@@ -81,50 +76,14 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
   // Track scroll velocity for dynamic buffering
   const lastScrollTopRef = useRef(0)
   const lastScrollTimeRef = useRef(Date.now())
-  const scrollDirectionRef = useRef<'down' | 'up'>('down')
   
   // Get chat context for navigation
   const { navigateToMessage } = useChat()
- 
-  // Cooldown для форс-восстановления, чтобы не зациклиться пока страницы ещё не смонтировались
-  const lastForceRestoreRef = useRef(0)
-  // Флаг активного изменения масштаба
-  const isZoomingRef = useRef(false)
 
   // Update the ref whenever scale changes
   useEffect(() => {
     currentScaleRef.current = scale
   }, [scale])
-
-  // Базовая оценка высоты страницы (до масштабирования)
-  const BASE_PAGE_HEIGHT_ESTIMATE = 1100
-
-  // Возвращает динамическую оценку высоты страницы: средняя из измеренных или базовая * scale
-  const getEstimatedPageHeight = () => {
-    if (pageHeights.size > 0) {
-      let sum = 0
-      pageHeights.forEach((h) => (sum += h))
-      const avg = sum / pageHeights.size
-      return Math.max(300, avg)
-    }
-    return Math.max(300, BASE_PAGE_HEIGHT_ESTIMATE * scale)
-  }
-
-  const estimatePageFromScroll = (scrollTop: number, totalPages: number) => {
-    if (pageHeights.size > 0) {
-      let acc = 0
-      for (let i = 1; i <= totalPages; i++) {
-        const h = pageHeights.get(i) || getEstimatedPageHeight()
-        acc += h
-        if (acc > scrollTop) {
-          return i
-        }
-      }
-      return totalPages
-    }
-    const estHeight = getEstimatedPageHeight()
-    return Math.max(1, Math.min(totalPages, Math.floor(scrollTop / estHeight) + 1))
-  }
 
   // Load document info
   useEffect(() => {
@@ -163,8 +122,7 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
   // Handle window resize
   useEffect(() => {
     const handleResize = () => {
-      setIsMobile(window.innerWidth < 1024)
-      setIsTablet(window.innerWidth >= 640 && window.innerWidth < 1024)
+      setIsMobile(window.innerWidth < 768)
     }
 
     window.addEventListener('resize', handleResize)
@@ -363,86 +321,45 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
     }
   }, [continuousScroll])
 
-  // Буфер теперь мемоизируется на время скролла
-  const dynamicBufferRef = useRef(PAGES_BUFFER)
-  const bufferTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-
-  const setDynamicBuffer = (buffer: number) => {
-    if (dynamicBufferRef.current !== buffer) {
-      dynamicBufferRef.current = buffer
-      // блокируем изменение буфера на 300мс после изменения
-      if (bufferTimeoutRef.current) clearTimeout(bufferTimeoutRef.current)
-      bufferTimeoutRef.current = setTimeout(() => {
-        dynamicBufferRef.current = PAGES_BUFFER
-      }, 300)
-    }
-  }
-
+  // Calculate which pages should be rendered based on scroll position
   const updateVisiblePageRange = useCallback(() => {
     if (!continuousScroll || !scrollContainerRef.current || numPages === 0) {
       return
     }
+
     const container = scrollContainerRef.current
     const scrollTop = container.scrollTop
     const containerHeight = container.clientHeight
+    
+    // Calculate scroll velocity for dynamic buffering
     const now = Date.now()
     const timeDelta = now - lastScrollTimeRef.current
     const scrollDelta = Math.abs(scrollTop - lastScrollTopRef.current)
     const scrollVelocity = timeDelta > 0 ? scrollDelta / timeDelta : 0
-    // Определяем направление скролла
-    scrollDirectionRef.current = scrollTop >= lastScrollTopRef.current ? 'down' : 'up'
+    
     lastScrollTopRef.current = scrollTop
     lastScrollTimeRef.current = now
+    
+    // Dynamically adjust buffer based on scroll velocity
+    // Faster scrolling = larger buffer to prevent unmounting
+    const dynamicBuffer = scrollVelocity > 0.5 ? PAGES_BUFFER + 5 : PAGES_BUFFER
 
-    // Если быстрая прокрутка — увеличиваем буфер, но один раз на цикл скролла
-    if (scrollVelocity > 0.5) setDynamicBuffer(PAGES_BUFFER + 5)
-    // При маленьком масштабе рендерим больший буфер, чтобы избежать "пустых" зон
-    if (scale <= 0.75) setDynamicBuffer(PAGES_BUFFER + 10)
+    // Calculate which pages are in viewport
+    let estimatedPage = Math.floor(scrollTop / PAGE_HEIGHT_ESTIMATE) + 1
+    estimatedPage = Math.max(1, Math.min(estimatedPage, numPages))
 
-    const buffer = dynamicBufferRef.current
-    const estHeight = getEstimatedPageHeight()
-    let estimatedPage = estimatePageFromScroll(scrollTop, numPages)
-
-    // Рассчитываем диапазон с учётом реальной высоты контейнера
-    const pagesPerViewport = Math.max(1, Math.ceil(containerHeight / estHeight))
-    let start: number
-    let end: number
-    if (isZoomingRef.current) {
-      // во время зума гарантируем, что currentPage всегда в диапазоне, а окно стабильное
-      const zoomWindow = Math.max(6, Math.floor(buffer / 2))
-      start = Math.max(1, currentPage - zoomWindow)
-      end = Math.min(numPages, currentPage + zoomWindow)
-    } else {
-      start = Math.max(1, estimatedPage - buffer)
-      end = Math.min(numPages, estimatedPage + buffer + pagesPerViewport)
-      // Предзагружаем несколько страниц в направлении скролла
-      const lead = isZoomingRef.current ? 5 : 3
-      if (scrollDirectionRef.current === 'down') {
-        end = Math.min(numPages, end + lead)
-      } else {
-        start = Math.max(1, start - lead)
-      }
-    }
-
-    // Всегда включаем currentPage в диапазон на всякий случай
-    if (currentPage < start) start = currentPage
-    if (currentPage > end) end = currentPage
-
-    if (end < start) {
-      start = estimatedPage
-      end = estimatedPage + pagesPerViewport
-      end = Math.min(numPages, Math.max(start, end))
-      console.warn('Fallback (range fix): restoring visiblePageRange window around estimated page', estimatedPage)
-    }
+    // Add buffer pages before and after with dynamic buffer size
+    const start = Math.max(1, estimatedPage - dynamicBuffer)
+    const end = Math.min(numPages, estimatedPage + dynamicBuffer + Math.ceil(containerHeight / PAGE_HEIGHT_ESTIMATE))
 
     setVisiblePageRange(prev => {
       if (prev.start !== start || prev.end !== end) {
-        console.log(`Rendering pages ${start} to ${end} (buffer: ${buffer})`)
+        console.log(`Rendering pages ${start} to ${end} (buffer: ${dynamicBuffer})`)
         return { start, end }
       }
       return prev
     })
-  }, [continuousScroll, numPages, scale, currentPage])
+  }, [continuousScroll, numPages])
 
   // Функция для определения видимой страницы при скролле
   const updateVisiblePage = useCallback(() => {
@@ -489,47 +406,6 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
     // Update visible page range for virtualization
     updateVisiblePageRange()
   }, [continuousScroll, currentPage, saveProgress, updateVisiblePageRange])
-
-  // Гарантия восстановления рендера: если после обновления диапазона ничего не видно — форсируем одну страницу
-  useEffect(() => {
-    if (!continuousScroll || !scrollContainerRef.current || numPages === 0) return
-
-    const container = scrollContainerRef.current
-    const containerRect = container.getBoundingClientRect()
-
-    let anyVisible = false
-    for (let i = visiblePageRange.start; i <= visiblePageRange.end; i++) {
-      const ref = pageRefs.current[i - 1]
-      if (ref) {
-        const rect = ref.getBoundingClientRect()
-        const intersects = rect.bottom >= containerRect.top && rect.top <= containerRect.bottom
-        if (intersects) {
-          anyVisible = true
-          break
-        }
-      }
-    }
-
-    if (!anyVisible) {
-      const now = Date.now()
-      // ждем немного, чтобы DOM успел смонтировать страницы после смены диапазона
-      if (now - lastForceRestoreRef.current < 250) {
-        return
-      }
-      lastForceRestoreRef.current = now
-      const scrollTop = container.scrollTop
-      const estimatedPage = estimatePageFromScroll(scrollTop, numPages)
-      // восстанавливаем небольшое, но достаточное окно (например, 6-10 страниц)
-      const minWindow = 8
-      const windowHalf = Math.max(minWindow / 2, Math.floor(dynamicBufferRef.current / 4))
-      const safeStart = Math.max(1, estimatedPage - windowHalf)
-      const safeEnd = Math.min(numPages, estimatedPage + windowHalf)
-      if (visiblePageRange.start !== safeStart || visiblePageRange.end !== safeEnd) {
-        console.warn('No visible pages in viewport. Forcing restore window around estimated page', estimatedPage)
-        setVisiblePageRange({ start: safeStart, end: safeEnd })
-      }
-    }
-  }, [visiblePageRange, continuousScroll, numPages, pageHeights, scale])
 
   const goToPrevPage = () => {
     if (currentPage > 1) {
@@ -610,6 +486,17 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
     }
   }, [updateVisiblePage, continuousScroll])
 
+  // Дополнительная проверка видимой страницы каждые 500ms
+  useEffect(() => {
+    if (!continuousScroll) return
+
+    const interval = setInterval(() => {
+      updateVisiblePage()
+    }, 500)
+
+    return () => clearInterval(interval)
+  }, [continuousScroll, updateVisiblePage])
+
   // Cleanup timeout on component unmount
   useEffect(() => {
     return () => {
@@ -653,7 +540,6 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
   }, [])
 
   const zoomIn = () => {
-    isZoomingRef.current = true
     setScale(prev => Math.min(prev + 0.25, 3.0))
     // Clear page heights cache when zooming to recalculate
     setPageHeights(new Map())
@@ -664,17 +550,10 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
     }
     updateVisiblePageRangeTimeoutRef.current = setTimeout(() => {
       updateVisiblePageRange()
-      // Важно: обновляем вычисление наиболее видимой страницы после изменения зума
-      requestAnimationFrame(() => {
-        updateVisiblePage()
-        // Снимаем флаг через небольшой таймаут
-        setTimeout(() => { isZoomingRef.current = false }, 200)
-      })
     }, 50)
   }
 
   const zoomOut = () => {
-    isZoomingRef.current = true
     setScale(prev => Math.max(prev - 0.25, 0.5))
     // Clear page heights cache when zooming to recalculate
     setPageHeights(new Map())
@@ -685,17 +564,10 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
     }
     updateVisiblePageRangeTimeoutRef.current = setTimeout(() => {
       updateVisiblePageRange()
-      // Важно: обновляем вычисление наиболее видимой страницы после изменения зума
-      requestAnimationFrame(() => {
-        updateVisiblePage()
-        // Снимаем флаг через небольшой таймаут
-        setTimeout(() => { isZoomingRef.current = false }, 200)
-      })
     }, 50)
   }
 
   const resetZoom = () => {
-    isZoomingRef.current = true
     setScale(1.0)
     // Clear page heights cache when zooming to recalculate
     setPageHeights(new Map())
@@ -706,12 +578,6 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
     }
     updateVisiblePageRangeTimeoutRef.current = setTimeout(() => {
       updateVisiblePageRange()
-      // Важно: обновляем вычисление наиболее видимой страницы после изменения зума
-      requestAnimationFrame(() => {
-        updateVisiblePage()
-        // Снимаем флаг через небольшой таймаут
-        setTimeout(() => { isZoomingRef.current = false }, 200)
-      })
     }, 50)
   }
 
@@ -796,8 +662,6 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
     return null
   }
 
-  // в отрисовке страниц для continuousScroll
-  const WINDOW_RENDER_DISTANCE = 4 // чуть шире окно для textLayer, чтобы не пропадал текст при зуме
   return (
     <div style={{
       position: 'fixed',
@@ -1049,11 +913,8 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
                 Array.from({ length: numPages }, (_, index) => {
                   const pageNumber = index + 1
                   const isInRange = pageNumber >= visiblePageRange.start && pageNumber <= visiblePageRange.end
-                  const knownHeight = pageHeights.get(pageNumber) || getEstimatedPageHeight()
-                  // Важно: отображаем textLayer только если страница реально "в рабочем окне"
-                  const shouldRenderTextLayer = isZoomingRef.current
-                    ? Math.abs(pageNumber - currentPage) <= Math.max(4, WINDOW_RENDER_DISTANCE)
-                    : Math.abs(pageNumber - currentPage) <= WINDOW_RENDER_DISTANCE
+                  const knownHeight = pageHeights.get(pageNumber) || PAGE_HEIGHT_ESTIMATE
+
                   return (
                     <div
                       key={pageNumber}
@@ -1077,20 +938,16 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
                             key={`page-${pageNumber}-scale-${scale}`}
                             pageNumber={pageNumber}
                             scale={scale}
-                            renderTextLayer={shouldRenderTextLayer}
+                            renderTextLayer={true}
                             renderAnnotationLayer={true}
                             loading={
                               <div style={{
                                 width: '100%',
-                                height: `${knownHeight}px`,
+                                height: '500px',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
                                 color: '#9CA3AF',
-                                background: 'linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 37%, #f3f4f6 63%)',
-                                backgroundSize: '400% 100%',
-                                animation: 'pulse 1.2s ease-in-out infinite',
-                                borderRadius: 8,
                               }}>
                                 Loading page {pageNumber}...
                               </div>
@@ -1168,7 +1025,7 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
             <Document
               file={documentInfo.url}
               onLoadSuccess={onDocumentLoadSuccess}
-              onLoadError={() => setError('Failed to load PDF document')}
+              onLoadError={(error) => setError('Failed to load PDF document')}
               options={pdfOptions}
             >
               <Page
@@ -1182,65 +1039,15 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
           </div>
         )}
         </div>
-        {/* End PDF Content */}
 
         {/* Chat Panel */}
-        {isMobile ? (
-          isChatVisible ? (
-            <div
-              onClick={() => setIsChatVisible(false)}
-              style={{
-                position: 'fixed',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                zIndex: 2000,
-                display: 'flex',
-                justifyContent: 'flex-end',
-                backgroundColor: 'rgba(0,0,0,0.35)'
-              }}
-            >
-              {/* Panel справа */}
-              <div
-                onClick={(e) => e.stopPropagation()}
-                style={{
-                  width: isTablet ? 'max-content' : '100%',
-                  maxWidth: isTablet ? '90vw' : '100%',
-                  height: '100%',
-                  backgroundColor: 'white',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.2)',
-                  pointerEvents: 'auto',
-                  borderRadius: 0,
-                  overflow: 'hidden',
-                  boxSizing: 'border-box',
-                  margin: 0,
-                  position: 'relative',
-                  minWidth: 0
-                }}
-              >
-                <ChatPanel
-                  documentId={documentId}
-                  currentPage={currentPage}
-                  isVisible={true}
-                  onToggle={() => setIsChatVisible(false)}
-                  isMobile={!isTablet}
-                />
-              </div>
-            </div>
-          ) : null
-        ) : (
-          // Sidebar mode for desktop
-          <ChatPanel
-            documentId={documentId}
-            currentPage={currentPage}
-            isVisible={isChatVisible}
-            onToggle={() => setIsChatVisible(!isChatVisible)}
-            isMobile={false}
-          />
-        )}
+        <ChatPanel
+          documentId={documentId}
+          currentPage={currentPage}
+          isVisible={isChatVisible}
+          onToggle={() => setIsChatVisible(!isChatVisible)}
+          isMobile={isMobile}
+        />
       </div>
     </div>
   )
