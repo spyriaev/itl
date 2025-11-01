@@ -65,30 +65,30 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
   const [isTablet, setIsTablet] = useState<boolean>(window.innerWidth >= 640 && window.innerWidth < 1024)
   const [pageQuestionsMap, setPageQuestionsMap] = useState<Map<number, PageQuestionsData>>(new Map())
   const [pageHeights, setPageHeights] = useState<Map<number, number>>(new Map())
-  const [visiblePageRange, setVisiblePageRange] = useState<{start: number, end: number}>({ start: 1, end: 10 })
-  const [assistantButtonPosition, setAssistantButtonPosition] = useState<{right: number | string, bottom: number | string}>({ right: 24, bottom: 24 })
-  
+  const [visiblePageRange, setVisiblePageRange] = useState<{ start: number, end: number }>({ start: 1, end: 10 })
+  const [assistantButtonPosition, setAssistantButtonPosition] = useState<{ right: number | string, bottom: number | string }>({ right: 24, bottom: 24 })
+
   // Refs для отслеживания скролла
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const pageRefs = useRef<(HTMLDivElement | null)[]>([])
-  
+
   // Track current scale to detect race conditions during zoom operations
   const currentScaleRef = useRef(scale)
-  
+
   // Store timeout ID for updateVisiblePageRange to prevent accumulation
   const updateVisiblePageRangeTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-  
+
   // Store PDF document instance for cleanup
   const pdfDocumentRef = useRef<PDFDocumentProxy | null>(null)
-  
+
   // Track scroll velocity for dynamic buffering
   const lastScrollTopRef = useRef(0)
   const lastScrollTimeRef = useRef(Date.now())
   const scrollDirectionRef = useRef<'down' | 'up'>('down')
-  
+
   // Get chat context for navigation and assistant state
   const { navigateToMessage, isStreaming } = useChat()
- 
+
   // Cooldown для форс-восстановления, чтобы не зациклиться пока страницы ещё не смонтировались
   const lastForceRestoreRef = useRef(0)
   // Флаг активного изменения масштаба
@@ -135,7 +135,7 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
       try {
         setLoading(true)
         setError(null)
-        
+
         // Clean up previous document when switching
         if (pdfDocumentRef.current) {
           console.log('Destroying previous PDF document...')
@@ -144,12 +144,12 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
           })
           pdfDocumentRef.current = null
         }
-        
+
         // Clear all cached data
         setPageHeights(new Map())
         setPageQuestionsMap(new Map())
         setNumPages(0)
-        
+
         const info = await getDocumentViewUrl(documentId)
         setDocumentInfo(info)
         setCurrentPage(info.lastViewedPage)
@@ -194,18 +194,18 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
       const currentRange = visiblePageRange
       const startCleanup = Math.max(1, currentRange.start - MAX_CACHE_PAGES)
       const endCleanup = Math.min(numPages, currentRange.end + MAX_CACHE_PAGES)
-      
+
       const cleaned = new Map()
       for (let i = startCleanup; i <= endCleanup; i++) {
         if (prev.has(i)) {
           cleaned.set(i, prev.get(i)!)
         }
       }
-      
+
       if (cleaned.size < prev.size) {
         console.log(`Cleaned up ${prev.size - cleaned.size} pages from memory`)
       }
-      
+
       return cleaned
     })
   }, [visiblePageRange, numPages])
@@ -216,14 +216,14 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
       const currentRange = visiblePageRange
       const startCleanup = Math.max(1, currentRange.start - MAX_CACHE_PAGES)
       const endCleanup = Math.min(numPages, currentRange.end + MAX_CACHE_PAGES)
-      
+
       const cleaned = new Map()
       for (let i = startCleanup; i <= endCleanup; i++) {
         if (prev.has(i)) {
           cleaned.set(i, prev.get(i)!)
         }
       }
-      
+
       return cleaned
     })
   }, [visiblePageRange, numPages])
@@ -231,12 +231,12 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
   const onDocumentLoadSuccess = useCallback((pdf: PDFDocumentProxy) => {
     // Store PDF document instance for cleanup
     pdfDocumentRef.current = pdf
-    
+
     const numPages = pdf.numPages
     setNumPages(numPages)
     // Инициализируем refs для страниц
     pageRefs.current = new Array(numPages).fill(null)
-    
+
     // Initialize visible page range centered around the saved page position
     // Use documentInfo.lastViewedPage directly to avoid race condition with currentPage state
     // This prevents flickering by rendering the correct pages from the start
@@ -244,7 +244,7 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
     const start = Math.max(1, savedPage - PAGES_BUFFER)
     const end = Math.min(numPages, savedPage + PAGES_BUFFER)
     setVisiblePageRange({ start, end })
-    
+
     // Прокручиваем к последней просмотренной странице
     // Use requestAnimationFrame for smoother, immediate scroll without visible delay
     requestAnimationFrame(() => {
@@ -254,10 +254,10 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
         const container = scrollContainerRef.current
         const containerRect = container.getBoundingClientRect()
         const pageRect = pageRef.getBoundingClientRect()
-        
+
         // Вычисляем позицию для центрирования страницы
         const scrollTop = pageRef.offsetTop - containerRect.height / 2 + pageRect.height / 2
-        
+
         container.scrollTo({
           top: Math.max(0, scrollTop),
           behavior: 'auto'
@@ -278,10 +278,10 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
       const pagesToFetch = pageNumbers.filter(
         pageNum => !pageQuestionsMap.has(pageNum) && !fetchingPagesRef.current.has(pageNum)
       )
-      
+
       // Mark pages as being fetched
       pagesToFetch.forEach(pageNum => fetchingPagesRef.current.add(pageNum))
-      
+
       // Fetch questions for specified pages only
       for (const pageNum of pagesToFetch) {
         try {
@@ -295,7 +295,7 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
           fetchingPagesRef.current.delete(pageNum)
         }
       }
-      
+
       if (questionsMap.size > 0) {
         setPageQuestionsMap(prev => new Map([...prev, ...questionsMap]))
       }
@@ -303,7 +303,7 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
 
     // Determine which pages to fetch
     let pagesToFetch: number[] = []
-    
+
     if (!continuousScroll) {
       // Single page mode - fetch current page
       pagesToFetch = [currentPage]
@@ -315,7 +315,7 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
           if (ref) {
             const rect = ref.getBoundingClientRect()
             const containerRect = container.getBoundingClientRect()
-            
+
             // Check if page is in viewport
             if (
               rect.bottom >= containerRect.top &&
@@ -353,12 +353,12 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
       const container = scrollContainerRef.current
       const containerRect = container.getBoundingClientRect()
       const pageRect = pageRef.getBoundingClientRect()
-      
+
       // Вычисляем позицию для центрирования страницы
       const scrollTop = pageRef.offsetTop - containerRect.height / 2 + pageRect.height / 2
-      
+
       console.log(`Scrolling to page ${pageNumber}, scrollTop: ${scrollTop}`)
-      
+
       container.scrollTo({
         top: Math.max(0, scrollTop),
         behavior: 'auto'
@@ -466,12 +466,12 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
         const pageRect = pageRef.getBoundingClientRect()
         const pageTop = pageRect.top
         const pageBottom = pageRect.bottom
-        
+
         // Вычисляем пересечение страницы с видимой областью
         const visibleTop = Math.max(pageTop, containerTop)
         const visibleBottom = Math.min(pageBottom, containerBottom)
         const visibleHeight = Math.max(0, visibleBottom - visibleTop)
-        
+
         // Вычисляем процент видимости страницы
         const pageHeight = pageRect.height
         const visibilityRatio = visibleHeight / pageHeight
@@ -559,7 +559,7 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
 
   const toggleContinuousScroll = () => {
     setContinuousScroll(!continuousScroll)
-    
+
     // Если переключаемся в режим непрерывного скролла, прокручиваем к текущей странице
     if (!continuousScroll) {
       setTimeout(() => {
@@ -586,7 +586,7 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
 
       // Находим первую видимую страницу или используем контейнер для определения правого края
       let pageRight: number | null = null
-      
+
       // Сначала пытаемся найти видимую страницу
       for (let i = 0; i < pageRefs.current.length; i++) {
         const pageRef = pageRefs.current[i]
@@ -603,17 +603,17 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
 
       if (pageRight !== null) {
         const windowWidth = window.innerWidth
-        
+
         // Кнопка должна быть справа от страницы с отступом 32px (чтобы точно была за пределами)
         // pageRight - координата правого края страницы от левого края окна
         // windowWidth - pageRight - расстояние от правого края страницы до правого края окна
         const offsetFromPage = 32 // отступ от правого края страницы
         const buttonRight = windowWidth - pageRight - offsetFromPage
-        
+
         // Если места недостаточно, размещаем справа внизу экрана
         const minRight = 24
         const finalRight = buttonRight < minRight ? minRight : buttonRight
-        
+
         setAssistantButtonPosition({ right: finalRight, bottom: 24 })
       } else {
         // Если страница не найдена, используем дефолтную позицию
@@ -623,11 +623,11 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
 
     // Обновляем позицию при изменении масштаба, скролле или изменении размера окна
     updateButtonPosition()
-    
+
     const handleResize = () => {
       setTimeout(updateButtonPosition, 100)
     }
-    
+
     const handleScroll = () => {
       requestAnimationFrame(updateButtonPosition)
     }
@@ -644,11 +644,11 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
       }
     }
   }, [scale, continuousScroll, currentPage, visiblePageRange, isMobile, isTablet])
-  
+
   // Отдельный эффект для обновления позиции при открытии/закрытии чата
   useEffect(() => {
     if (isMobile || isTablet) return
-    
+
     // Ждем завершения анимации перехода (300ms + небольшой запас)
     const timeoutId = setTimeout(() => {
       if (!scrollContainerRef.current || !pageRefs.current.length) return
@@ -669,11 +669,11 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
 
       if (pageRight !== null) {
         const windowWidth = window.innerWidth
-        
+
         // Кнопка должна быть справа от страницы с отступом 32px
         const offsetFromPage = 32 // отступ от правого края страницы
         const buttonRight = windowWidth - pageRight - offsetFromPage
-        
+
         // Если места недостаточно, размещаем справа внизу экрана
         const minRight = 24
         const finalRight = buttonRight < minRight ? minRight : buttonRight
@@ -696,12 +696,12 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
     // Добавляем обработчик с throttling для производительности
     let timeoutId: NodeJS.Timeout
     let rafId: number | null = null
-    
+
     const throttledHandleScroll = () => {
       if (rafId !== null) {
         cancelAnimationFrame(rafId)
       }
-      
+
       rafId = requestAnimationFrame(() => {
         clearTimeout(timeoutId)
         timeoutId = setTimeout(handleScroll, SCROLL_THROTTLE_MS)
@@ -710,12 +710,12 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
     }
 
     container.addEventListener('scroll', throttledHandleScroll, { passive: true })
-    
+
     const handleResize = () => {
       setTimeout(handleScroll, 100)
     }
     window.addEventListener('resize', handleResize)
-    
+
     return () => {
       container.removeEventListener('scroll', throttledHandleScroll)
       window.removeEventListener('resize', handleResize)
@@ -741,7 +741,7 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
       cleanupOldHeights()
       cleanupOldQuestions()
     }, CLEANUP_INTERVAL)
-    
+
     return () => clearInterval(interval)
   }, [cleanupOldHeights, cleanupOldQuestions])
 
@@ -749,16 +749,16 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
   useEffect(() => {
     return () => {
       console.log('Cleaning up PDF viewer resources...')
-      
+
       // Очищаем все таймауты
       if (updateVisiblePageRangeTimeoutRef.current) {
         clearTimeout(updateVisiblePageRangeTimeoutRef.current)
         updateVisiblePageRangeTimeoutRef.current = null
       }
-      
+
       // Сбрасываем флаг зума
       isZoomingRef.current = false
-      
+
       // Destroy PDF.js document instance to free memory
       if (pdfDocumentRef.current) {
         pdfDocumentRef.current.destroy().catch((err) => {
@@ -766,12 +766,12 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
         })
         pdfDocumentRef.current = null
       }
-      
+
       // Clear all state to free memory
       setPageHeights(new Map())
       setPageQuestionsMap(new Map())
       setVisiblePageRange({ start: 1, end: 10 })
-      
+
       // Clear page refs
       pageRefs.current = []
     }
@@ -793,20 +793,20 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
     setPageHeights(new Map())
     // Update visible range immediately and after a brief delay for re-render
     updateVisiblePageRange()
-    
+
     // Очищаем предыдущий таймаут, если он есть
     if (updateVisiblePageRangeTimeoutRef.current) {
       clearTimeout(updateVisiblePageRangeTimeoutRef.current)
       updateVisiblePageRangeTimeoutRef.current = null
     }
-    
+
     updateVisiblePageRangeTimeoutRef.current = setTimeout(() => {
       // Проверяем, что компонент еще смонтирован
       if (!scrollContainerRef.current) {
         isZoomingRef.current = false
         return
       }
-      
+
       updateVisiblePageRange()
       // Важно: обновляем вычисление наиболее видимой страницы после изменения зума
       requestAnimationFrame(() => {
@@ -814,7 +814,7 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
           isZoomingRef.current = false
           return
         }
-        
+
         updateVisiblePage()
         // Снимаем флаг через небольшой таймаут
         setTimeout(() => { isZoomingRef.current = false }, 200)
@@ -838,20 +838,20 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
     setPageHeights(new Map())
     // Update visible range immediately and after a brief delay for re-render
     updateVisiblePageRange()
-    
+
     // Очищаем предыдущий таймаут, если он есть
     if (updateVisiblePageRangeTimeoutRef.current) {
       clearTimeout(updateVisiblePageRangeTimeoutRef.current)
       updateVisiblePageRangeTimeoutRef.current = null
     }
-    
+
     updateVisiblePageRangeTimeoutRef.current = setTimeout(() => {
       // Проверяем, что компонент еще смонтирован
       if (!scrollContainerRef.current) {
         isZoomingRef.current = false
         return
       }
-      
+
       updateVisiblePageRange()
       // Важно: обновляем вычисление наиболее видимой страницы после изменения зума
       requestAnimationFrame(() => {
@@ -859,7 +859,7 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
           isZoomingRef.current = false
           return
         }
-        
+
         updateVisiblePage()
         // Снимаем флаг через небольшой таймаут
         setTimeout(() => { isZoomingRef.current = false }, 200)
@@ -883,20 +883,20 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
     setPageHeights(new Map())
     // Update visible range immediately and after a brief delay for re-render
     updateVisiblePageRange()
-    
+
     // Очищаем предыдущий таймаут, если он есть
     if (updateVisiblePageRangeTimeoutRef.current) {
       clearTimeout(updateVisiblePageRangeTimeoutRef.current)
       updateVisiblePageRangeTimeoutRef.current = null
     }
-    
+
     updateVisiblePageRangeTimeoutRef.current = setTimeout(() => {
       // Проверяем, что компонент еще смонтирован
       if (!scrollContainerRef.current) {
         isZoomingRef.current = false
         return
       }
-      
+
       updateVisiblePageRange()
       // Важно: обновляем вычисление наиболее видимой страницы после изменения зума
       requestAnimationFrame(() => {
@@ -904,7 +904,7 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
           isZoomingRef.current = false
           return
         }
-        
+
         updateVisiblePage()
         // Снимаем флаг через небольшой таймаут
         setTimeout(() => { isZoomingRef.current = false }, 200)
@@ -924,29 +924,29 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
 
     try {
       isZoomingRef.current = true
-      
+
       // Получаем первую страницу для определения ширины (все страницы обычно имеют одинаковую ширину)
       const page = await pdfDocumentRef.current.getPage(1)
-      
+
       // Проверяем, что компонент еще смонтирован и документ существует
       if (!pdfDocumentRef.current || !scrollContainerRef.current) {
         isZoomingRef.current = false
         return
       }
-      
+
       const viewport = page.getViewport({ scale: 1.0 })
       const pageWidth = viewport.width
-      
+
       // Получаем доступную ширину контейнера
       const container = scrollContainerRef.current
       if (!container) {
         isZoomingRef.current = false
         return
       }
-      
+
       const containerRect = container.getBoundingClientRect()
       const availableWidth = containerRect.width - 48 // Учитываем padding (24px с каждой стороны)
-      
+
       // Вычисляем оптимальный scale
       let optimalScale: number
       
@@ -954,53 +954,53 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
         // Для планшета и мобильных: страница должна полностью помещаться по ширине
         optimalScale = availableWidth / pageWidth
       } else {
-        // Для десктопа: страница помещается по ширине, но не слишком широкая
-        // Ограничиваем максимальную ширину страницы (например, 1200px)
-        const maxPageWidth = 1200
-        const targetWidth = Math.min(availableWidth, maxPageWidth)
-        optimalScale = targetWidth / pageWidth
+        // Для десктопа: страница помещается по ширине без ограничений
+        // Для очень широких презентаций это может привести к зуму меньше 50%
+        optimalScale = availableWidth / pageWidth
       }
       
       // Ограничиваем scale разумными пределами
-      optimalScale = Math.max(0.5, Math.min(optimalScale, 3.0))
-      
+      // Минимальный scale 0.1 (10%) для очень широких презентаций
+      // Максимальный scale 3.0 (300%)
+      optimalScale = Math.max(0.1, Math.min(optimalScale, 3.0))
+
       // Очищаем предыдущий таймаут, если он есть
       if (updateVisiblePageRangeTimeoutRef.current) {
         clearTimeout(updateVisiblePageRangeTimeoutRef.current)
         updateVisiblePageRangeTimeoutRef.current = null
       }
-      
+
       setScale(optimalScale)
       // Clear page heights cache when zooming to recalculate
       setPageHeights(new Map())
-      
+
       // Update visible range immediately and after a brief delay for re-render
       updateVisiblePageRange()
-      
+
       updateVisiblePageRangeTimeoutRef.current = setTimeout(() => {
         // Проверяем, что компонент еще смонтирован
         if (!scrollContainerRef.current) {
           isZoomingRef.current = false
           return
         }
-        
+
         updateVisiblePageRange()
         requestAnimationFrame(() => {
           if (!scrollContainerRef.current) {
             isZoomingRef.current = false
             return
           }
-          
+
           updateVisiblePage()
-          setTimeout(() => { 
-            isZoomingRef.current = false 
+          setTimeout(() => {
+            isZoomingRef.current = false
           }, 200)
         })
       }, 50)
     } catch (error) {
       console.error('Error fitting to width:', error)
       isZoomingRef.current = false
-      
+
       // Очищаем таймаут в случае ошибки
       if (updateVisiblePageRangeTimeoutRef.current) {
         clearTimeout(updateVisiblePageRangeTimeoutRef.current)
@@ -1178,7 +1178,7 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
         overflow: 'hidden',
       }}>
         {/* PDF Content */}
-        <div 
+        <div
           ref={scrollContainerRef}
           style={{
             flex: 1,
@@ -1190,158 +1190,158 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
             marginRight: isChatVisible ? (isMobile ? 0 : 400) : 0,
             transition: 'margin-right 0.3s ease-out',
           }}>
-        {continuousScroll ? (
-          /* Continuous Scroll Mode - Virtualized rendering for memory efficiency */
+          {continuousScroll ? (
+            /* Continuous Scroll Mode - Virtualized rendering for memory efficiency */
           <div style={{
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
             gap: 16,
             width: '100%',
-            maxWidth: '100%',
+            minWidth: 'max-content',
           }}>
-            <Document
-              file={documentInfo.url}
-              onLoadSuccess={onDocumentLoadSuccess}
-              onLoadError={(error) => setError('Failed to load PDF document')}
-              options={pdfOptions}
-            >
-              {numPages > 0 ? (
-                Array.from({ length: numPages }, (_, index) => {
-                  const pageNumber = index + 1
-                  const isInRange = pageNumber >= visiblePageRange.start && pageNumber <= visiblePageRange.end
-                  const knownHeight = pageHeights.get(pageNumber) || getEstimatedPageHeight()
-                  // Важно: отображаем textLayer только если страница реально "в рабочем окне"
-                  const shouldRenderTextLayer = isZoomingRef.current
-                    ? Math.abs(pageNumber - currentPage) <= Math.max(4, WINDOW_RENDER_DISTANCE)
-                    : Math.abs(pageNumber - currentPage) <= WINDOW_RENDER_DISTANCE
-                  return (
-                    <div
-                      key={pageNumber}
-                      ref={(el) => pageRefs.current[index] = el}
-                      style={{
-                        backgroundColor: 'white',
-                        borderRadius: 8,
-                        boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
-                        padding: 16,
-                        marginBottom: 8,
-                        minHeight: isInRange ? 'auto' : `${knownHeight}px`,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      {isInRange ? (
-                        <>
-                          <Page
-                            key={`page-${pageNumber}-scale-${scale}`}
-                            pageNumber={pageNumber}
-                            scale={scale}
-                            renderTextLayer={shouldRenderTextLayer}
-                            renderAnnotationLayer={true}
-                            loading={
-                              <div style={{
-                                width: '100%',
-                                height: `${knownHeight}px`,
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                color: '#9CA3AF',
-                                background: 'linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 37%, #f3f4f6 63%)',
-                                backgroundSize: '400% 100%',
-                                animation: 'pulse 1.2s ease-in-out infinite',
-                                borderRadius: 8,
-                              }}>
-                                Loading page {pageNumber}...
-                              </div>
-                            }
-                            onLoadSuccess={(page) => {
-                              // Get the scale captured in the closure (scale when this Page rendered)
-                              const capturedScale = scale
-                              // Get the current scale (may have changed due to zoom)
-                              const currentScale = currentScaleRef.current
-                              
-                              // Check if the captured scale still matches the current scale
-                              // If not, ignore this callback to prevent race condition during zoom
-                              if (capturedScale !== currentScale) {
-                                console.log(`Ignoring page ${pageNumber} height (captured: ${capturedScale}, current: ${currentScale})`)
-                                return
+              <Document
+                file={documentInfo.url}
+                onLoadSuccess={onDocumentLoadSuccess}
+                onLoadError={(error) => setError('Failed to load PDF document')}
+                options={pdfOptions}
+              >
+                {numPages > 0 ? (
+                  Array.from({ length: numPages }, (_, index) => {
+                    const pageNumber = index + 1
+                    const isInRange = pageNumber >= visiblePageRange.start && pageNumber <= visiblePageRange.end
+                    const knownHeight = pageHeights.get(pageNumber) || getEstimatedPageHeight()
+                    // Важно: отображаем textLayer только если страница реально "в рабочем окне"
+                    const shouldRenderTextLayer = isZoomingRef.current
+                      ? Math.abs(pageNumber - currentPage) <= Math.max(4, WINDOW_RENDER_DISTANCE)
+                      : Math.abs(pageNumber - currentPage) <= WINDOW_RENDER_DISTANCE
+                    return (
+                      <div
+                        key={pageNumber}
+                        ref={(el) => pageRefs.current[index] = el}
+                        style={{
+                          backgroundColor: 'white',
+                          borderRadius: 8,
+                          boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
+                          padding: 16,
+                          marginBottom: 8,
+                          minHeight: isInRange ? 'auto' : `${knownHeight}px`,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        {isInRange ? (
+                          <>
+                            <Page
+                              key={`page-${pageNumber}-scale-${scale}`}
+                              pageNumber={pageNumber}
+                              scale={scale}
+                              renderTextLayer={shouldRenderTextLayer}
+                              renderAnnotationLayer={true}
+                              loading={
+                                <div style={{
+                                  width: '100%',
+                                  height: `${knownHeight}px`,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  color: '#9CA3AF',
+                                  background: 'linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 37%, #f3f4f6 63%)',
+                                  backgroundSize: '400% 100%',
+                                  animation: 'pulse 1.2s ease-in-out infinite',
+                                  borderRadius: 8,
+                                }}>
+                                  Loading page {pageNumber}...
+                                </div>
                               }
-                              
-                              const viewport = page.getViewport({ scale: capturedScale })
-                              const height = viewport.height + 64 // padding + margin
-                              setPageHeights(prev => new Map(prev).set(pageNumber, height))
-                            }}
-                          />
-                          {/* Page number indicator */}
+                              onLoadSuccess={(page) => {
+                                // Get the scale captured in the closure (scale when this Page rendered)
+                                const capturedScale = scale
+                                // Get the current scale (may have changed due to zoom)
+                                const currentScale = currentScaleRef.current
+
+                                // Check if the captured scale still matches the current scale
+                                // If not, ignore this callback to prevent race condition during zoom
+                                if (capturedScale !== currentScale) {
+                                  console.log(`Ignoring page ${pageNumber} height (captured: ${capturedScale}, current: ${currentScale})`)
+                                  return
+                                }
+
+                                const viewport = page.getViewport({ scale: capturedScale })
+                                const height = viewport.height + 64 // padding + margin
+                                setPageHeights(prev => new Map(prev).set(pageNumber, height))
+                              }}
+                            />
+                            {/* Page number indicator */}
+                            <div style={{
+                              textAlign: 'center',
+                              marginTop: 8,
+                              fontSize: 12,
+                              color: '#6B7280',
+                              fontWeight: 500,
+                            }}>
+                              Page {pageNumber} of {numPages}
+                            </div>
+
+                            {/* Related questions for this page */}
+                            <PageRelatedQuestions
+                              questionsData={pageQuestionsMap.get(pageNumber) || null}
+                              onQuestionClick={handleQuestionClick}
+                            />
+                          </>
+                        ) : (
                           <div style={{
                             textAlign: 'center',
-                            marginTop: 8,
-                            fontSize: 12,
-                            color: '#6B7280',
-                            fontWeight: 500,
+                            fontSize: 14,
+                            color: '#9CA3AF',
+                            padding: '20px',
                           }}>
-                            Page {pageNumber} of {numPages}
+                            Page {pageNumber}
                           </div>
-                          
-                          {/* Related questions for this page */}
-                          <PageRelatedQuestions
-                            questionsData={pageQuestionsMap.get(pageNumber) || null}
-                            onQuestionClick={handleQuestionClick}
-                          />
-                        </>
-                      ) : (
-                        <div style={{
-                          textAlign: 'center',
-                          fontSize: 14,
-                          color: '#9CA3AF',
-                          padding: '20px',
-                        }}>
-                          Page {pageNumber}
-                        </div>
-                      )}
-                    </div>
-                  )
-                })
-              ) : (
-                <div style={{
-                  backgroundColor: 'white',
-                  padding: 32,
-                  borderRadius: 12,
-                  textAlign: 'center',
-                  boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
-                }}>
-                  <div style={{ fontSize: 32, marginBottom: 16 }}>⏳</div>
-                  <p style={{ margin: 0, fontSize: 16, color: '#374151' }}>Loading PDF pages...</p>
-                </div>
-              )}
-            </Document>
-          </div>
-        ) : (
-          /* Single Page Mode - Original behavior */
-          <div style={{
-            backgroundColor: 'white',
-            borderRadius: 8,
-            boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
-            padding: 16,
-          }}>
-            <Document
-              file={documentInfo.url}
-              onLoadSuccess={onDocumentLoadSuccess}
-              onLoadError={() => setError('Failed to load PDF document')}
-              options={pdfOptions}
-            >
-              <Page
-                key={`page-${currentPage}-scale-${scale}`}
-                pageNumber={currentPage}
-                scale={scale}
-                renderTextLayer={true}
-                renderAnnotationLayer={true}
-              />
-            </Document>
-          </div>
-        )}
+                        )}
+                      </div>
+                    )
+                  })
+                ) : (
+                  <div style={{
+                    backgroundColor: 'white',
+                    padding: 32,
+                    borderRadius: 12,
+                    textAlign: 'center',
+                    boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
+                  }}>
+                    <div style={{ fontSize: 32, marginBottom: 16 }}>⏳</div>
+                    <p style={{ margin: 0, fontSize: 16, color: '#374151' }}>Loading PDF pages...</p>
+                  </div>
+                )}
+              </Document>
+            </div>
+          ) : (
+            /* Single Page Mode - Original behavior */
+            <div style={{
+              backgroundColor: 'white',
+              borderRadius: 8,
+              boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
+              padding: 16,
+            }}>
+              <Document
+                file={documentInfo.url}
+                onLoadSuccess={onDocumentLoadSuccess}
+                onLoadError={() => setError('Failed to load PDF document')}
+                options={pdfOptions}
+              >
+                <Page
+                  key={`page-${currentPage}-scale-${scale}`}
+                  pageNumber={currentPage}
+                  scale={scale}
+                  renderTextLayer={true}
+                  renderAnnotationLayer={true}
+                />
+              </Document>
+            </div>
+          )}
         </div>
         {/* End PDF Content */}
 
@@ -1457,7 +1457,7 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
               border: 'none',
               cursor: 'pointer',
               backgroundColor: '#2563EB',
-              boxShadow: isStreaming 
+              boxShadow: isStreaming
                 ? '0 0 20px rgba(37, 99, 235, 0.5), 0 10px 15px -3px rgb(0 0 0 / 0.3), 0 4px 6px -2px rgb(0 0 0 / 0.2)'
                 : '0 10px 15px -3px rgb(0 0 0 / 0.3), 0 4px 6px -2px rgb(0 0 0 / 0.2)',
               display: 'flex',
@@ -1471,15 +1471,15 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
             title="Open AI Assistant"
           >
 
-<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
-<path d="M5.75 21.25H15.45C17.1302 21.25 17.9702 21.25 18.612 20.923C19.1765 20.6354 19.6354 20.1765 19.923 19.612C20.25 18.9702 20.25 18.1302 20.25 16.45V10.9882C20.25 10.2545 20.25 9.88757 20.1671 9.5423C20.0936 9.2362 19.9724 8.94356 19.8079 8.67515C19.6224 8.3724 19.363 8.11297 18.8441 7.59411L15.4059 4.15589C14.887 3.63703 14.6276 3.37761 14.3249 3.19208C14.0564 3.02759 13.7638 2.90638 13.4577 2.83289C13.1124 2.75 12.7455 2.75 12.0118 2.75H9.875H9.25C8.78558 2.75 8.55337 2.75 8.35842 2.77567C7.01222 2.9529 5.9529 4.01222 5.77567 5.35842C5.75 5.55337 5.75 5.78558 5.75 6.25" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
-<path d="M13.75 2.75V4.45C13.75 6.13016 13.75 6.97024 14.077 7.61197C14.3646 8.17646 14.8235 8.6354 15.388 8.92302C16.0298 9.25 16.8698 9.25 18.55 9.25H20.25" stroke="white" strokeWidth="1.5"/>
-<path d="M9.33687 15.1876L8.67209 17.2136C8.53833 17.6213 7.96167 17.6213 7.82791 17.2136L7.16313 15.1876C7.03098 14.7849 6.71511 14.469 6.31236 14.3369L4.28637 13.6721C3.87872 13.5383 3.87872 12.9617 4.28637 12.8279L6.31236 12.1631C6.71511 12.031 7.03098 11.7151 7.16313 11.3124L7.82791 9.28637C7.96167 8.87872 8.53833 8.87872 8.67209 9.28637L9.33687 11.3124C9.46902 11.7151 9.78489 12.031 10.1876 12.1631L12.2136 12.8279C12.6213 12.9617 12.6213 13.5383 12.2136 13.6721L10.1876 14.3369C9.78489 14.469 9.46902 14.7849 9.33687 15.1876Z" fill="white"/>
-</svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+              <path d="M5.75 21.25H15.45C17.1302 21.25 17.9702 21.25 18.612 20.923C19.1765 20.6354 19.6354 20.1765 19.923 19.612C20.25 18.9702 20.25 18.1302 20.25 16.45V10.9882C20.25 10.2545 20.25 9.88757 20.1671 9.5423C20.0936 9.2362 19.9724 8.94356 19.8079 8.67515C19.6224 8.3724 19.363 8.11297 18.8441 7.59411L15.4059 4.15589C14.887 3.63703 14.6276 3.37761 14.3249 3.19208C14.0564 3.02759 13.7638 2.90638 13.4577 2.83289C13.1124 2.75 12.7455 2.75 12.0118 2.75H9.875H9.25C8.78558 2.75 8.55337 2.75 8.35842 2.77567C7.01222 2.9529 5.9529 4.01222 5.77567 5.35842C5.75 5.55337 5.75 5.78558 5.75 6.25" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
+              <path d="M13.75 2.75V4.45C13.75 6.13016 13.75 6.97024 14.077 7.61197C14.3646 8.17646 14.8235 8.6354 15.388 8.92302C16.0298 9.25 16.8698 9.25 18.55 9.25H20.25" stroke="white" strokeWidth="1.5" />
+              <path d="M9.33687 15.1876L8.67209 17.2136C8.53833 17.6213 7.96167 17.6213 7.82791 17.2136L7.16313 15.1876C7.03098 14.7849 6.71511 14.469 6.31236 14.3369L4.28637 13.6721C3.87872 13.5383 3.87872 12.9617 4.28637 12.8279L6.31236 12.1631C6.71511 12.031 7.03098 11.7151 7.16313 11.3124L7.82791 9.28637C7.96167 8.87872 8.53833 8.87872 8.67209 9.28637L9.33687 11.3124C9.46902 11.7151 9.78489 12.031 10.1876 12.1631L12.2136 12.8279C12.6213 12.9617 12.6213 13.5383 12.2136 13.6721L10.1876 14.3369C9.78489 14.469 9.46902 14.7849 9.33687 15.1876Z" fill="white" />
+            </svg>
           </button>
         </div>
       )}
-      
+
       {/* Add CSS animation for light rotation */}
       <style>{`
         @keyframes rotate-light {
