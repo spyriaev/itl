@@ -249,6 +249,59 @@ export async function getDocumentViewUrl(documentId: string): Promise<DocumentVi
 }
 
 /**
+ * Get document metadata by ID from the documents list
+ */
+async function getDocumentById(documentId: string): Promise<DocumentMetadata | null> {
+  try {
+    const documents = await fetchDocuments(100, 0)
+    const document = documents.find(doc => doc.id === documentId) || null
+    console.log(`[waitForDocumentUpload] Looking for document ${documentId}, found:`, document ? { id: document.id, status: document.status } : 'not found')
+    return document
+  } catch (error) {
+    console.error('[waitForDocumentUpload] Error fetching documents:', error)
+    return null
+  }
+}
+
+/**
+ * Wait for document to be uploaded (status === "uploaded")
+ */
+export async function waitForDocumentUpload(documentId: string, maxAttempts: number = 30, intervalMs: number = 1000): Promise<DocumentMetadata> {
+  console.log(`[waitForDocumentUpload] Starting to wait for document ${documentId}`, { maxAttempts, intervalMs })
+  
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      const document = await getDocumentById(documentId)
+      
+      if (document) {
+        const status = document.status?.toLowerCase() || ""
+        console.log(`[waitForDocumentUpload] Attempt ${attempt + 1}: Found document with status "${document.status}" (normalized: "${status}")`)
+        if (status === "uploaded") {
+          console.log(`[waitForDocumentUpload] Document is uploaded, returning`)
+          return document
+        }
+      } else {
+        console.log(`[waitForDocumentUpload] Attempt ${attempt + 1}: Document not found in list yet`)
+      }
+      
+      // Wait before next attempt (except on last attempt)
+      if (attempt < maxAttempts - 1) {
+        await new Promise(resolve => setTimeout(resolve, intervalMs))
+      }
+    } catch (error) {
+      console.error(`[waitForDocumentUpload] Attempt ${attempt + 1} error:`, error)
+      // If error, wait and retry (except on last attempt)
+      if (attempt < maxAttempts - 1) {
+        await new Promise(resolve => setTimeout(resolve, intervalMs))
+      }
+    }
+  }
+  
+  console.error(`[waitForDocumentUpload] Timeout waiting for document ${documentId} after ${maxAttempts} attempts`)
+  throw new Error('Document upload timeout')
+}
+
+/**
  * Update viewing progress for a document
  */
 export async function updateViewProgress(documentId: string, page: number): Promise<void> {

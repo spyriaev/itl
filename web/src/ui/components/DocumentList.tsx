@@ -6,9 +6,10 @@ import { fetchDocuments, type DocumentMetadata } from "../../services/uploadServ
 interface DocumentListProps {
   refreshTrigger?: number
   onDocumentClick: (documentId: string) => void
+  loadingDocumentId?: string | null
 }
 
-export function DocumentList({ refreshTrigger, onDocumentClick }: DocumentListProps) {
+export function DocumentList({ refreshTrigger, onDocumentClick, loadingDocumentId }: DocumentListProps) {
   const [documents, setDocuments] = useState<DocumentMetadata[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -174,17 +175,17 @@ export function DocumentList({ refreshTrigger, onDocumentClick }: DocumentListPr
           {documents.map((doc) => (
             <button
               key={doc.id}
-              onClick={() => onDocumentClick(doc.id)}
+              onClick={() => loadingDocumentId !== doc.id && onDocumentClick(doc.id)}
               style={{
                 textAlign: 'left',
                 padding: 12,
                 border: '1px solid #EEF0F3',
                 borderRadius: 12,
-                backgroundColor: 'white',
+                backgroundColor: loadingDocumentId === doc.id ? '#f8f9fa' : 'white',
                 display: 'flex',
                 gap: 12,
                 alignItems: 'flex-start',
-                cursor: 'pointer',
+                cursor: loadingDocumentId === doc.id ? 'wait' : 'pointer',
               }}
             >
               <svg
@@ -213,8 +214,16 @@ export function DocumentList({ refreshTrigger, onDocumentClick }: DocumentListPr
                   )}
                 </div>
                 <div style={{ display: 'flex', gap: 12, marginTop: 8, color: '#6e7787', fontSize: 13 }}>
-                  <span>Size: {formatFileSize(doc.sizeBytes)}</span>
-                  <span>Modified: {formatDate(doc.createdAt)}</span>
+                  {loadingDocumentId === doc.id ? (
+                    <span>Loading...</span>
+                  ) : doc.status === "uploaded" ? (
+                    <>
+                      <span>Size: {formatFileSize(doc.sizeBytes)}</span>
+                      <span>Modified: {formatDate(doc.createdAt)}</span>
+                    </>
+                  ) : (
+                    <span>Loading...</span>
+                  )}
                 </div>
               </div>
             </button>
@@ -233,7 +242,14 @@ export function DocumentList({ refreshTrigger, onDocumentClick }: DocumentListPr
             </thead>
             <tbody className="document-table-body">
               {documents.map((doc) => (
-                <tr key={doc.id} onClick={() => onDocumentClick(doc.id)}>
+                <tr 
+                  key={doc.id} 
+                  onClick={() => loadingDocumentId !== doc.id && onDocumentClick(doc.id)}
+                  style={{ 
+                    cursor: loadingDocumentId === doc.id ? 'wait' : 'pointer',
+                    backgroundColor: loadingDocumentId === doc.id ? '#f8f9fa' : 'transparent'
+                  }}
+                >
                   <td>
                     <div className="document-name-cell">
                       <svg
@@ -254,8 +270,12 @@ export function DocumentList({ refreshTrigger, onDocumentClick }: DocumentListPr
                       <span className="document-name">{doc.title || "Untitled Document"}</span>
                     </div>
                   </td>
-                  <td className="document-size">{formatFileSize(doc.sizeBytes)}</td>
-                  <td className="document-date">{formatDate(doc.createdAt)}</td>
+                  <td className="document-size">
+                    {loadingDocumentId === doc.id ? "Loading..." : (doc.status === "uploaded" ? formatFileSize(doc.sizeBytes) : "Loading...")}
+                  </td>
+                  <td className="document-date">
+                    {loadingDocumentId === doc.id ? "Loading..." : (doc.status === "uploaded" ? formatDate(doc.createdAt) : "Loading...")}
+                  </td>
                   <td>
                     {doc.status === "uploaded" && (
                       <span className="document-questions-badge">{Math.floor(Math.random() * 10) + 1}</span>

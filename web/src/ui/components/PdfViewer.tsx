@@ -49,14 +49,15 @@ const SCROLL_THROTTLE_MS = 50 // Reduced throttle for faster range updates durin
 interface PdfViewerProps {
   documentId: string
   onClose: () => void
+  preloadedDocumentInfo?: DocumentViewInfo | null
 }
 
-function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
-  const [documentInfo, setDocumentInfo] = useState<DocumentViewInfo | null>(null)
+function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo }: PdfViewerProps) {
+  const [documentInfo, setDocumentInfo] = useState<DocumentViewInfo | null>(preloadedDocumentInfo || null)
   const [numPages, setNumPages] = useState<number>(0)
   const [currentPage, setCurrentPage] = useState<number>(1)
   const [scale, setScale] = useState<number>(1.0)
-  const [loading, setLoading] = useState<boolean>(true)
+  const [loading, setLoading] = useState<boolean>(!preloadedDocumentInfo)
   const [error, setError] = useState<string | null>(null)
   const [continuousScroll, setContinuousScroll] = useState<boolean>(true) // По умолчанию включен непрерывный режим
   const [isChatVisible, setIsChatVisible] = useState<boolean>(false)
@@ -129,8 +130,16 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
     return Math.max(1, Math.min(totalPages, Math.floor(scrollTop / estHeight) + 1))
   }
 
-  // Load document info
+  // Load document info (only if not preloaded)
   useEffect(() => {
+    // If documentInfo is already preloaded, use it
+    if (preloadedDocumentInfo) {
+      setDocumentInfo(preloadedDocumentInfo)
+      setCurrentPage(preloadedDocumentInfo.lastViewedPage)
+      setLoading(false)
+      return
+    }
+
     const loadDocument = async () => {
       try {
         setLoading(true)
@@ -161,15 +170,16 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
     }
 
     loadDocument()
-  }, [documentId])
+  }, [documentId, preloadedDocumentInfo])
 
-  // Preload PDF and calculate initial scale to avoid flickering
+  // Calculate initial scale to avoid flickering (PDF is already loaded on document list screen)
   useEffect(() => {
     if (!documentInfo?.url) return
 
-    const preloadAndCalculateScale = async () => {
+    const calculateScale = async () => {
       try {
-        // Load PDF document
+        // PDF document should already be loaded/cached from the document list screen
+        // Load PDF document (should be fast if cached)
         const loadingTask = pdfjs.getDocument({ url: documentInfo.url })
         const pdf = await loadingTask.promise
 
@@ -193,15 +203,15 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
           // Set initial scale before rendering
           setScale(optimalScale)
 
-          // Clean up the preloaded PDF
+          // Clean up the PDF (we only used it for scale calculation)
           await pdf.destroy()
         }
       } catch (error) {
-        console.error('Error preloading PDF for scale calculation:', error)
+        console.error('Error calculating scale:', error)
       }
     }
 
-    preloadAndCalculateScale()
+    calculateScale()
   }, [documentInfo?.url])
 
   // Handle window resize
@@ -1078,34 +1088,6 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
     }
   }, [])
 
-  if (loading) {
-    return (
-      <div style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.8)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1000,
-      }}>
-        <div style={{
-          backgroundColor: 'white',
-          padding: 32,
-          borderRadius: 12,
-          textAlign: 'center',
-          boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)',
-        }}>
-          <div style={{ fontSize: 32, marginBottom: 16 }}>⏳</div>
-          <p style={{ margin: 0, fontSize: 16, color: '#374151' }}>Loading PDF...</p>
-        </div>
-      </div>
-    )
-  }
-
   if (error) {
     return (
       <div style={{
@@ -1155,10 +1137,37 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
     )
   }
 
-  if (!documentInfo) {
-    return null
+  // Show minimal loading state only if documentInfo is not yet loaded
+  // If preloadedDocumentInfo was provided, we should already have documentInfo and loading should be false
+  if (!documentInfo || loading) {
+    return (
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1000,
+      }}>
+        <div style={{
+          backgroundColor: 'white',
+          padding: 16,
+          borderRadius: 8,
+          textAlign: 'center',
+          boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
+        }}>
+          <div style={{ fontSize: 24, marginBottom: 8 }}>⏳</div>
+          <p style={{ margin: 0, fontSize: 14, color: '#374151' }}>Opening document...</p>
+        </div>
+      </div>
+    )
   }
 
+  // At this point documentInfo is guaranteed to be non-null
   // в отрисовке страниц для continuousScroll
   const WINDOW_RENDER_DISTANCE = 4 // чуть шире окно для textLayer, чтобы не пропадал текст при зуме
   return (

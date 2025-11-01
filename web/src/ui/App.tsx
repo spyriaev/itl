@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { AuthProvider, useAuth } from "../contexts/AuthContext"
 import { FileUpload } from "./components/FileUpload"
 import { DocumentList } from "./components/DocumentList"
@@ -6,6 +6,9 @@ import { UserMenu } from "./components/UserMenu"
 import { AuthModal } from "./components/AuthModal"
 import { ProtectedRoute } from "./components/ProtectedRoute"
 import { PdfViewer } from "./components/PdfViewer"
+import { waitForDocumentUpload, fetchDocuments, getDocumentViewUrl, type DocumentViewInfo } from "../services/uploadService"
+import { pdfjs } from 'react-pdf'
+import type { PDFDocumentProxy } from 'pdfjs-dist'
 import "./styles/upload-page.css"
 
 type ViewMode = "library" | "reader"
@@ -14,19 +17,120 @@ function AppContent() {
   const [refreshTrigger, setRefreshTrigger] = useState(0)
   const [viewMode, setViewMode] = useState<ViewMode>("library")
   const [currentDocumentId, setCurrentDocumentId] = useState<string | null>(null)
+  const [preloadedDocumentInfo, setPreloadedDocumentInfo] = useState<DocumentViewInfo | null>(null)
+  const [loadingDocumentId, setLoadingDocumentId] = useState<string | null>(null)
+  const [waitingForUpload, setWaitingForUpload] = useState<string | null>(null)
   const { user } = useAuth()
+
+  // Configure PDF.js worker (same as in PdfViewer)
+  useEffect(() => {
+    pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`
+  }, [])
 
   const handleUploadComplete = () => {
     setRefreshTrigger((prev) => prev + 1)
   }
 
-  const handleDocumentClick = (documentId: string) => {
-    setCurrentDocumentId(documentId)
-    setViewMode("reader")
+  const handleDocumentClick = async (documentId: string) => {
+    console.log('[handleDocumentClick] Clicked on document:', documentId)
+    
+    try {
+      // Small delay to ensure backend has processed the document creation
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      // Check if document is already uploaded
+      const documents = await fetchDocuments(100, 0)
+      const document = documents.find(doc => doc.id === documentId)
+      
+      console.log('[handleDocumentClick] Found document:', document ? { id: document.id, status: document.status, title: document.title } : 'not found')
+      
+      // If document is found and status is "uploaded", preload PDF and open
+      // Check status case-insensitively in case backend returns it differently
+      const status = document?.status?.toLowerCase() || ""
+      if (document && status === "uploaded") {
+        console.log('[handleDocumentClick] Document is uploaded, loading PDF...')
+        setLoadingDocumentId(documentId)
+        try {
+          // Get documentInfo (URL)
+          const documentInfo = await getDocumentViewUrl(documentId)
+          console.log('[handleDocumentClick] DocumentInfo loaded, loading PDF document...')
+          
+          // Load PDF document (this is the time-consuming operation)
+          const loadingTask = pdfjs.getDocument({ url: documentInfo.url })
+          const pdf = await loadingTask.promise
+          console.log('[handleDocumentClick] PDF document loaded, opening viewer')
+          
+          // PDF is loaded, open viewer
+          setPreloadedDocumentInfo(documentInfo)
+          setCurrentDocumentId(documentId)
+          setViewMode("reader")
+        } catch (error) {
+          console.error('[handleDocumentClick] Failed to load PDF:', error)
+          // Still try to open, PDF will be loaded in PdfViewer
+          setPreloadedDocumentInfo(null)
+          setCurrentDocumentId(documentId)
+          setViewMode("reader")
+        } finally {
+          setLoadingDocumentId(null)
+        }
+        return
+      }
+      
+      // Document not found or status is not "uploaded" - wait for it
+      console.log('[handleDocumentClick] Document not ready yet:', document ? `status="${document.status}"` : 'not found in list')
+      setWaitingForUpload(documentId)
+      
+      try {
+        const uploadedDocument = await waitForDocumentUpload(documentId)
+        console.log('[handleDocumentClick] Document upload complete, loading PDF...')
+        
+        // Get documentInfo and load PDF
+        setLoadingDocumentId(documentId)
+        try {
+          const documentInfo = await getDocumentViewUrl(documentId)
+          console.log('[handleDocumentClick] DocumentInfo loaded, loading PDF document...')
+          
+          // Load PDF document
+          const loadingTask = pdfjs.getDocument({ url: documentInfo.url })
+          const pdf = await loadingTask.promise
+          console.log('[handleDocumentClick] PDF document loaded, opening viewer')
+          
+          setPreloadedDocumentInfo(documentInfo)
+          setCurrentDocumentId(documentId)
+          setViewMode("reader")
+        } catch (error) {
+          console.error('[handleDocumentClick] Failed to load PDF:', error)
+          setPreloadedDocumentInfo(null)
+          setCurrentDocumentId(documentId)
+          setViewMode("reader")
+        } finally {
+          setLoadingDocumentId(null)
+        }
+      } catch (error) {
+        console.error('[handleDocumentClick] Failed to wait for document upload:', error)
+        // Still try to open, maybe it's ready now
+        console.log('[handleDocumentClick] Trying to open anyway...')
+        setPreloadedDocumentInfo(null)
+        setCurrentDocumentId(documentId)
+        setViewMode("reader")
+        setLoadingDocumentId(null)
+      } finally {
+        setWaitingForUpload(null)
+        // Refresh the list to show updated status
+        setRefreshTrigger((prev) => prev + 1)
+      }
+    } catch (error) {
+      console.error('[handleDocumentClick] Error during document click:', error)
+      // On error, try to open anyway - maybe it will work
+      setCurrentDocumentId(documentId)
+      setViewMode("reader")
+      setWaitingForUpload(null)
+    }
   }
 
   const handleCloseReader = () => {
     setCurrentDocumentId(null)
+    setPreloadedDocumentInfo(null)
     setViewMode("library")
     setRefreshTrigger((prev) => prev + 1)
   }
@@ -107,11 +211,11 @@ function AppContent() {
               <div className="upload-area">
                 <FileUpload onUploadComplete={handleUploadComplete} />
 
-                <DocumentList refreshTrigger={refreshTrigger} onDocumentClick={handleDocumentClick} />
+                <DocumentList refreshTrigger={refreshTrigger} onDocumentClick={handleDocumentClick} loadingDocumentId={loadingDocumentId} />
               </div>
             </>
           ) : (
-            currentDocumentId && <PdfViewer documentId={currentDocumentId} onClose={handleCloseReader} />
+            currentDocumentId && <PdfViewer documentId={currentDocumentId} onClose={handleCloseReader} preloadedDocumentInfo={preloadedDocumentInfo} />
           )}
         </ProtectedRoute>
       </main>
