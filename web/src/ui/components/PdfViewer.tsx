@@ -163,6 +163,47 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
     loadDocument()
   }, [documentId])
 
+  // Preload PDF and calculate initial scale to avoid flickering
+  useEffect(() => {
+    if (!documentInfo?.url) return
+
+    const preloadAndCalculateScale = async () => {
+      try {
+        // Load PDF document
+        const loadingTask = pdfjs.getDocument({ url: documentInfo.url })
+        const pdf = await loadingTask.promise
+
+        // Calculate optimal scale
+        const page = await pdf.getPage(1)
+        const viewport = page.getViewport({ scale: 1.0 })
+        const pageWidth = viewport.width
+
+        // Get available container width
+        const container = scrollContainerRef.current
+        if (container) {
+          const containerRect = container.getBoundingClientRect()
+          const availableWidth = containerRect.width - 48 // Account for padding (24px on each side)
+
+          // Calculate optimal scale
+          let optimalScale = availableWidth / pageWidth
+
+          // Clamp scale to reasonable limits
+          optimalScale = Math.max(0.1, Math.min(optimalScale, 3.0))
+
+          // Set initial scale before rendering
+          setScale(optimalScale)
+
+          // Clean up the preloaded PDF
+          await pdf.destroy()
+        }
+      } catch (error) {
+        console.error('Error preloading PDF for scale calculation:', error)
+      }
+    }
+
+    preloadAndCalculateScale()
+  }, [documentInfo?.url])
+
   // Handle window resize
   useEffect(() => {
     const handleResize = () => {
@@ -228,7 +269,7 @@ function PdfViewerContent({ documentId, onClose }: PdfViewerProps) {
     })
   }, [visiblePageRange, numPages])
 
-  const onDocumentLoadSuccess = useCallback((pdf: PDFDocumentProxy) => {
+  const onDocumentLoadSuccess = useCallback(async (pdf: PDFDocumentProxy) => {
     // Store PDF document instance for cleanup
     pdfDocumentRef.current = pdf
 
