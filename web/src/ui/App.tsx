@@ -20,6 +20,7 @@ function AppContent() {
   const [preloadedDocumentInfo, setPreloadedDocumentInfo] = useState<DocumentViewInfo | null>(null)
   const [loadingDocumentId, setLoadingDocumentId] = useState<string | null>(null)
   const [waitingForUpload, setWaitingForUpload] = useState<string | null>(null)
+  const [isPdfReady, setIsPdfReady] = useState<boolean>(false)
   const { user } = useAuth()
 
   // Configure PDF.js worker (same as in PdfViewer)
@@ -63,6 +64,7 @@ function AppContent() {
           // PDF is loaded, open viewer
           setPreloadedDocumentInfo(documentInfo)
           setCurrentDocumentId(documentId)
+          setIsPdfReady(false) // Reset ready state
           setViewMode("reader")
         } catch (error) {
           console.error('[handleDocumentClick] Failed to load PDF:', error)
@@ -97,6 +99,7 @@ function AppContent() {
           
           setPreloadedDocumentInfo(documentInfo)
           setCurrentDocumentId(documentId)
+          setIsPdfReady(false) // Reset ready state
           setViewMode("reader")
         } catch (error) {
           console.error('[handleDocumentClick] Failed to load PDF:', error)
@@ -132,7 +135,12 @@ function AppContent() {
     setCurrentDocumentId(null)
     setPreloadedDocumentInfo(null)
     setViewMode("library")
+    setIsPdfReady(false)
     setRefreshTrigger((prev) => prev + 1)
+  }
+
+  const handlePdfRenderComplete = () => {
+    setIsPdfReady(true)
   }
 
   return (
@@ -215,7 +223,23 @@ function AppContent() {
               </div>
             </>
           ) : (
-            currentDocumentId && <PdfViewer documentId={currentDocumentId} onClose={handleCloseReader} preloadedDocumentInfo={preloadedDocumentInfo} />
+            currentDocumentId && (
+              <div style={{
+                position: 'relative',
+                width: '100%',
+                height: '100%',
+                opacity: isPdfReady ? 1 : 0,
+                transition: 'opacity 0.3s ease-in-out',
+                pointerEvents: isPdfReady ? 'auto' : 'none'
+              }}>
+                <PdfViewer 
+                  documentId={currentDocumentId} 
+                  onClose={handleCloseReader} 
+                  preloadedDocumentInfo={preloadedDocumentInfo}
+                  onRenderComplete={handlePdfRenderComplete}
+                />
+              </div>
+            )
           )}
         </ProtectedRoute>
       </main>

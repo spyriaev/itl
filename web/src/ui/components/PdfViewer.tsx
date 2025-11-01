@@ -50,15 +50,17 @@ interface PdfViewerProps {
   documentId: string
   onClose: () => void
   preloadedDocumentInfo?: DocumentViewInfo | null
+  onRenderComplete?: () => void
 }
 
-function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo }: PdfViewerProps) {
+function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRenderComplete }: PdfViewerProps) {
   const [documentInfo, setDocumentInfo] = useState<DocumentViewInfo | null>(preloadedDocumentInfo || null)
   const [numPages, setNumPages] = useState<number>(0)
   const [currentPage, setCurrentPage] = useState<number>(1)
   const [scale, setScale] = useState<number>(1.0)
   const [loading, setLoading] = useState<boolean>(!preloadedDocumentInfo)
   const [error, setError] = useState<string | null>(null)
+  const [isFullyRendered, setIsFullyRendered] = useState<boolean>(false)
   const [continuousScroll, setContinuousScroll] = useState<boolean>(true) // По умолчанию включен непрерывный режим
   const [isChatVisible, setIsChatVisible] = useState<boolean>(false)
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false)
@@ -86,6 +88,10 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo }: PdfVie
   const lastScrollTopRef = useRef(0)
   const lastScrollTimeRef = useRef(Date.now())
   const scrollDirectionRef = useRef<'down' | 'up'>('down')
+  
+  // Track rendered pages for onRenderComplete callback
+  const renderedPagesRef = useRef<Set<number>>(new Set())
+  const renderCompleteCalledRef = useRef(false)
 
   // Get chat context for navigation and assistant state
   const { navigateToMessage, isStreaming } = useChat()
@@ -287,6 +293,10 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo }: PdfVie
     setNumPages(numPages)
     // Инициализируем refs для страниц
     pageRefs.current = new Array(numPages).fill(null)
+    
+    // Reset rendered pages tracking
+    renderedPagesRef.current.clear()
+    renderCompleteCalledRef.current = false
 
     // Initialize visible page range centered around the saved page position
     // Use documentInfo.lastViewedPage directly to avoid race condition with currentPage state
@@ -1322,6 +1332,37 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo }: PdfVie
                                 const viewport = page.getViewport({ scale: capturedScale })
                                 const height = viewport.height + 64 // padding + margin
                                 setPageHeights(prev => new Map(prev).set(pageNumber, height))
+                                
+                                // Track rendered pages and call onRenderComplete when first visible pages are ready
+                                if (!renderCompleteCalledRef.current) {
+                                  renderedPagesRef.current.add(pageNumber)
+                                  
+                                  // Check if this page is in the visible range
+                                  const isInVisibleRange = pageNumber >= visiblePageRange.start && pageNumber <= visiblePageRange.end
+                                  
+                                  if (isInVisibleRange) {
+                                    // Count how many visible pages have been rendered
+                                    let renderedVisibleCount = 0
+                                    const visibleRangeSize = visiblePageRange.end - visiblePageRange.start + 1
+                                    const minVisiblePages = Math.min(3, visibleRangeSize) // Wait for at least 3 visible pages or all if less
+                                    
+                                    for (let i = visiblePageRange.start; i <= visiblePageRange.end; i++) {
+                                      if (renderedPagesRef.current.has(i)) {
+                                        renderedVisibleCount++
+                                      }
+                                    }
+                                    
+                                    // When we've rendered enough visible pages, mark as complete
+                                    if (renderedVisibleCount >= minVisiblePages) {
+                                      renderCompleteCalledRef.current = true
+                                      setIsFullyRendered(true)
+                                      // Use requestAnimationFrame to ensure DOM is updated
+                                      requestAnimationFrame(() => {
+                                        onRenderComplete?.()
+                                      })
+                                    }
+                                  }
+                                }
                               }}
                             />
                             {/* Page number indicator */}
@@ -1388,6 +1429,16 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo }: PdfVie
                   scale={scale}
                   renderTextLayer={true}
                   renderAnnotationLayer={true}
+                  onLoadSuccess={(page) => {
+                    // Call onRenderComplete when single page is loaded
+                    if (!renderCompleteCalledRef.current) {
+                      renderCompleteCalledRef.current = true
+                      setIsFullyRendered(true)
+                      requestAnimationFrame(() => {
+                        onRenderComplete?.()
+                      })
+                    }
+                  }}
                 />
               </Document>
             </div>
