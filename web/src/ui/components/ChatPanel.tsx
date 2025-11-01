@@ -61,21 +61,27 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
   useEffect(() => {
     const wasNavigating = prevTargetMessageIdRef.current !== null
     
-    if (targetMessageId) {
-      // Scroll to specific message
-      const targetElement = messageRefs.current.get(targetMessageId)
-      if (targetElement) {
-        targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
-        // Add highlight animation
-        targetElement.style.animation = 'highlight 2s ease-out'
-        setTimeout(() => {
-          targetElement.style.animation = ''
-        }, 2000)
+    try {
+      if (targetMessageId) {
+        // Scroll to specific message
+        const targetElement = messageRefs.current.get(targetMessageId)
+        if (targetElement) {
+          targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          // Add highlight animation
+          targetElement.style.animation = 'highlight 2s ease-out'
+          setTimeout(() => {
+            if (targetElement.style) {
+              targetElement.style.animation = ''
+            }
+          }, 2000)
+        }
+      } else if (!wasNavigating && messages.length > prevMessagesLengthRef.current) {
+        // Only auto-scroll to bottom when new messages are added
+        // Don't scroll when targetMessageId was just cleared
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
       }
-    } else if (!wasNavigating && messages.length > prevMessagesLengthRef.current) {
-      // Only auto-scroll to bottom when new messages are added
-      // Don't scroll when targetMessageId was just cleared
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    } catch (error) {
+      // Silently fail if scrolling cannot be performed (e.g., due to browser extensions)
     }
     
     // Update refs
@@ -86,7 +92,11 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
   // Focus input when panel becomes visible
   useEffect(() => {
     if (isVisible && inputRef.current) {
-      inputRef.current.focus()
+      try {
+        inputRef.current.focus()
+      } catch (error) {
+        // Silently fail if focus cannot be set (e.g., due to browser extensions)
+      }
     }
   }, [isVisible])
 
@@ -136,7 +146,6 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
 
   // Track user manual selection changes in ContextSelector
   const handleContextChange = useCallback((level: number | null | 'none') => {
-    console.log('User selected level:', level)
     userSelectionRef.current = level
     setSelectedLevel(level)
   }, [])
