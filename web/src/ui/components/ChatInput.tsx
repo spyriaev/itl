@@ -144,15 +144,79 @@ export function ChatInput({
                 xmlns="http://www.w3.org/2000/svg" 
                 width="24" 
                 height="24" 
-                viewBox="0 0 24 24" 
-                fill="none" 
-                stroke="currentColor" 
-                strokeWidth="1.5" 
-                strokeLinecap="round" 
-                strokeLinejoin="round"
+                viewBox="-4 -4 40 40" 
                 style={styles.icon}
               >
-                <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"></path>
+                <circle 
+                  fill="none" 
+                  stroke="#686583" 
+                  strokeWidth="2.4" 
+                  strokeLinecap="square" 
+                  strokeMiterlimit="10" 
+                  cx="5" 
+                  cy="5" 
+                  r="4" 
+                  strokeLinejoin="miter"
+                />
+                <line 
+                  fill="none" 
+                  stroke="#686583" 
+                  strokeWidth="2.4" 
+                  strokeLinecap="square" 
+                  strokeMiterlimit="10" 
+                  x1="15" 
+                  y1="5" 
+                  x2="31" 
+                  y2="5" 
+                  strokeLinejoin="miter"
+                />
+                <line 
+                  fill="none" 
+                  stroke="#686583" 
+                  strokeWidth="2.4" 
+                  strokeLinecap="square" 
+                  strokeMiterlimit="10" 
+                  x1="15" 
+                  y1="13" 
+                  x2="31" 
+                  y2="13" 
+                  strokeLinejoin="miter"
+                />
+                <circle 
+                  fill="none" 
+                  stroke="#686583" 
+                  strokeWidth="2.4" 
+                  strokeLinecap="square" 
+                  strokeMiterlimit="10" 
+                  cx="5" 
+                  cy="21" 
+                  r="4" 
+                  strokeLinejoin="miter"
+                />
+                <line 
+                  fill="none" 
+                  stroke="#686583" 
+                  strokeWidth="2.4" 
+                  strokeLinecap="square" 
+                  strokeMiterlimit="10" 
+                  x1="15" 
+                  y1="21" 
+                  x2="31" 
+                  y2="21" 
+                  strokeLinejoin="miter"
+                />
+                <line 
+                  fill="none" 
+                  stroke="#686583" 
+                  strokeWidth="2.4" 
+                  strokeLinecap="square" 
+                  strokeMiterlimit="10" 
+                  x1="15" 
+                  y1="29" 
+                  x2="31" 
+                  y2="29" 
+                  strokeLinejoin="miter"
+                />
               </svg>
               <select
                 value={getSelectedValue()}
