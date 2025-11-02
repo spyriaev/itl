@@ -296,7 +296,13 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
       </div>
 
       {/* Thread selector */}
-      <div style={{ padding: '16px', borderBottom: '1px solid #E5E7EB' }}>
+      <div style={{ 
+        padding: '16px', 
+        borderBottom: '1px solid #E5E7EB',
+        minWidth: 0,
+        maxWidth: '100%',
+        boxSizing: 'border-box',
+      }}>
         <ThreadSelector 
           documentId={documentId} 
           onNewThread={handleNewThread}
@@ -344,7 +350,6 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
             textAlign: 'center',
             color: '#6B7280',
           }}>
-            <div style={{ fontSize: 32, marginBottom: 16 }}>💬</div>
             <h4 style={{ margin: '0 0 8px 0', fontSize: 16, fontWeight: 600 }}>
               Start a conversation
             </h4>
@@ -360,11 +365,11 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
                   onClick={() => setInputValue(prompt)}
                   style={{
                     padding: '8px 12px',
-                    backgroundColor: 'white',
-                    border: '1px solid #D1D5DB',
+                    backgroundColor: '#FAFAFA',
+                    border: 'none',
                     borderRadius: 6,
                     fontSize: 13,
-                    color: '#374151',
+                    color: '#2d66f5',
                     cursor: 'pointer',
                     textAlign: 'left',
                   }}
