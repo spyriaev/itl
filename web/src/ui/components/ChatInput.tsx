@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { DocumentStructureItem } from '../../types/document'
 
 interface ChatInputProps {
@@ -19,7 +20,7 @@ export function ChatInput({
   value, 
   onChange, 
   onSend, 
-  placeholder = "Ask a question about this document...",
+  placeholder,
   disabled = false,
   isStreaming = false,
   contextItems = [],
@@ -27,6 +28,8 @@ export function ChatInput({
   selectedLevel = null,
   onContextChange
 }: ChatInputProps) {
+  const { t } = useTranslation()
+  const defaultPlaceholder = placeholder || t("chatInput.askQuestion")
   const [isFocused, setIsFocused] = useState(false)
   const [hasText, setHasText] = useState(false)
   const editorRef = useRef<HTMLDivElement>(null)
@@ -99,7 +102,7 @@ export function ChatInput({
 
   const getContextDisplay = () => {
     if (selectedLevel === 'none') return ''
-    if (selectedLevel === null) return `Page ${currentPage}`
+    if (selectedLevel === null) return `${t("chatMessage.page")} ${currentPage}`
     const item = contextItems.find(item => item.level === selectedLevel)
     if (item) {
       const cleanTitle = item.title
@@ -224,9 +227,9 @@ export function ChatInput({
                 disabled={disabled || isStreaming}
                 style={styles.select}
               >
-                <option value="none">No context</option>
-                <option value="page">Current Page</option>
-                {hasChapter && <option value="chapter">Current Chapter</option>}
+                <option value="none">{t("chatInput.noContext")}</option>
+                <option value="page">{t("chatInput.currentPage")}</option>
+                {hasChapter && <option value="chapter">{t("chatInput.currentChapter")}</option>}
               </select>
             </div>
             {getContextDisplay() && (
@@ -260,7 +263,7 @@ export function ChatInput({
                 suppressContentEditableWarning
               />
               <div style={styles.placeholder}>
-                {isFocused || hasText ? '' : placeholder}
+                {isFocused || hasText ? '' : defaultPlaceholder}
               </div>
             </div>
             

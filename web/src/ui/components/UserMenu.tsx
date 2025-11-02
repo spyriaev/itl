@@ -1,9 +1,12 @@
 "use client"
 
 import { useState } from "react"
+import { useTranslation } from "react-i18next"
 import { useAuth } from "../../contexts/AuthContext"
+import { LanguageSelector } from "./LanguageSelector"
 
 export function UserMenu() {
+  const { t } = useTranslation()
   const { user, signOut } = useAuth()
   const [isOpen, setIsOpen] = useState(false)
 
@@ -84,7 +87,7 @@ export function UserMenu() {
                   marginBottom: 4,
                 }}
               >
-                {user.displayName || "User"}
+                {user.displayName || t("userMenu.user")}
               </div>
               <div
                 style={{
@@ -94,6 +97,9 @@ export function UserMenu() {
               >
                 {user.email}
               </div>
+            </div>
+            <div style={{ padding: "8px 16px", borderBottom: "1px solid #dee1e6" }}>
+              <LanguageSelector />
             </div>
             <button className="user-menu-item" onClick={handleSignOut}>
               <svg
@@ -110,7 +116,7 @@ export function UserMenu() {
                 <polyline points="16 17 21 12 16 7"></polyline>
                 <line x1="21" y1="12" x2="9" y2="12"></line>
               </svg>
-              Sign out
+              {t("userMenu.signOut")}
             </button>
           </div>
         </>

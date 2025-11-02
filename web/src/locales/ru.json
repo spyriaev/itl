@@ -1,0 +1,79 @@
+{
+  "app": {
+    "title": "Innesi Reader",
+    "allDocuments": "Все документы"
+  },
+  "fileUpload": {
+    "dragAndDrop": "Перетащите файлы сюда для загрузки.",
+    "chooseFiles": "Выберите файлы или папки с вашего компьютера.",
+    "supportFormat": "Поддержка .pdf, до 25 МБ",
+    "uploadComplete": "Загрузка завершена!",
+    "uploadFailed": "Ошибка загрузки",
+    "uploading": "Загрузка..."
+  },
+  "documentList": {
+    "loadingDocuments": "Загрузка документов...",
+    "error": "Ошибка:",
+    "retry": "Повторить",
+    "moreCanDo": "ЧТО ЕЩЁ МОЖНО СДЕЛАТЬ:",
+    "takeFilesAnywhere": "Возьмите файлы с собой",
+    "takeFilesAnywhereDesc": "для удобного доступа на всех ваших устройствах",
+    "supportedFiles": "Поддерживаемые файлы",
+    "supportedFilesDesc": "загружайте PDF файлы размером до 25 МБ",
+    "refresh": "Обновить",
+    "name": "Имя",
+    "size": "Размер",
+    "lastModified": "Последнее изменение",
+    "questions": "Вопросы",
+    "untitledDocument": "Документ без названия",
+    "loading": "Загрузка...",
+    "sizeLabel": "Размер:",
+    "modifiedLabel": "Изменён:",
+    "unknownSize": "Неизвестный размер",
+    "unknownDate": "Неизвестная дата",
+    "invalidDate": "Некорректная дата"
+  },
+  "chatPanel": {
+    "assistant": "Помощник",
+    "startConversation": "Начать разговор",
+    "startConversationDesc": "Задавайте вопросы о документе или получите помощь в понимании содержимого.",
+    "prompt1": "О чём этот документ?",
+    "prompt2": "Можете ли вы резюмировать основные моменты?",
+    "prompt3": "Какие ключевые концепции обсуждаются?",
+    "prompt4": "Можете ли вы объяснить это проще?",
+    "aiThinking": "ИИ думает...",
+    "askQuestion": "Задайте вопрос об этом документе..."
+  },
+  "authModal": {
+    "signIn": "Войти",
+    "signUp": "Регистрация",
+    "email": "Электронная почта",
+    "password": "Пароль",
+    "loading": "Загрузка...",
+    "or": "ИЛИ",
+    "continueWithGoogle": "Продолжить с Google",
+    "unexpectedError": "Произошла неожиданная ошибка",
+    "googleSignInFailed": "Не удалось войти через Google",
+    "signUpSuccess": "Регистрация успешна! Пожалуйста, проверьте свою электронную почту для подтверждения аккаунта.",
+    "emailPlaceholder": "you@example.com",
+    "passwordPlaceholder": "••••••••"
+  },
+  "userMenu": {
+    "user": "Пользователь",
+    "signOut": "Выйти"
+  },
+  "chatInput": {
+    "askQuestion": "Задайте вопрос об этом документе...",
+    "noContext": "Без контекста",
+    "currentPage": "Текущая страница",
+    "currentChapter": "Текущая глава"
+  },
+  "threadSelector": {
+    "conversations": "Обсуждения",
+    "newConversation": "Новое обсуждение",
+    "noConversations": "Пока нет обсуждений"
+  },
+  "chatMessage": {
+    "page": "Страница"
+  }
+}

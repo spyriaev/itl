@@ -1,0 +1,79 @@
+{
+  "app": {
+    "title": "Innesi Reader",
+    "allDocuments": "All documents"
+  },
+  "fileUpload": {
+    "dragAndDrop": "Drag and drop here to upload.",
+    "chooseFiles": "Choose files or folders from your computer.",
+    "supportFormat": "Support .pdf, up to 25 MB",
+    "uploadComplete": "Upload complete!",
+    "uploadFailed": "Upload failed",
+    "uploading": "Uploading..."
+  },
+  "documentList": {
+    "loadingDocuments": "Loading documents...",
+    "error": "Error:",
+    "retry": "Retry",
+    "moreCanDo": "MORE OF WHAT YOU CAN DO:",
+    "takeFilesAnywhere": "Take Your Files Anywhere",
+    "takeFilesAnywhereDesc": "for easy access on all your devices",
+    "supportedFiles": "Supported Files",
+    "supportedFilesDesc": "upload PDF files with a maximum size of 25 MB",
+    "refresh": "Refresh",
+    "name": "Name",
+    "size": "Size",
+    "lastModified": "Last modified",
+    "questions": "Questions",
+    "untitledDocument": "Untitled Document",
+    "loading": "Loading...",
+    "sizeLabel": "Size:",
+    "modifiedLabel": "Modified:",
+    "unknownSize": "Unknown size",
+    "unknownDate": "Unknown date",
+    "invalidDate": "Invalid date"
+  },
+  "chatPanel": {
+    "assistant": "Assistant",
+    "startConversation": "Start a conversation",
+    "startConversationDesc": "Ask questions about this document or get help understanding the content.",
+    "prompt1": "What is this document about?",
+    "prompt2": "Can you summarize the main points?",
+    "prompt3": "What are the key concepts discussed?",
+    "prompt4": "Can you explain this in simpler terms?",
+    "aiThinking": "AI is thinking...",
+    "askQuestion": "Ask a question about this document..."
+  },
+  "authModal": {
+    "signIn": "Sign In",
+    "signUp": "Sign Up",
+    "email": "Email",
+    "password": "Password",
+    "loading": "Loading...",
+    "or": "OR",
+    "continueWithGoogle": "Continue with Google",
+    "unexpectedError": "An unexpected error occurred",
+    "googleSignInFailed": "Failed to sign in with Google",
+    "signUpSuccess": "Sign up successful! Please check your email to confirm your account.",
+    "emailPlaceholder": "you@example.com",
+    "passwordPlaceholder": "••••••••"
+  },
+  "userMenu": {
+    "user": "User",
+    "signOut": "Sign out"
+  },
+  "chatInput": {
+    "askQuestion": "Ask a question about this document...",
+    "noContext": "No context",
+    "currentPage": "Current Page",
+    "currentChapter": "Current Chapter"
+  },
+  "threadSelector": {
+    "conversations": "Conversations",
+    "newConversation": "New conversation",
+    "noConversations": "No conversations yet"
+  },
+  "chatMessage": {
+    "page": "Page"
+  }
+}

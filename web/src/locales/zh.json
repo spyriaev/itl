@@ -1,0 +1,79 @@
+{
+  "app": {
+    "title": "Innesi Reader",
+    "allDocuments": "所有文档"
+  },
+  "fileUpload": {
+    "dragAndDrop": "拖放文件到此处上传。",
+    "chooseFiles": "从您的计算机选择文件或文件夹。",
+    "supportFormat": "支持 .pdf，最大 25 MB",
+    "uploadComplete": "上传完成！",
+    "uploadFailed": "上传失败",
+    "uploading": "上传中..."
+  },
+  "documentList": {
+    "loadingDocuments": "正在加载文档...",
+    "error": "错误：",
+    "retry": "重试",
+    "moreCanDo": "更多功能：",
+    "takeFilesAnywhere": "随身携带文件",
+    "takeFilesAnywhereDesc": "在所有设备上轻松访问",
+    "supportedFiles": "支持的文件",
+    "supportedFilesDesc": "上传最大 25 MB 的 PDF 文件",
+    "refresh": "刷新",
+    "name": "名称",
+    "size": "大小",
+    "lastModified": "最后修改",
+    "questions": "问题",
+    "untitledDocument": "未命名文档",
+    "loading": "加载中...",
+    "sizeLabel": "大小：",
+    "modifiedLabel": "修改：",
+    "unknownSize": "未知大小",
+    "unknownDate": "未知日期",
+    "invalidDate": "无效日期"
+  },
+  "chatPanel": {
+    "assistant": "助手",
+    "startConversation": "开始对话",
+    "startConversationDesc": "询问有关此文档的问题或获得理解内容的帮助。",
+    "prompt1": "这个文档是关于什么的？",
+    "prompt2": "你能总结一下要点吗？",
+    "prompt3": "讨论了哪些关键概念？",
+    "prompt4": "你能用更简单的术语解释一下吗？",
+    "aiThinking": "AI 正在思考...",
+    "askQuestion": "询问有关此文档的问题..."
+  },
+  "authModal": {
+    "signIn": "登录",
+    "signUp": "注册",
+    "email": "电子邮件",
+    "password": "密码",
+    "loading": "加载中...",
+    "or": "或",
+    "continueWithGoogle": "使用 Google 继续",
+    "unexpectedError": "发生意外错误",
+    "googleSignInFailed": "使用 Google 登录失败",
+    "signUpSuccess": "注册成功！请检查您的电子邮件以确认您的账户。",
+    "emailPlaceholder": "you@example.com",
+    "passwordPlaceholder": "••••••••"
+  },
+  "userMenu": {
+    "user": "用户",
+    "signOut": "退出"
+  },
+  "chatInput": {
+    "askQuestion": "询问有关此文档的问题...",
+    "noContext": "无上下文",
+    "currentPage": "当前页面",
+    "currentChapter": "当前章节"
+  },
+  "threadSelector": {
+    "conversations": "对话",
+    "newConversation": "新对话",
+    "noConversations": "还没有对话"
+  },
+  "chatMessage": {
+    "page": "页面"
+  }
+}

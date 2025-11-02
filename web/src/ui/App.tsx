@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react"
+import { useTranslation } from "react-i18next"
 import { AuthProvider, useAuth } from "../contexts/AuthContext"
 import { FileUpload } from "./components/FileUpload"
 import { DocumentList } from "./components/DocumentList"
@@ -14,6 +15,7 @@ import "./styles/upload-page.css"
 type ViewMode = "library" | "reader"
 
 function AppContent() {
+  const { t } = useTranslation()
   const [refreshTrigger, setRefreshTrigger] = useState(0)
   const [viewMode, setViewMode] = useState<ViewMode>("library")
   const [currentDocumentId, setCurrentDocumentId] = useState<string | null>(null)
@@ -154,7 +156,7 @@ function AppContent() {
               <path d="M9.33687 15.1876L8.67209 17.2136C8.53833 17.6213 7.96167 17.6213 7.82791 17.2136L7.16313 15.1876C7.03098 14.7849 6.71511 14.469 6.31236 14.3369L4.28637 13.6721C3.87872 13.5383 3.87872 12.9617 4.28637 12.8279L6.31236 12.1631C6.71511 12.031 7.03098 11.7151 7.16313 11.3124L7.82791 9.28637C7.96167 8.87872 8.53833 8.87872 8.67209 9.28637L9.33687 11.3124C9.46902 11.7151 9.78489 12.031 10.1876 12.1631L12.2136 12.8279C12.6213 12.9617 12.6213 13.5383 12.2136 13.6721L10.1876 14.3369C9.78489 14.469 9.46902 14.7849 9.33687 15.1876Z" fill="white" />
             </svg>
           </div>
-          <h1 className="upload-header-logo-text">Innesi Reader</h1>
+          <h1 className="upload-header-logo-text">{t("app.title")}</h1>
         </div>
         <UserMenu />
       </header>
@@ -165,7 +167,7 @@ function AppContent() {
             <>
               <div className="documents-header">
                 <div className="documents-title">
-                  All documents
+                  {t("app.allDocuments")}
                   <svg
                     width="24"
                     height="24"

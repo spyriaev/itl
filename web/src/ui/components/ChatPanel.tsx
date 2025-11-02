@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useChat } from '../../contexts/ChatContext'
 import { ChatMessage } from './ChatMessage'
 import { ThreadSelector } from './ThreadSelector'
@@ -15,6 +16,7 @@ interface ChatPanelProps {
 }
 
 export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobile = false }: ChatPanelProps) {
+  const { t } = useTranslation()
   const {
     activeThread,
     messages,
@@ -222,10 +224,10 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
   }
 
   const suggestedPrompts = [
-    "What is this document about?",
-    "Can you summarize the main points?",
-    "What are the key concepts discussed?",
-    "Can you explain this in simpler terms?",
+    t("chatPanel.prompt1"),
+    t("chatPanel.prompt2"),
+    t("chatPanel.prompt3"),
+    t("chatPanel.prompt4"),
   ]
 
   if (!isVisible) {
@@ -265,7 +267,7 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
           alignItems: 'center',
           gap: 8,
         }}>
-          Assistant
+          {t("chatPanel.assistant")}
           {isStreaming && (
             <div
               style={{
@@ -351,10 +353,10 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
             color: '#6B7280',
           }}>
             <h4 style={{ margin: '0 0 8px 0', fontSize: 16, fontWeight: 600 }}>
-              Start a conversation
+              {t("chatPanel.startConversation")}
             </h4>
             <p style={{ margin: '0 0 24px 0', fontSize: 14 }}>
-              Ask questions about this document or get help understanding the content.
+              {t("chatPanel.startConversationDesc")}
             </p>
             
             {/* Suggested prompts */}
@@ -429,7 +431,7 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
                 fontSize: 14,
                 textAlign: 'left',
               }} className="thinking-text">
-                AI is thinking...
+                {t("chatPanel.aiThinking")}
               </div>
             )}
             
@@ -448,7 +450,7 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
           value={inputValue}
           onChange={setInputValue}
           onSend={handleSendMessage}
-          placeholder="Ask a question about this document..."
+          placeholder={t("chatPanel.askQuestion")}
           disabled={isStreaming}
           isStreaming={isStreaming}
           contextItems={contextItems || []}

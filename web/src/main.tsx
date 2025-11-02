@@ -1,5 +1,6 @@
 import React from 'react'
 import { createRoot } from 'react-dom/client'
+import './lib/i18n'
 import { App } from './ui/App'
 
 // Global error handler to suppress browser extension errors

@@ -85,33 +85,6 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
   // Track current scale to detect race conditions during zoom operations
   const currentScaleRef = useRef(scale)
 
-  // Update current scale ref and page widths when scale changes
-  useEffect(() => {
-    currentScaleRef.current = scale
-    // Update page widths when scale changes - wait for DOM to update
-    const updateWidths = () => {
-      const newWidths = new Map<number, number>()
-      for (let i = 0; i < pdfPageRefs.current.length; i++) {
-        const pageContainer = pdfPageRefs.current[i]
-        if (pageContainer) {
-          const canvas = pageContainer.querySelector('canvas')
-          if (canvas) {
-            const width = canvas.getBoundingClientRect().width
-            if (width > 0) {
-              newWidths.set(i + 1, width)
-            }
-          }
-        }
-      }
-      if (newWidths.size > 0) {
-        setPageWidths(newWidths)
-      }
-    }
-    // Delay to allow DOM to update after scale change
-    const timeoutId = setTimeout(updateWidths, 150)
-    return () => clearTimeout(timeoutId)
-  }, [scale])
-
   // Store timeout ID for updateVisiblePageRange to prevent accumulation
   const updateVisiblePageRangeTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -135,7 +108,7 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
   // Флаг активного изменения масштаба
   const isZoomingRef = useRef(false)
 
-  // Update the ref whenever scale changes
+  // Update current scale ref when scale changes
   useEffect(() => {
     currentScaleRef.current = scale
   }, [scale])
@@ -929,11 +902,30 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
     }
 
     isZoomingRef.current = true
-    setScale(prev => Math.min(prev + 0.25, 3.0))
-    // Clear page heights cache when zooming to recalculate
-    setPageHeights(new Map())
-    // Update visible range immediately and after a brief delay for re-render
-    updateVisiblePageRange()
+    const oldScale = scale
+    const newScale = Math.min(scale + 0.25, 3.0)
+    const scaleRatio = newScale / oldScale
+    
+    // Recalculate page heights and widths proportionally to new scale
+    setPageHeights(prev => {
+      const newHeights = new Map()
+      prev.forEach((height, pageNum) => {
+        newHeights.set(pageNum, height * scaleRatio)
+      })
+      return newHeights
+    })
+    setPageWidths(prev => {
+      const newWidths = new Map()
+      prev.forEach((width, pageNum) => {
+        newWidths.set(pageNum, width * scaleRatio)
+      })
+      return newWidths
+    })
+    
+    // Update ref synchronously before setState to prevent race conditions
+    currentScaleRef.current = newScale
+    setScale(newScale)
+    // Update visible range after a brief delay to allow state to update
 
     // Очищаем предыдущий таймаут, если он есть
     if (updateVisiblePageRangeTimeoutRef.current) {
@@ -974,11 +966,30 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
     }
 
     isZoomingRef.current = true
-    setScale(prev => Math.max(prev - 0.25, 0.5))
-    // Clear page heights cache when zooming to recalculate
-    setPageHeights(new Map())
-    // Update visible range immediately and after a brief delay for re-render
-    updateVisiblePageRange()
+    const oldScale = scale
+    const newScale = Math.max(scale - 0.25, 0.5)
+    const scaleRatio = newScale / oldScale
+    
+    // Recalculate page heights and widths proportionally to new scale
+    setPageHeights(prev => {
+      const newHeights = new Map()
+      prev.forEach((height, pageNum) => {
+        newHeights.set(pageNum, height * scaleRatio)
+      })
+      return newHeights
+    })
+    setPageWidths(prev => {
+      const newWidths = new Map()
+      prev.forEach((width, pageNum) => {
+        newWidths.set(pageNum, width * scaleRatio)
+      })
+      return newWidths
+    })
+    
+    // Update ref synchronously before setState to prevent race conditions
+    currentScaleRef.current = newScale
+    setScale(newScale)
+    // Update visible range after a brief delay to allow state to update
 
     // Очищаем предыдущий таймаут, если он есть
     if (updateVisiblePageRangeTimeoutRef.current) {
@@ -1019,11 +1030,30 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
     }
 
     isZoomingRef.current = true
-    setScale(1.0)
-    // Clear page heights cache when zooming to recalculate
-    setPageHeights(new Map())
-    // Update visible range immediately and after a brief delay for re-render
-    updateVisiblePageRange()
+    const oldScale = scale
+    const newScale = 1.0
+    const scaleRatio = newScale / oldScale
+    
+    // Recalculate page heights and widths proportionally to new scale
+    setPageHeights(prev => {
+      const newHeights = new Map()
+      prev.forEach((height, pageNum) => {
+        newHeights.set(pageNum, height * scaleRatio)
+      })
+      return newHeights
+    })
+    setPageWidths(prev => {
+      const newWidths = new Map()
+      prev.forEach((width, pageNum) => {
+        newWidths.set(pageNum, width * scaleRatio)
+      })
+      return newWidths
+    })
+    
+    // Update ref synchronously before setState to prevent race conditions
+    currentScaleRef.current = newScale
+    setScale(newScale)
+    // Update visible range after a brief delay to allow state to update
 
     // Очищаем предыдущий таймаут, если он есть
     if (updateVisiblePageRangeTimeoutRef.current) {
@@ -1065,6 +1095,7 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
 
     try {
       isZoomingRef.current = true
+      const oldScale = scale
 
       // Получаем первую страницу для определения ширины (все страницы обычно имеют одинаковую ширину)
       const page = await pdfDocumentRef.current.getPage(1)
@@ -1111,13 +1142,29 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
         updateVisiblePageRangeTimeoutRef.current = null
       }
 
+      const scaleRatio = optimalScale / oldScale
+      
+      // Recalculate page heights and widths proportionally to new scale
+      setPageHeights(prev => {
+        const newHeights = new Map()
+        prev.forEach((height, pageNum) => {
+          newHeights.set(pageNum, height * scaleRatio)
+        })
+        return newHeights
+      })
+      setPageWidths(prev => {
+        const newWidths = new Map()
+        prev.forEach((width, pageNum) => {
+          newWidths.set(pageNum, width * scaleRatio)
+        })
+        return newWidths
+      })
+      
+      // Update ref synchronously before setState to prevent race conditions
+      currentScaleRef.current = optimalScale
       setScale(optimalScale)
-      // Clear page heights cache when zooming to recalculate
-      setPageHeights(new Map())
 
-      // Update visible range immediately and after a brief delay for re-render
-      updateVisiblePageRange()
-
+      // Update visible range after a brief delay to allow state to update
       updateVisiblePageRangeTimeoutRef.current = setTimeout(() => {
         // Проверяем, что компонент еще смонтирован
         if (!scrollContainerRef.current) {
@@ -1377,21 +1424,6 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
                             <div
                               ref={(el) => {
                                 pdfPageRefs.current[index] = el
-                                // Update page width when ref is set or changes
-                                if (el) {
-                                  // Use ResizeObserver or setTimeout to get actual rendered width
-                                  setTimeout(() => {
-                                    const canvas = el.querySelector('canvas')
-                                    if (canvas) {
-                                      const width = canvas.getBoundingClientRect().width
-                                      setPageWidths(prev => {
-                                        const newMap = new Map(prev)
-                                        newMap.set(pageNumber, width)
-                                        return newMap
-                                      })
-                                    }
-                                  }, 0)
-                                }
                               }}
                             >
                               <Page

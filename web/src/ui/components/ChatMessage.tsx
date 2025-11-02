@@ -1,4 +1,5 @@
 import React from 'react'
+import { useTranslation } from 'react-i18next'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { DocumentStructureItem } from '../../types/document'
@@ -17,6 +18,7 @@ interface ChatMessageProps {
 }
 
 export function ChatMessage({ message, documentStructure }: ChatMessageProps) {
+  const { t } = useTranslation()
   const isUser = message.role === 'user'
   const isAssistant = message.role === 'assistant'
   const isEmptyAssistant = isAssistant && !message.content
@@ -189,7 +191,7 @@ export function ChatMessage({ message, documentStructure }: ChatMessageProps) {
         ) : message.pageContext ? (
           <>
             <span>•</span>
-            <span>Page {message.pageContext}</span>
+            <span>{t("chatMessage.page")} {message.pageContext}</span>
           </>
         ) : null}
       </div>

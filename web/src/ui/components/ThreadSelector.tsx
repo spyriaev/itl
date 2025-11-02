@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useChat } from '../../contexts/ChatContext'
 
 interface ThreadSelectorProps {
@@ -7,6 +8,7 @@ interface ThreadSelectorProps {
 }
 
 export function ThreadSelector({ documentId, onNewThread }: ThreadSelectorProps) {
+  const { t } = useTranslation()
   const { threads, activeThread, selectThread, isLoading } = useChat()
   const [isOpen, setIsOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -122,7 +124,7 @@ export function ThreadSelector({ documentId, onNewThread }: ThreadSelectorProps)
             minWidth: 0,
             maxWidth: '100%',
           }}>
-            {activeThread ? activeThread.title : 'Conversations'}
+            {activeThread ? activeThread.title : t("threadSelector.conversations")}
           </span>
           <span style={{ 
             fontSize: 10, 
@@ -222,7 +224,7 @@ export function ThreadSelector({ documentId, onNewThread }: ThreadSelectorProps)
                 strokeLinecap="round"
               />
             </svg>
-            <span style={{ fontWeight: 500 }}>New conversation</span>
+            <span style={{ fontWeight: 500 }}>{t("threadSelector.newConversation")}</span>
           </button>
 
           {/* Separator */}
@@ -242,7 +244,7 @@ export function ThreadSelector({ documentId, onNewThread }: ThreadSelectorProps)
               color: '#9CA3AF',
               fontSize: 12,
             }}>
-              No conversations yet
+              {t("threadSelector.noConversations")}
             </div>
           ) : (
             threads.map((thread, index) => (
