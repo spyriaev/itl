@@ -116,13 +116,22 @@ export function ChatInput({
   const getSelectedValue = () => {
     if (selectedLevel === 'none') return 'none'
     if (selectedLevel === null) return 'page'
-    // If selectedLevel is a number, check if it's a valid chapter
+    // If selectedLevel is a number, it means we have a chapter/section selected
     if (hasChapter) {
       return 'chapter'
     }
-    // If no chapter structure, default to page
+    // If no chapter structure but selectedLevel is a number, we need to reset
+    // This happens when user previously had chapter selected but structure changed
     return 'page'
   }
+
+  // Effect to reset invalid selectedLevel when chapter structure disappears
+  React.useEffect(() => {
+    if (onContextChange && typeof selectedLevel === 'number' && !hasChapter) {
+      // Reset to page if chapter structure is no longer available
+      onContextChange(null)
+    }
+  }, [hasChapter, selectedLevel, onContextChange])
 
   return (
     <div style={styles.container}>

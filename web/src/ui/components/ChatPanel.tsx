@@ -168,7 +168,7 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
       } else {
         setChapterInfo(null)
         setContextItems([])
-        if (selectedLevel !== null) {
+        if (selectedLevel !== null && selectedLevel !== 'none') {
           setSelectedLevel(null)
         }
       }
