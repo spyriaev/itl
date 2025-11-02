@@ -111,6 +111,8 @@ export function ChatProvider({ children }: ChatProviderProps) {
         role: 'assistant',
         content: '',
         pageContext,
+        contextType,
+        chapterId,
         createdAt: new Date().toISOString()
       }
       setMessages(prev => [...prev, assistantMessage])
@@ -128,10 +130,10 @@ export function ChatProvider({ children }: ChatProviderProps) {
           ))
         },
         (messageId) => {
-          // Replace temp message with real message
+          // Replace temp message with real message - preserve contextType and chapterId
           setMessages(prev => prev.map(msg => 
             msg.id === assistantMessageId 
-              ? { ...msg, id: messageId }
+              ? { ...msg, id: messageId, contextType: msg.contextType, chapterId: msg.chapterId, pageContext: msg.pageContext }
               : msg
           ))
           setIsStreaming(false)
@@ -200,10 +202,10 @@ export function ChatProvider({ children }: ChatProviderProps) {
           ))
         },
         (messageId) => {
-          // Replace temp message with real message
+          // Replace temp message with real message - preserve contextType and chapterId
           setMessages(prev => prev.map(msg => 
             msg.id === assistantMessageId 
-              ? { ...msg, id: messageId }
+              ? { ...msg, id: messageId, contextType: msg.contextType, chapterId: msg.chapterId, pageContext: msg.pageContext }
               : msg
           ))
           setIsStreaming(false)

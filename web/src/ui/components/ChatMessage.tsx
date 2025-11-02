@@ -1,6 +1,7 @@
 import React from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import { DocumentStructureItem } from '../../types/document'
 
 interface ChatMessageProps {
   message: {
@@ -8,11 +9,14 @@ interface ChatMessageProps {
     role: 'user' | 'assistant'
     content: string
     pageContext?: number
+    contextType?: string
+    chapterId?: string
     createdAt: string
   }
+  documentStructure?: DocumentStructureItem[]
 }
 
-export function ChatMessage({ message }: ChatMessageProps) {
+export function ChatMessage({ message, documentStructure }: ChatMessageProps) {
   const isUser = message.role === 'user'
   const isAssistant = message.role === 'assistant'
   const isEmptyAssistant = isAssistant && !message.content
@@ -23,6 +27,27 @@ export function ChatMessage({ message }: ChatMessageProps) {
       minute: '2-digit' 
     })
   }
+
+  // Find chapter info by ID in document structure
+  const findChapterById = (items: DocumentStructureItem[], id: string): DocumentStructureItem | null => {
+    for (const item of items) {
+      if (item.id === id) {
+        return item
+      }
+      if (item.children && item.children.length > 0) {
+        const found = findChapterById(item.children, id)
+        if (found) return found
+      }
+    }
+    return null
+  }
+
+  const chapterInfo = message.chapterId && documentStructure
+    ? findChapterById(documentStructure, message.chapterId)
+    : null
+
+  const isChapterContext = message.contextType === 'chapter' || message.contextType === 'section'
+  const shouldShowChapterInfo = isChapterContext && chapterInfo && message.pageContext
 
   return (
     <div style={{
@@ -143,14 +168,30 @@ export function ChatMessage({ message }: ChatMessageProps) {
         marginTop: 4,
         fontSize: 12,
         color: '#6B7280',
+        maxWidth: '80%',
       }}>
         <span>{formatTime(message.createdAt)}</span>
-        {message.pageContext && (
+        {shouldShowChapterInfo && chapterInfo ? (
+          <>
+            <span>•</span>
+            <span style={{
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              maxWidth: '100%',
+            }}>
+              {chapterInfo.title
+                .replace(/[☑☒☐✓✗×◊◆►▸▹►▲▼]/g, '')
+                .replace(/[^\p{L}\p{N}\s.,;:!?()[\]{}""''-]/gu, '')
+                .trim()}
+            </span>
+          </>
+        ) : message.pageContext ? (
           <>
             <span>•</span>
             <span>Page {message.pageContext}</span>
           </>
-        )}
+        ) : null}
       </div>
 
       {/* CSS for loading animation */}

@@ -411,7 +411,10 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
                     }
                   }}
                 >
-                  <ChatMessage message={message} />
+                  <ChatMessage 
+                    message={message} 
+                    documentStructure={documentStructure?.items}
+                  />
                 </div>
               )
             })}
