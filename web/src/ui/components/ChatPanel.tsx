@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { useChat } from '../../contexts/ChatContext'
 import { ChatMessage } from './ChatMessage'
 import { ThreadSelector } from './ThreadSelector'
-import { ContextSelector } from './ContextSelector'
+import { ChatInput } from './ChatInput'
 import { ContextType, ChapterInfo, DocumentStructureItem } from '../../types/document'
 import { getChapterForPage, getDocumentStructure } from '../../services/documentService'
 
@@ -32,14 +32,12 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
   } = useChat()
 
   const [inputValue, setInputValue] = useState('')
-  const [isComposing, setIsComposing] = useState(false)
   const [selectedLevel, setSelectedLevel] = useState<number | null | 'none'>(null)
   const [chapterInfo, setChapterInfo] = useState<ChapterInfo | null>(null)
   const [documentStructure, setDocumentStructure] = useState<any>(null)
   const [contextItems, setContextItems] = useState<DocumentStructureItem[]>([])
   const userSelectionRef = useRef<number | null | 'none'>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLTextAreaElement>(null)
   const messageRefs = useRef<Map<string, HTMLDivElement>>(new Map())
   const prevMessagesLengthRef = useRef<number>(0)
   const renderedMessageIdsRef = useRef<Set<string>>(new Set())
@@ -88,17 +86,6 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
     prevMessagesLengthRef.current = messages.length
     prevTargetMessageIdRef.current = targetMessageId
   }, [messages, targetMessageId])
-
-  // Focus input when panel becomes visible
-  useEffect(() => {
-    if (isVisible && inputRef.current) {
-      try {
-        inputRef.current.focus()
-      } catch (error) {
-        // Silently fail if focus cannot be set (e.g., due to browser extensions)
-      }
-    }
-  }, [isVisible])
 
   // Load document structure when document loads
   useEffect(() => {
@@ -155,13 +142,14 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
     if (currentPage && documentStructure) {
       const items = findContextItemsForPage(documentStructure.items, currentPage)
       
-      // Only keep the deepest level item (the specific section containing the page)
+      // Keep all items in the path (for displaying chapter info)
       const deepestItem = items.length > 0 ? items[items.length - 1] : null
       
       if (deepestItem) {
         const previousItem = contextItems[0]
         
-        setContextItems([deepestItem])
+        // Pass all items in the path to ChatInput so it can find the chapter
+        setContextItems(items)
         setChapterInfo({
           id: deepestItem.id,
           title: deepestItem.title,
@@ -222,13 +210,6 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
       }
     } catch (err) {
       console.error('Failed to send message:', err)
-    }
-  }
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey && !isComposing) {
-      e.preventDefault()
-      handleSendMessage()
     }
   }
 
@@ -455,67 +436,17 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
         borderTop: '1px solid #E5E7EB',
         backgroundColor: 'white',
       }}>
-        <div style={{
-          display: 'flex',
-          gap: 8,
-          alignItems: 'flex-end',
-        }}>
-          <textarea
-            ref={inputRef}
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            onKeyDown={handleKeyDown}
-            onCompositionStart={() => setIsComposing(true)}
-            onCompositionEnd={() => setIsComposing(false)}
-            placeholder="Ask a question about this document..."
-            disabled={isStreaming}
-            style={{
-              flex: 1,
-              minHeight: 40,
-              maxHeight: 120,
-              padding: '8px 12px',
-              border: '1px solid #D1D5DB',
-              borderRadius: 8,
-              fontSize: 14,
-              fontFamily: 'inherit',
-              resize: 'none',
-              outline: 'none',
-              backgroundColor: isStreaming ? '#F9FAFB' : 'white',
-              opacity: isStreaming ? 0.6 : 1,
-            }}
-          />
-          <button
-            onClick={handleSendMessage}
-            disabled={!inputValue.trim() || isStreaming}
-            style={{
-              padding: '8px 12px',
-              backgroundColor: (!inputValue.trim() || isStreaming) ? '#F3F4F6' : '#3B82F6',
-              color: (!inputValue.trim() || isStreaming) ? '#9CA3AF' : 'white',
-              border: 'none',
-              borderRadius: 8,
-              fontSize: 14,
-              fontWeight: 500,
-              cursor: (!inputValue.trim() || isStreaming) ? 'not-allowed' : 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 4,
-            }}
-          >
-            <span>Send</span>
-            <span>→</span>
-          </button>
-        </div>
-        
-        {/* Spacing between input and context */}
-        <div style={{ height: 12 }} />
-        
-        {/* Context selector */}
-        <ContextSelector
+        <ChatInput
+          value={inputValue}
+          onChange={setInputValue}
+          onSend={handleSendMessage}
+          placeholder="Ask a question about this document..."
+          disabled={isStreaming}
+          isStreaming={isStreaming}
           contextItems={contextItems || []}
           currentPage={currentPage || 1}
           selectedLevel={selectedLevel}
-          onChange={handleContextChange}
-          disabled={isStreaming}
+          onContextChange={handleContextChange}
         />
       </div>
 

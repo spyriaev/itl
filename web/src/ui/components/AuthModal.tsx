@@ -319,9 +319,6 @@ const styles: { [key: string]: React.CSSProperties } = {
 // Add divider line using ::before pseudo-element effect
 const dividerStyle = document.createElement('style')
 dividerStyle.textContent = `
-  div[style*="position: relative"] {
-    border-top: 1px solid #e5e7eb;
-  }
   input:focus {
     outline: none;
     border-color: #3b82f6;
