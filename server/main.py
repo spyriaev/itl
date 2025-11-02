@@ -329,7 +329,7 @@ async def get_page_questions_endpoint(
             detail="Document not found"
         )
     
-    return get_page_questions(db, document_id, page_number, user_id, limit=None)
+    return get_page_questions(db, document_id, page_number, user_id, limit=3)
 
 @app.get("/api/chat/threads/{thread_id}/messages", response_model=ThreadWithMessagesResponse)
 async def get_chat_thread_messages(

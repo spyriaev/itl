@@ -2,7 +2,6 @@
 
 import type React from "react"
 import { useState, useRef } from "react"
-import { useTranslation } from "react-i18next"
 import { uploadPdfFile, type UploadProgress } from "../../services/uploadService"
 
 interface FileUploadProps {
@@ -10,7 +9,6 @@ interface FileUploadProps {
 }
 
 export function FileUpload({ onUploadComplete }: FileUploadProps) {
-  const { t } = useTranslation()
   const [isDragging, setIsDragging] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const [progress, setProgress] = useState<UploadProgress | null>(null)
@@ -80,7 +78,7 @@ export function FileUpload({ onUploadComplete }: FileUploadProps) {
         onUploadComplete?.()
       }, 1500)
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("fileUpload.uploadFailed"))
+      setError(err instanceof Error ? err.message : "Upload failed")
       setIsUploading(false)
       setProgress(null)
     }
@@ -120,9 +118,9 @@ export function FileUpload({ onUploadComplete }: FileUploadProps) {
             <line x1="12" y1="12" x2="12" y2="21"></line>
           </svg>
 
-          <div className="upload-text-primary">{t("fileUpload.dragAndDrop")}</div>
-          <div className="upload-text-secondary">{t("fileUpload.chooseFiles")}</div>
-          <div className="upload-text-hint">{t("fileUpload.supportFormat")}</div>
+          <div className="upload-text-primary">Drag and drop here to upload.</div>
+          <div className="upload-text-secondary">Choose files or folders from your computer.</div>
+          <div className="upload-text-hint">Support .pdf, up to 25 MB</div>
         </div>
 
         {isUploading && progress && (
@@ -189,7 +187,7 @@ export function FileUpload({ onUploadComplete }: FileUploadProps) {
               fontWeight: 600,
             }}
           >
-            ✓ {t("fileUpload.uploadComplete")}
+            ✓ Upload complete!
           </div>
         )}
     </div>

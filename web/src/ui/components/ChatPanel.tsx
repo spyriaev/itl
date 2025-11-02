@@ -1,9 +1,8 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
-import { useTranslation } from 'react-i18next'
 import { useChat } from '../../contexts/ChatContext'
 import { ChatMessage } from './ChatMessage'
 import { ThreadSelector } from './ThreadSelector'
-import { ChatInput } from './ChatInput'
+import { ContextSelector } from './ContextSelector'
 import { ContextType, ChapterInfo, DocumentStructureItem } from '../../types/document'
 import { getChapterForPage, getDocumentStructure } from '../../services/documentService'
 
@@ -16,7 +15,6 @@ interface ChatPanelProps {
 }
 
 export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobile = false }: ChatPanelProps) {
-  const { t } = useTranslation()
   const {
     activeThread,
     messages,
@@ -34,12 +32,14 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
   } = useChat()
 
   const [inputValue, setInputValue] = useState('')
+  const [isComposing, setIsComposing] = useState(false)
   const [selectedLevel, setSelectedLevel] = useState<number | null | 'none'>(null)
   const [chapterInfo, setChapterInfo] = useState<ChapterInfo | null>(null)
   const [documentStructure, setDocumentStructure] = useState<any>(null)
   const [contextItems, setContextItems] = useState<DocumentStructureItem[]>([])
   const userSelectionRef = useRef<number | null | 'none'>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
   const messageRefs = useRef<Map<string, HTMLDivElement>>(new Map())
   const prevMessagesLengthRef = useRef<number>(0)
   const renderedMessageIdsRef = useRef<Set<string>>(new Set())
@@ -61,33 +61,34 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
   useEffect(() => {
     const wasNavigating = prevTargetMessageIdRef.current !== null
     
-    try {
-      if (targetMessageId) {
-        // Scroll to specific message
-        const targetElement = messageRefs.current.get(targetMessageId)
-        if (targetElement) {
-          targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
-          // Add highlight animation
-          targetElement.style.animation = 'highlight 2s ease-out'
-          setTimeout(() => {
-            if (targetElement.style) {
-              targetElement.style.animation = ''
-            }
-          }, 2000)
-        }
-      } else if (!wasNavigating && messages.length > prevMessagesLengthRef.current) {
-        // Only auto-scroll to bottom when new messages are added
-        // Don't scroll when targetMessageId was just cleared
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    if (targetMessageId) {
+      // Scroll to specific message
+      const targetElement = messageRefs.current.get(targetMessageId)
+      if (targetElement) {
+        targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        // Add highlight animation
+        targetElement.style.animation = 'highlight 2s ease-out'
+        setTimeout(() => {
+          targetElement.style.animation = ''
+        }, 2000)
       }
-    } catch (error) {
-      // Silently fail if scrolling cannot be performed (e.g., due to browser extensions)
+    } else if (!wasNavigating && messages.length > prevMessagesLengthRef.current) {
+      // Only auto-scroll to bottom when new messages are added
+      // Don't scroll when targetMessageId was just cleared
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
     }
     
     // Update refs
     prevMessagesLengthRef.current = messages.length
     prevTargetMessageIdRef.current = targetMessageId
   }, [messages, targetMessageId])
+
+  // Focus input when panel becomes visible
+  useEffect(() => {
+    if (isVisible && inputRef.current) {
+      inputRef.current.focus()
+    }
+  }, [isVisible])
 
   // Load document structure when document loads
   useEffect(() => {
@@ -135,6 +136,7 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
 
   // Track user manual selection changes in ContextSelector
   const handleContextChange = useCallback((level: number | null | 'none') => {
+    console.log('User selected level:', level)
     userSelectionRef.current = level
     setSelectedLevel(level)
   }, [])
@@ -144,14 +146,13 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
     if (currentPage && documentStructure) {
       const items = findContextItemsForPage(documentStructure.items, currentPage)
       
-      // Keep all items in the path (for displaying chapter info)
+      // Only keep the deepest level item (the specific section containing the page)
       const deepestItem = items.length > 0 ? items[items.length - 1] : null
       
       if (deepestItem) {
         const previousItem = contextItems[0]
         
-        // Pass all items in the path to ChatInput so it can find the chapter
-        setContextItems(items)
+        setContextItems([deepestItem])
         setChapterInfo({
           id: deepestItem.id,
           title: deepestItem.title,
@@ -170,7 +171,7 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
       } else {
         setChapterInfo(null)
         setContextItems([])
-        if (selectedLevel !== null && selectedLevel !== 'none') {
+        if (selectedLevel !== null) {
           setSelectedLevel(null)
         }
       }
@@ -215,6 +216,13 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
     }
   }
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey && !isComposing) {
+      e.preventDefault()
+      handleSendMessage()
+    }
+  }
+
   const handleNewThread = async () => {
     try {
       await createNewThread(documentId)
@@ -224,14 +232,40 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
   }
 
   const suggestedPrompts = [
-    t("chatPanel.prompt1"),
-    t("chatPanel.prompt2"),
-    t("chatPanel.prompt3"),
-    t("chatPanel.prompt4"),
+    "What is this document about?",
+    "Can you summarize the main points?",
+    "What are the key concepts discussed?",
+    "Can you explain this in simpler terms?",
   ]
 
   if (!isVisible) {
-    return null
+    return (
+      <button
+        onClick={onToggle}
+        style={{
+          position: 'fixed',
+          top: '50%',
+          right: isMobile ? 16 : 20,
+          transform: 'translateY(-50%)',
+          width: isMobile ? 56 : 48,
+          height: isMobile ? 56 : 48,
+          backgroundColor: '#3B82F6',
+          color: 'white',
+          border: 'none',
+          borderRadius: '50%',
+          fontSize: isMobile ? 24 : 20,
+          cursor: 'pointer',
+          boxShadow: '0 4px 12px rgba(59, 130, 246, 0.4)',
+          zIndex: 1000,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+        title="Open AI Assistant"
+      >
+        💬
+      </button>
+    )
   }
 
   return (
@@ -267,19 +301,7 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
           alignItems: 'center',
           gap: 8,
         }}>
-          {t("chatPanel.assistant")}
-          {isStreaming && (
-            <div
-              style={{
-                width: 8,
-                height: 8,
-                borderRadius: '50%',
-                backgroundColor: '#3B82F6',
-                boxShadow: '0 0 8px rgba(59, 130, 246, 0.8)',
-                animation: 'pulse-dot 1.5s ease-in-out infinite',
-              }}
-            />
-          )}
+          Assistant
         </h3>
         <button
           onClick={onToggle}
@@ -298,13 +320,7 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
       </div>
 
       {/* Thread selector */}
-      <div style={{ 
-        padding: '16px', 
-        borderBottom: '1px solid #E5E7EB',
-        minWidth: 0,
-        maxWidth: '100%',
-        boxSizing: 'border-box',
-      }}>
+      <div style={{ padding: '16px', borderBottom: '1px solid #E5E7EB' }}>
         <ThreadSelector 
           documentId={documentId} 
           onNewThread={handleNewThread}
@@ -352,11 +368,12 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
             textAlign: 'center',
             color: '#6B7280',
           }}>
+            <div style={{ fontSize: 32, marginBottom: 16 }}>💬</div>
             <h4 style={{ margin: '0 0 8px 0', fontSize: 16, fontWeight: 600 }}>
-              {t("chatPanel.startConversation")}
+              Start a conversation
             </h4>
             <p style={{ margin: '0 0 24px 0', fontSize: 14 }}>
-              {t("chatPanel.startConversationDesc")}
+              Ask questions about this document or get help understanding the content.
             </p>
             
             {/* Suggested prompts */}
@@ -367,11 +384,11 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
                   onClick={() => setInputValue(prompt)}
                   style={{
                     padding: '8px 12px',
-                    backgroundColor: '#FAFAFA',
-                    border: 'none',
+                    backgroundColor: 'white',
+                    border: '1px solid #D1D5DB',
                     borderRadius: 6,
                     fontSize: 13,
-                    color: '#2d66f5',
+                    color: '#374151',
                     cursor: 'pointer',
                     textAlign: 'left',
                   }}
@@ -413,10 +430,7 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
                     }
                   }}
                 >
-                  <ChatMessage 
-                    message={message} 
-                    documentStructure={documentStructure?.items}
-                  />
+                  <ChatMessage message={message} />
                 </div>
               )
             })}
@@ -431,7 +445,7 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
                 fontSize: 14,
                 textAlign: 'left',
               }} className="thinking-text">
-                {t("chatPanel.aiThinking")}
+                AI is thinking...
               </div>
             )}
             
@@ -446,17 +460,67 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
         borderTop: '1px solid #E5E7EB',
         backgroundColor: 'white',
       }}>
-        <ChatInput
-          value={inputValue}
-          onChange={setInputValue}
-          onSend={handleSendMessage}
-          placeholder={t("chatPanel.askQuestion")}
-          disabled={isStreaming}
-          isStreaming={isStreaming}
+        <div style={{
+          display: 'flex',
+          gap: 8,
+          alignItems: 'flex-end',
+        }}>
+          <textarea
+            ref={inputRef}
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onCompositionStart={() => setIsComposing(true)}
+            onCompositionEnd={() => setIsComposing(false)}
+            placeholder="Ask a question about this document..."
+            disabled={isStreaming}
+            style={{
+              flex: 1,
+              minHeight: 40,
+              maxHeight: 120,
+              padding: '8px 12px',
+              border: '1px solid #D1D5DB',
+              borderRadius: 8,
+              fontSize: 14,
+              fontFamily: 'inherit',
+              resize: 'none',
+              outline: 'none',
+              backgroundColor: isStreaming ? '#F9FAFB' : 'white',
+              opacity: isStreaming ? 0.6 : 1,
+            }}
+          />
+          <button
+            onClick={handleSendMessage}
+            disabled={!inputValue.trim() || isStreaming}
+            style={{
+              padding: '8px 12px',
+              backgroundColor: (!inputValue.trim() || isStreaming) ? '#F3F4F6' : '#3B82F6',
+              color: (!inputValue.trim() || isStreaming) ? '#9CA3AF' : 'white',
+              border: 'none',
+              borderRadius: 8,
+              fontSize: 14,
+              fontWeight: 500,
+              cursor: (!inputValue.trim() || isStreaming) ? 'not-allowed' : 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+            }}
+          >
+            <span>Send</span>
+            <span>→</span>
+          </button>
+        </div>
+        
+        {/* Spacing between input and context */}
+        <div style={{ height: 12 }} />
+        
+        {/* Context selector */}
+        <ContextSelector
           contextItems={contextItems || []}
           currentPage={currentPage || 1}
           selectedLevel={selectedLevel}
-          onContextChange={handleContextChange}
+          onChange={handleContextChange}
+          disabled={isStreaming}
         />
       </div>
 
@@ -532,17 +596,6 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
           }
           100% {
             background-position: -150% center;
-          }
-        }
-        
-        @keyframes pulse-dot {
-          0%, 100% {
-            opacity: 1;
-            transform: scale(1);
-          }
-          50% {
-            opacity: 0.5;
-            transform: scale(0.8);
           }
         }
       `}</style>

@@ -1,17 +1,14 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useTranslation } from "react-i18next"
 import { fetchDocuments, type DocumentMetadata } from "../../services/uploadService"
 
 interface DocumentListProps {
   refreshTrigger?: number
   onDocumentClick: (documentId: string) => void
-  loadingDocumentId?: string | null
 }
 
-export function DocumentList({ refreshTrigger, onDocumentClick, loadingDocumentId }: DocumentListProps) {
-  const { t } = useTranslation()
+export function DocumentList({ refreshTrigger, onDocumentClick }: DocumentListProps) {
   const [documents, setDocuments] = useState<DocumentMetadata[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -24,7 +21,7 @@ export function DocumentList({ refreshTrigger, onDocumentClick, loadingDocumentI
       const docs = await fetchDocuments()
       setDocuments(docs)
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("documentList.error"))
+      setError(err instanceof Error ? err.message : "Failed to load documents")
     } finally {
       setLoading(false)
     }
@@ -58,7 +55,7 @@ export function DocumentList({ refreshTrigger, onDocumentClick, loadingDocumentI
 
   const formatFileSize = (bytes: number | null | undefined): string => {
     if (bytes === null || bytes === undefined || bytes < 0) {
-      return t("documentList.unknownSize")
+      return "Unknown size"
     }
 
     if (bytes < 1024) return bytes + " B"
@@ -67,12 +64,12 @@ export function DocumentList({ refreshTrigger, onDocumentClick, loadingDocumentI
   }
 
   const formatDate = (dateStr: string): string => {
-    if (!dateStr) return t("documentList.unknownDate")
+    if (!dateStr) return "Unknown date"
 
     const date = new Date(dateStr)
 
     if (isNaN(date.getTime())) {
-      return t("documentList.invalidDate")
+      return "Invalid date"
     }
 
     return date.toLocaleDateString("en-US", {
@@ -86,7 +83,7 @@ export function DocumentList({ refreshTrigger, onDocumentClick, loadingDocumentI
     return (
       <div className="document-list-loading">
         <div className="document-list-loading-icon">⏳</div>
-        <p className="document-list-loading-text">{t("documentList.loadingDocuments")}</p>
+        <p className="document-list-loading-text">Loading documents...</p>
       </div>
     )
   }
@@ -95,10 +92,10 @@ export function DocumentList({ refreshTrigger, onDocumentClick, loadingDocumentI
     return (
       <div className="document-list-error">
         <p className="document-list-error-text">
-          <strong>{t("documentList.error")}</strong> {error}
+          <strong>Error:</strong> {error}
         </p>
         <button onClick={loadDocuments} className="document-list-error-button">
-          {t("documentList.retry")}
+          Retry
         </button>
       </div>
     )
@@ -107,7 +104,7 @@ export function DocumentList({ refreshTrigger, onDocumentClick, loadingDocumentI
   if (documents.length === 0) {
     return (
       <div className="info-card">
-        <div className="info-card-title">{t("documentList.moreCanDo")}</div>
+        <div className="info-card-title">MORE OF WHAT YOU CAN DO:</div>
 
         <div className="info-card-items">
           <div className="info-card-item">
@@ -124,8 +121,8 @@ export function DocumentList({ refreshTrigger, onDocumentClick, loadingDocumentI
               <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
             </svg>
             <div className="info-card-content">
-              <span className="info-card-item-title">{t("documentList.takeFilesAnywhere")}</span>{" "}
-              <span className="info-card-item-description">{t("documentList.takeFilesAnywhereDesc")}</span>
+              <span className="info-card-item-title">Take Your Files Anywhere</span>{" "}
+              <span className="info-card-item-description">for easy access on all your devices</span>
             </div>
           </div>
 
@@ -143,8 +140,8 @@ export function DocumentList({ refreshTrigger, onDocumentClick, loadingDocumentI
               <polyline points="14 2 14 8 20 8"></polyline>
             </svg>
             <div className="info-card-content">
-              <span className="info-card-item-title">{t("documentList.supportedFiles")}</span>{" "}
-              <span className="info-card-item-description">{t("documentList.supportedFilesDesc")}</span>
+              <span className="info-card-item-title">Supported Files</span>{" "}
+              <span className="info-card-item-description">upload PDF files with a maximum size of 25 MB</span>
             </div>
           </div>
         </div>
@@ -167,7 +164,7 @@ export function DocumentList({ refreshTrigger, onDocumentClick, loadingDocumentI
           >
             <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2" />
           </svg>
-          {t("documentList.refresh")}
+          Refresh
         </button>
       </div>
 
@@ -177,17 +174,17 @@ export function DocumentList({ refreshTrigger, onDocumentClick, loadingDocumentI
           {documents.map((doc) => (
             <button
               key={doc.id}
-              onClick={() => loadingDocumentId !== doc.id && onDocumentClick(doc.id)}
+              onClick={() => onDocumentClick(doc.id)}
               style={{
                 textAlign: 'left',
                 padding: 12,
                 border: '1px solid #EEF0F3',
                 borderRadius: 12,
-                backgroundColor: loadingDocumentId === doc.id ? '#f8f9fa' : 'white',
+                backgroundColor: 'white',
                 display: 'flex',
                 gap: 12,
                 alignItems: 'flex-start',
-                cursor: loadingDocumentId === doc.id ? 'wait' : 'pointer',
+                cursor: 'pointer',
               }}
             >
               <svg
@@ -209,23 +206,15 @@ export function DocumentList({ refreshTrigger, onDocumentClick, loadingDocumentI
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span className="document-name" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {doc.title || t("documentList.untitledDocument")}
+                    {doc.title || 'Untitled Document'}
                   </span>
                   {doc.status === 'uploaded' && (
                     <span className="document-questions-badge">{Math.floor(Math.random() * 10) + 1}</span>
                   )}
                 </div>
                 <div style={{ display: 'flex', gap: 12, marginTop: 8, color: '#6e7787', fontSize: 13 }}>
-                  {loadingDocumentId === doc.id ? (
-                    <span>{t("documentList.loading")}</span>
-                  ) : doc.status === "uploaded" ? (
-                    <>
-                      <span>{t("documentList.sizeLabel")} {formatFileSize(doc.sizeBytes)}</span>
-                      <span>{t("documentList.modifiedLabel")} {formatDate(doc.createdAt)}</span>
-                    </>
-                  ) : (
-                    <span>{t("documentList.loading")}</span>
-                  )}
+                  <span>Size: {formatFileSize(doc.sizeBytes)}</span>
+                  <span>Modified: {formatDate(doc.createdAt)}</span>
                 </div>
               </div>
             </button>
@@ -236,22 +225,15 @@ export function DocumentList({ refreshTrigger, onDocumentClick, loadingDocumentI
           <table className="document-table">
             <thead className="document-table-header">
               <tr>
-                <th>{t("documentList.name")}</th>
-                <th>{t("documentList.size")}</th>
-                <th>{t("documentList.lastModified")}</th>
-                <th>{t("documentList.questions")}</th>
+                <th>Name</th>
+                <th>Size</th>
+                <th>Last modified</th>
+                <th>Questions</th>
               </tr>
             </thead>
             <tbody className="document-table-body">
               {documents.map((doc) => (
-                <tr 
-                  key={doc.id} 
-                  onClick={() => loadingDocumentId !== doc.id && onDocumentClick(doc.id)}
-                  style={{ 
-                    cursor: loadingDocumentId === doc.id ? 'wait' : 'pointer',
-                    backgroundColor: loadingDocumentId === doc.id ? '#f8f9fa' : 'transparent'
-                  }}
-                >
+                <tr key={doc.id} onClick={() => onDocumentClick(doc.id)}>
                   <td>
                     <div className="document-name-cell">
                       <svg
@@ -269,15 +251,11 @@ export function DocumentList({ refreshTrigger, onDocumentClick, loadingDocumentI
                         <line x1="16" y1="17" x2="8" y2="17"></line>
                         <polyline points="10 9 9 9 8 9"></polyline>
                       </svg>
-                      <span className="document-name">{doc.title || t("documentList.untitledDocument")}</span>
+                      <span className="document-name">{doc.title || "Untitled Document"}</span>
                     </div>
                   </td>
-                  <td className="document-size">
-                    {loadingDocumentId === doc.id ? t("documentList.loading") : (doc.status === "uploaded" ? formatFileSize(doc.sizeBytes) : t("documentList.loading"))}
-                  </td>
-                  <td className="document-date">
-                    {loadingDocumentId === doc.id ? t("documentList.loading") : (doc.status === "uploaded" ? formatDate(doc.createdAt) : t("documentList.loading"))}
-                  </td>
+                  <td className="document-size">{formatFileSize(doc.sizeBytes)}</td>
+                  <td className="document-date">{formatDate(doc.createdAt)}</td>
                   <td>
                     {doc.status === "uploaded" && (
                       <span className="document-questions-badge">{Math.floor(Math.random() * 10) + 1}</span>

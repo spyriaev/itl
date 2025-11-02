@@ -1,5 +1,4 @@
 import React, { useState } from 'react'
-import { useTranslation } from 'react-i18next'
 import { useAuth } from '../../contexts/AuthContext'
 
 interface AuthModalProps {
@@ -7,7 +6,6 @@ interface AuthModalProps {
 }
 
 export function AuthModal({ onClose }: AuthModalProps) {
-  const { t } = useTranslation()
   const [mode, setMode] = useState<'signin' | 'signup'>('signin')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -31,13 +29,13 @@ export function AuthModal({ onClose }: AuthModalProps) {
         setError(error.message)
       } else {
         if (mode === 'signup') {
-          setError(t("authModal.signUpSuccess"))
+          setError('Sign up successful! Please check your email to confirm your account.')
         } else if (onClose) {
           onClose()
         }
       }
     } catch (err) {
-      setError(t("authModal.unexpectedError"))
+      setError('An unexpected error occurred')
     } finally {
       setLoading(false)
     }
@@ -53,7 +51,7 @@ export function AuthModal({ onClose }: AuthModalProps) {
         setError(error.message)
       }
     } catch (err) {
-      setError(t("authModal.googleSignInFailed"))
+      setError('Failed to sign in with Google')
     } finally {
       setLoading(false)
     }
@@ -64,7 +62,7 @@ export function AuthModal({ onClose }: AuthModalProps) {
       <div style={styles.modal}>
         <div style={styles.header}>
           <h2 style={styles.title}>
-            {mode === 'signin' ? t("authModal.signIn") : t("authModal.signUp")}
+            {mode === 'signin' ? 'Sign In' : 'Sign Up'}
           </h2>
         </div>
 
@@ -77,7 +75,7 @@ export function AuthModal({ onClose }: AuthModalProps) {
             onClick={() => setMode('signin')}
             disabled={loading}
           >
-            {t("authModal.signIn")}
+            Sign In
           </button>
           <button
             style={{
@@ -87,13 +85,13 @@ export function AuthModal({ onClose }: AuthModalProps) {
             onClick={() => setMode('signup')}
             disabled={loading}
           >
-            {t("authModal.signUp")}
+            Sign Up
           </button>
         </div>
 
         <form onSubmit={handleSubmit} style={styles.form}>
           <div style={styles.formGroup}>
-            <label style={styles.label}>{t("authModal.email")}</label>
+            <label style={styles.label}>Email</label>
             <input
               type="email"
               value={email}
@@ -101,12 +99,12 @@ export function AuthModal({ onClose }: AuthModalProps) {
               style={styles.input}
               required
               disabled={loading}
-              placeholder={t("authModal.emailPlaceholder")}
+              placeholder="you@example.com"
             />
           </div>
 
           <div style={styles.formGroup}>
-            <label style={styles.label}>{t("authModal.password")}</label>
+            <label style={styles.label}>Password</label>
             <input
               type="password"
               value={password}
@@ -114,7 +112,7 @@ export function AuthModal({ onClose }: AuthModalProps) {
               style={styles.input}
               required
               disabled={loading}
-              placeholder={t("authModal.passwordPlaceholder")}
+              placeholder="••••••••"
               minLength={6}
             />
           </div>
@@ -135,12 +133,12 @@ export function AuthModal({ onClose }: AuthModalProps) {
             onMouseLeave={() => setHoveredSubmit(false)}
             disabled={loading}
           >
-            {loading ? t("authModal.loading") : mode === 'signin' ? t("authModal.signIn") : t("authModal.signUp")}
+            {loading ? 'Loading...' : mode === 'signin' ? 'Sign In' : 'Sign Up'}
           </button>
         </form>
 
         <div style={styles.divider}>
-          <span style={styles.dividerText}>{t("authModal.or")}</span>
+          <span style={styles.dividerText}>OR</span>
         </div>
 
         <button
@@ -171,7 +169,7 @@ export function AuthModal({ onClose }: AuthModalProps) {
               d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
             />
           </svg>
-          {t("authModal.continueWithGoogle")}
+          Continue with Google
         </button>
       </div>
     </div>
@@ -321,6 +319,9 @@ const styles: { [key: string]: React.CSSProperties } = {
 // Add divider line using ::before pseudo-element effect
 const dividerStyle = document.createElement('style')
 dividerStyle.textContent = `
+  div[style*="position: relative"] {
+    border-top: 1px solid #e5e7eb;
+  }
   input:focus {
     outline: none;
     border-color: #3b82f6;
