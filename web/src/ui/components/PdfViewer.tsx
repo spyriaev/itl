@@ -54,6 +54,7 @@ interface PdfViewerProps {
 }
 
 function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRenderComplete }: PdfViewerProps) {
+  const { messages, isStreaming: chatIsStreaming } = useChat()
   const [documentInfo, setDocumentInfo] = useState<DocumentViewInfo | null>(preloadedDocumentInfo || null)
   const [numPages, setNumPages] = useState<number>(0)
   const [currentPage, setCurrentPage] = useState<number>(1)
@@ -68,15 +69,48 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
   const [isTablet, setIsTablet] = useState<boolean>(window.innerWidth >= 640 && window.innerWidth < 1024)
   const [pageQuestionsMap, setPageQuestionsMap] = useState<Map<number, PageQuestionsData>>(new Map())
   const [pageHeights, setPageHeights] = useState<Map<number, number>>(new Map())
+  const [pageWidths, setPageWidths] = useState<Map<number, number>>(new Map())
   const [visiblePageRange, setVisiblePageRange] = useState<{ start: number, end: number }>({ start: 1, end: 10 })
   const [assistantButtonPosition, setAssistantButtonPosition] = useState<{ right: number | string, bottom: number | string }>({ right: 24, bottom: 24 })
 
   // Refs для отслеживания скролла
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const pageRefs = useRef<(HTMLDivElement | null)[]>([])
+  const pdfPageRefs = useRef<(HTMLDivElement | null)[]>([])
+  
+  // Track previous streaming state to detect when message completes
+  const prevIsStreamingRef = useRef(chatIsStreaming)
+  const lastUserMessagePageRef = useRef<number | null>(null)
 
   // Track current scale to detect race conditions during zoom operations
   const currentScaleRef = useRef(scale)
+
+  // Update current scale ref and page widths when scale changes
+  useEffect(() => {
+    currentScaleRef.current = scale
+    // Update page widths when scale changes - wait for DOM to update
+    const updateWidths = () => {
+      const newWidths = new Map<number, number>()
+      for (let i = 0; i < pdfPageRefs.current.length; i++) {
+        const pageContainer = pdfPageRefs.current[i]
+        if (pageContainer) {
+          const canvas = pageContainer.querySelector('canvas')
+          if (canvas) {
+            const width = canvas.getBoundingClientRect().width
+            if (width > 0) {
+              newWidths.set(i + 1, width)
+            }
+          }
+        }
+      }
+      if (newWidths.size > 0) {
+        setPageWidths(newWidths)
+      }
+    }
+    // Delay to allow DOM to update after scale change
+    const timeoutId = setTimeout(updateWidths, 150)
+    return () => clearTimeout(timeoutId)
+  }, [scale])
 
   // Store timeout ID for updateVisiblePageRange to prevent accumulation
   const updateVisiblePageRangeTimeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -394,6 +428,52 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
 
     fetchPageQuestions(pagesToFetch)
   }, [documentId, numPages, currentPage, continuousScroll])
+
+  // Update page questions when a new message with page context is completed
+  useEffect(() => {
+    // Check if streaming just completed
+    const wasStreaming = prevIsStreamingRef.current
+    const justCompleted = wasStreaming && !chatIsStreaming
+    
+    if (justCompleted && messages.length > 0) {
+      // Find the last user message with pageContext
+      const lastUserMessage = [...messages].reverse().find(msg => 
+        msg.role === 'user' && msg.pageContext !== undefined && msg.pageContext !== null
+      )
+      
+      if (lastUserMessage && lastUserMessage.pageContext) {
+        const pageNum = lastUserMessage.pageContext
+        lastUserMessagePageRef.current = pageNum
+        
+        // Refetch questions for this page after a short delay to ensure backend has saved the message
+        const timeoutId = setTimeout(async () => {
+          try {
+            // Remove the page from cache to force refetch
+            setPageQuestionsMap(prev => {
+              const newMap = new Map(prev)
+              newMap.delete(pageNum)
+              return newMap
+            })
+            
+            // Clear fetching flag to allow refetch
+            fetchingPagesRef.current.delete(pageNum)
+            
+            // Fetch updated questions
+            const questionsData = await chatService.getPageQuestions(documentId, pageNum)
+            if (questionsData) {
+              setPageQuestionsMap(prev => new Map(prev).set(pageNum, questionsData))
+            }
+          } catch (err) {
+            console.error(`Failed to refresh questions for page ${pageNum}:`, err)
+          }
+        }, 500) // Small delay to ensure backend has processed the message
+        
+        return () => clearTimeout(timeoutId)
+      }
+    }
+    
+    prevIsStreamingRef.current = chatIsStreaming
+  }, [chatIsStreaming, messages, documentId])
 
   // Handle question click - open chat panel and navigate to message
   const handleQuestionClick = useCallback((threadId: string, messageId: string) => {
@@ -1294,77 +1374,108 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
                       >
                         {isInRange ? (
                           <>
-                            <Page
-                              key={`page-${pageNumber}-scale-${scale}`}
-                              pageNumber={pageNumber}
-                              scale={scale}
-                              renderTextLayer={shouldRenderTextLayer}
-                              renderAnnotationLayer={true}
-                              loading={
-                                <div style={{
-                                  width: '100%',
-                                  height: `${knownHeight}px`,
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  color: '#9CA3AF',
-                                  background: 'linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 37%, #f3f4f6 63%)',
-                                  backgroundSize: '400% 100%',
-                                  animation: 'pulse 1.2s ease-in-out infinite',
-                                  borderRadius: 8,
-                                }}>
-                                  Loading page {pageNumber}...
-                                </div>
-                              }
-                              onLoadSuccess={(page) => {
-                                // Get the scale captured in the closure (scale when this Page rendered)
-                                const capturedScale = scale
-                                // Get the current scale (may have changed due to zoom)
-                                const currentScale = currentScaleRef.current
-
-                                // Check if the captured scale still matches the current scale
-                                // If not, ignore this callback to prevent race condition during zoom
-                                if (capturedScale !== currentScale) {
-                                  console.log(`Ignoring page ${pageNumber} height (captured: ${capturedScale}, current: ${currentScale})`)
-                                  return
-                                }
-
-                                const viewport = page.getViewport({ scale: capturedScale })
-                                const height = viewport.height + 64 // padding + margin
-                                setPageHeights(prev => new Map(prev).set(pageNumber, height))
-                                
-                                // Track rendered pages and call onRenderComplete when first visible pages are ready
-                                if (!renderCompleteCalledRef.current) {
-                                  renderedPagesRef.current.add(pageNumber)
-                                  
-                                  // Check if this page is in the visible range
-                                  const isInVisibleRange = pageNumber >= visiblePageRange.start && pageNumber <= visiblePageRange.end
-                                  
-                                  if (isInVisibleRange) {
-                                    // Count how many visible pages have been rendered
-                                    let renderedVisibleCount = 0
-                                    const visibleRangeSize = visiblePageRange.end - visiblePageRange.start + 1
-                                    const minVisiblePages = Math.min(3, visibleRangeSize) // Wait for at least 3 visible pages or all if less
-                                    
-                                    for (let i = visiblePageRange.start; i <= visiblePageRange.end; i++) {
-                                      if (renderedPagesRef.current.has(i)) {
-                                        renderedVisibleCount++
-                                      }
-                                    }
-                                    
-                                    // When we've rendered enough visible pages, mark as complete
-                                    if (renderedVisibleCount >= minVisiblePages) {
-                                      renderCompleteCalledRef.current = true
-                                      setIsFullyRendered(true)
-                                      // Use requestAnimationFrame to ensure DOM is updated
-                                      requestAnimationFrame(() => {
-                                        onRenderComplete?.()
+                            <div
+                              ref={(el) => {
+                                pdfPageRefs.current[index] = el
+                                // Update page width when ref is set or changes
+                                if (el) {
+                                  // Use ResizeObserver or setTimeout to get actual rendered width
+                                  setTimeout(() => {
+                                    const canvas = el.querySelector('canvas')
+                                    if (canvas) {
+                                      const width = canvas.getBoundingClientRect().width
+                                      setPageWidths(prev => {
+                                        const newMap = new Map(prev)
+                                        newMap.set(pageNumber, width)
+                                        return newMap
                                       })
                                     }
-                                  }
+                                  }, 0)
                                 }
                               }}
-                            />
+                            >
+                              <Page
+                                key={`page-${pageNumber}-scale-${scale}`}
+                                pageNumber={pageNumber}
+                                scale={scale}
+                                renderTextLayer={shouldRenderTextLayer}
+                                renderAnnotationLayer={true}
+                                loading={
+                                  <div style={{
+                                    width: '100%',
+                                    height: `${knownHeight}px`,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    color: '#9CA3AF',
+                                    background: 'linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 37%, #f3f4f6 63%)',
+                                    backgroundSize: '400% 100%',
+                                    animation: 'pulse 1.2s ease-in-out infinite',
+                                    borderRadius: 8,
+                                  }}>
+                                    Loading page {pageNumber}...
+                                  </div>
+                                }
+                                onLoadSuccess={(page) => {
+                                  // Get the scale captured in the closure (scale when this Page rendered)
+                                  const capturedScale = scale
+                                  // Get the current scale (may have changed due to zoom)
+                                  const currentScale = currentScaleRef.current
+
+                                  // Check if the captured scale still matches the current scale
+                                  // If not, ignore this callback to prevent race condition during zoom
+                                  if (capturedScale !== currentScale) {
+                                    console.log(`Ignoring page ${pageNumber} height (captured: ${capturedScale}, current: ${currentScale})`)
+                                    return
+                                  }
+
+                                  const viewport = page.getViewport({ scale: capturedScale })
+                                  const height = viewport.height + 64 // padding + margin
+                                  const width = viewport.width
+                                  setPageHeights(prev => {
+                                    const newMap = new Map(prev)
+                                    newMap.set(pageNumber, height)
+                                    return newMap
+                                  })
+                                  setPageWidths(prev => {
+                                    const newMap = new Map(prev)
+                                    newMap.set(pageNumber, width)
+                                    return newMap
+                                  })
+                                  
+                                  // Track rendered pages and call onRenderComplete when first visible pages are ready
+                                  if (!renderCompleteCalledRef.current) {
+                                    renderedPagesRef.current.add(pageNumber)
+                                    
+                                    // Check if this page is in the visible range
+                                    const isInVisibleRange = pageNumber >= visiblePageRange.start && pageNumber <= visiblePageRange.end
+                                    
+                                    if (isInVisibleRange) {
+                                      // Count how many visible pages have been rendered
+                                      let renderedVisibleCount = 0
+                                      const visibleRangeSize = visiblePageRange.end - visiblePageRange.start + 1
+                                      const minVisiblePages = Math.min(3, visibleRangeSize) // Wait for at least 3 visible pages or all if less
+                                      
+                                      for (let i = visiblePageRange.start; i <= visiblePageRange.end; i++) {
+                                        if (renderedPagesRef.current.has(i)) {
+                                          renderedVisibleCount++
+                                        }
+                                      }
+                                      
+                                      // When we've rendered enough visible pages, mark as complete
+                                      if (renderedVisibleCount >= minVisiblePages) {
+                                        renderCompleteCalledRef.current = true
+                                        setIsFullyRendered(true)
+                                        // Use requestAnimationFrame to ensure DOM is updated
+                                        requestAnimationFrame(() => {
+                                          onRenderComplete?.()
+                                        })
+                                      }
+                                    }
+                                  }
+                                }}
+                              />
+                            </div>
                             {/* Page number indicator */}
                             <div style={{
                               textAlign: 'center',
@@ -1377,10 +1488,59 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
                             </div>
 
                             {/* Related questions for this page */}
-                            <PageRelatedQuestions
-                              questionsData={pageQuestionsMap.get(pageNumber) || null}
-                              onQuestionClick={handleQuestionClick}
-                            />
+                            <div style={{
+                              width: pageWidths.get(pageNumber) ? `${pageWidths.get(pageNumber)}px` : '100%',
+                              maxWidth: '100%',
+                              overflow: 'hidden',
+                              boxSizing: 'border-box',
+                              margin: '0 auto',
+                            }}>
+                              <PageRelatedQuestions
+                                questionsData={pageQuestionsMap.get(pageNumber) || null}
+                                onQuestionClick={handleQuestionClick}
+                                isStreaming={(() => {
+                                  if (!chatIsStreaming || messages.length === 0) return false
+                                  // Find the last user message with pageContext matching this page
+                                  const lastUserMessage = [...messages].reverse().find(msg =>
+                                    msg.role === 'user' &&
+                                    msg.pageContext === pageNumber
+                                  )
+                                  // Show shimmer if there's a user message for this page and streaming is active
+                                  // and either no assistant message exists yet, or the assistant message is empty
+                                  if (!lastUserMessage) return false
+                                  const assistantMessage = messages.find(msg =>
+                                    msg.role === 'assistant' &&
+                                    msg.pageContext === pageNumber &&
+                                    // Find message created after the user message
+                                    messages.indexOf(msg) > messages.indexOf(lastUserMessage)
+                                  )
+                                  return !assistantMessage || !assistantMessage.content || assistantMessage.content.trim() === ''
+                                })()}
+                                currentPageNumber={
+                                  chatIsStreaming && messages.length > 0
+                                    ? (() => {
+                                        const lastUserMessage = [...messages].reverse().find(msg =>
+                                          msg.role === 'user' &&
+                                          msg.pageContext === pageNumber
+                                        )
+                                        return lastUserMessage ? pageNumber : undefined
+                                      })()
+                                    : undefined
+                                }
+                                streamingQuestionText={
+                                  chatIsStreaming && messages.length > 0
+                                    ? (() => {
+                                        const lastUserMessage = [...messages].reverse().find(msg =>
+                                          msg.role === 'user' &&
+                                          msg.pageContext === pageNumber &&
+                                          msg.content
+                                        )
+                                        return lastUserMessage?.content || undefined
+                                      })()
+                                    : undefined
+                                }
+                              />
+                            </div>
                           </>
                         ) : (
                           <div style={{

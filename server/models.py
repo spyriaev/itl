@@ -157,6 +157,7 @@ class PageQuestionResponse(BaseModel):
     threadId: str
     threadTitle: str
     content: str
+    answer: str | None = None  # First assistant response to this question
     createdAt: str
     
     class Config:

@@ -46,6 +46,7 @@ export interface PageQuestion {
   threadId: string
   threadTitle: string
   content: string
+  answer?: string | null  // First assistant response to this question
   createdAt: string
 }
 
