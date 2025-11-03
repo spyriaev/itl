@@ -52,8 +52,8 @@ export function PageRelatedQuestions({
 
   return (
     <div style={{
-      width: '100%',
-      maxWidth: '100%',
+      width: 'fit-content',
+      maxWidth: 'min(100%, calc(100vw - 80px))',
       marginTop: 24,
       boxSizing: 'border-box',
       overflow: 'hidden', // Prevent content from overflowing
@@ -93,8 +93,8 @@ export function PageRelatedQuestions({
 
       {/* Questions container - styled as footnotes */}
       <div style={{
-        width: '100%',
-        maxWidth: '100%',
+        width: 'fit-content',
+        maxWidth: 'min(100%, calc(100vw - 80px))',
         display: 'flex',
         flexDirection: 'column',
         gap: 10,
@@ -104,8 +104,8 @@ export function PageRelatedQuestions({
         {/* Streaming indicator - shows when model is thinking/answering */}
         {isStreaming && currentPageNumber !== undefined && (
           <div style={{
-            width: '100%',
-            maxWidth: '100%',
+            width: 'fit-content',
+            maxWidth: 'min(100%, calc(100vw - 80px))',
             padding: '8px 0',
             boxSizing: 'border-box',
             overflow: 'hidden',
@@ -167,8 +167,8 @@ export function PageRelatedQuestions({
               }
             }}
             style={{
-              width: '100%',
-              maxWidth: '100%',
+              width: 'fit-content',
+              maxWidth: 'min(100%, calc(100vw - 80px))',
               padding: '8px 0',
               background: 'none',
               border: 'none',

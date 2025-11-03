@@ -83,6 +83,7 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
   const selectionRangeRef = useRef<Range | null>(null)
   const questionTimestampRef = useRef<number | null>(null)
   const questionPageNumberRef = useRef<number | null>(null)
+  const questionThreadIdRef = useRef<string | null>(null)
 
   // Refs для отслеживания скролла
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -459,13 +460,71 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
     prevIsStreamingRef.current = chatIsStreaming
   }, [chatIsStreaming, messages, documentId])
 
-  // Handle question click - open chat panel and navigate to message
-  const handleQuestionClick = useCallback((threadId: string, messageId: string) => {
-    if (!isChatVisible) {
-      setIsChatVisible(true)
+  // Handle question click - open full answer in FloatingAnswer
+  const handleQuestionClick = useCallback(async (threadId: string, messageId: string) => {
+    try {
+      // Load thread messages to get full answer
+      const threadWithMessages = await chatService.getThreadMessages(threadId)
+      
+      // Find the question message
+      const questionMessage = threadWithMessages.messages.find(msg => msg.id === messageId)
+      if (!questionMessage || questionMessage.role !== 'user') {
+        // Fallback: open chat panel
+        if (!isChatVisible) {
+          setIsChatVisible(true)
+        }
+        navigateToMessage(threadId, messageId)
+        return
+      }
+      
+      // Find the index of the question message
+      const questionIndex = threadWithMessages.messages.findIndex(msg => msg.id === messageId)
+      
+      // Find the next assistant message (answer)
+      let answerMessage = null
+      for (let i = questionIndex + 1; i < threadWithMessages.messages.length; i++) {
+        if (threadWithMessages.messages[i].role === 'assistant') {
+          answerMessage = threadWithMessages.messages[i]
+          break
+        }
+      }
+      
+      // Get question text and answer text
+      const questionText = questionMessage.content
+      const answerText = answerMessage?.content || ''
+      
+      // Check if answer is still streaming (if activeThread matches and isStreaming is true)
+      const isAnswerStreaming = activeThread?.id === threadId && 
+                                chatIsStreaming && 
+                                (!answerMessage || answerText === '')
+      
+      // Open FloatingAnswer with full answer
+      setFloatingAnswer({
+        selectedText: '', // Not needed for question click
+        question: questionText,
+        answer: answerText,
+        isStreaming: isAnswerStreaming,
+        position: undefined, // Center the modal
+        questionTimestamp: new Date(questionMessage.createdAt).getTime()
+      })
+      
+      // If answer is streaming, track updates
+      if (isAnswerStreaming) {
+        questionPageNumberRef.current = questionMessage.pageContext || null
+        questionTimestampRef.current = new Date(questionMessage.createdAt).getTime()
+        questionThreadIdRef.current = threadId
+      } else {
+        questionThreadIdRef.current = threadId
+      }
+    } catch (err) {
+      console.error('Failed to load thread messages:', err)
+      // Fallback: open chat panel
+      if (!isChatVisible) {
+        setIsChatVisible(true)
+      }
+      navigateToMessage(threadId, messageId)
     }
-    navigateToMessage(threadId, messageId)
-  }, [isChatVisible, navigateToMessage])
+  }, [isChatVisible, navigateToMessage, activeThread, chatIsStreaming])
 
   // Handle text selection
   const handleTextSelection = useCallback((e: MouseEvent) => {
@@ -699,9 +758,11 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
       // Send message without opening chat panel
       if (activeThread) {
         // Use existing thread
+        questionThreadIdRef.current = activeThread.id
         await sendMessage(question, pageNumber, 'page', undefined)
       } else {
-        // Start new conversation
+        // Start new conversation - threadId will be set after thread is created
+        questionThreadIdRef.current = null
         await startNewConversation(documentId, question, pageNumber, 'page', undefined)
       }
 
@@ -778,6 +839,13 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
       selectionRangeRef.current = null
     }
   }, [floatingAnswer])
+
+  // Update questionThreadIdRef when activeThread changes (for new conversations)
+  useEffect(() => {
+    if (floatingAnswer?.isStreaming && activeThread && !questionThreadIdRef.current) {
+      questionThreadIdRef.current = activeThread.id
+    }
+  }, [activeThread, floatingAnswer])
 
   // Clear floating answer when streaming completes
   useEffect(() => {
@@ -2082,7 +2150,7 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
                             {/* Related questions for this page */}
                             <div style={{
                               width: pageWidths.get(pageNumber) ? `${pageWidths.get(pageNumber)}px` : '100%',
-                              maxWidth: '100%',
+                              maxWidth: 'min(100%, calc(100vw - 80px))',
                               overflow: 'hidden',
                               boxSizing: 'border-box',
                               margin: '0 auto',
@@ -2401,6 +2469,7 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
             selectionRangeRef.current = null
             questionTimestampRef.current = null
             questionPageNumberRef.current = null
+            questionThreadIdRef.current = null
           }}
           position={floatingAnswer.position}
         />
