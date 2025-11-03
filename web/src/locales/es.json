@@ -31,7 +31,9 @@
     "modifiedLabel": "Modificado:",
     "unknownSize": "Tamaño desconocido",
     "unknownDate": "Fecha desconocida",
-    "invalidDate": "Fecha inválida"
+    "invalidDate": "Fecha inválida",
+    "shared": "Compartido",
+    "share": "Compartir"
   },
   "chatPanel": {
     "assistant": "Asistente",
@@ -177,5 +179,29 @@
       "button": "Obtén 1 mes de prueba gratis →",
       "badge": "PRÓXIMAMENTE MEJOR OFERTA"
     }
+  },
+  "shareDocument": {
+    "title": "Compartir Documento",
+    "share": "Compartir",
+    "close": "Cerrar",
+    "description": "Crea un enlace de compartición para permitir que otros accedan a este documento y vean todas las preguntas y respuestas.",
+    "createLink": "Crear Enlace de Compartición",
+    "creating": "Creando...",
+    "copy": "Copiar Enlace",
+    "copied": "¡Copiado!",
+    "revoke": "Revocar Enlace",
+    "revoking": "Revocando...",
+    "loading": "Cargando...",
+    "errorLoading": "Error al cargar el estado de compartición",
+    "errorCreating": "Error al crear el enlace de compartición",
+    "errorRevoking": "Error al revocar el enlace de compartición",
+    "errorCopying": "Error al copiar el enlace"
+  },
+  "sharedDocument": {
+    "loading": "Cargando documento compartido...",
+    "error": "Error",
+    "errorLoading": "Error al cargar el documento compartido",
+    "invalidToken": "Token de compartición inválido o expirado",
+    "backToLibrary": "Volver a la Biblioteca"
   }
 }

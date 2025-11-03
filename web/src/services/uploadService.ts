@@ -36,6 +36,8 @@ export interface DocumentMetadata {
   status: string
   createdAt: string
   lastViewedPage?: number | null
+  isShared?: boolean  // Whether this document is shared (not owned by current user)
+  hasActiveShare?: boolean  // Whether this document has an active share link (created by current user)
 }
 
 /**

@@ -127,6 +127,8 @@ class DocumentResponse(BaseModel):
     status: str
     createdAt: str
     lastViewedPage: Optional[int] = None
+    isShared: Optional[bool] = False  # True if document is shared (not owned by current user)
+    hasActiveShare: Optional[bool] = False  # True if document has an active share link (created by current user)
     
     class Config:
         from_attributes = True
@@ -188,6 +190,32 @@ class DocumentStructure(Base):
     document = relationship("Document", back_populates="structure")
     parent = relationship("DocumentStructure", remote_side=[id], backref="children")
 
+class DocumentShare(Base):
+    __tablename__ = "document_shares"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    document_id = Column(UUID(as_uuid=True), ForeignKey("documents.id", ondelete="CASCADE"), nullable=False)
+    share_token = Column(Text, nullable=False, unique=True)
+    created_by = Column(UUID(as_uuid=True), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    revoked_at = Column(DateTime(timezone=True), nullable=True)
+    expires_at = Column(DateTime(timezone=True), nullable=True)
+    
+    # Relationships
+    document = relationship("Document")
+    access_records = relationship("DocumentShareAccess", back_populates="share", cascade="all, delete-orphan")
+
+class DocumentShareAccess(Base):
+    __tablename__ = "document_share_access"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    share_id = Column(UUID(as_uuid=True), ForeignKey("document_shares.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(UUID(as_uuid=True), nullable=False)
+    accessed_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    share = relationship("DocumentShare", back_populates="access_records")
+
 class ThreadWithMessagesResponse(BaseModel):
     id: str
     title: str
@@ -207,6 +235,9 @@ class PageQuestionResponse(BaseModel):
     content: str
     answer: str | None = None  # First assistant response to this question
     createdAt: str
+    userId: str  # ID of the user who asked the question
+    isOwn: bool  # Whether this question belongs to the current user
+    canOpenThread: bool  # Whether the thread can be opened (only for own questions)
     
     class Config:
         from_attributes = True
@@ -293,3 +324,32 @@ class SetUserPlanRequest(BaseModel):
     
     class Config:
         allow_population_by_field_name = True
+
+# Document sharing related models
+class ShareDocumentRequest(BaseModel):
+    expiresAt: Optional[str] = None  # ISO datetime string
+    
+    class Config:
+        allow_population_by_field_name = True
+
+class ShareDocumentResponse(BaseModel):
+    shareToken: str
+    shareUrl: str  # Full URL to access the shared document
+    createdAt: str
+    expiresAt: Optional[str] = None
+    
+    class Config:
+        from_attributes = True
+        populate_by_name = True
+
+class ShareStatusResponse(BaseModel):
+    hasActiveShare: bool
+    shareToken: Optional[str] = None
+    shareUrl: Optional[str] = None
+    createdAt: Optional[str] = None
+    revokedAt: Optional[str] = None
+    expiresAt: Optional[str] = None
+    
+    class Config:
+        from_attributes = True
+        populate_by_name = True

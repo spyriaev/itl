@@ -146,16 +146,25 @@ export function PageRelatedQuestions({
           </div>
         )}
         
-        {questions.map((question) => (
-          <button
-            key={question.id}
-            onClick={() => onQuestionClick(question.threadId, question.id)}
-            onTouchStart={(e) => {
+        {questions.map((question) => {
+          const isOwn = question.isOwn !== false  // Default to true if not specified (backward compatibility)
+          const canOpen = question.canOpenThread !== false  // Default to true if not specified
+          const isOtherUser = !isOwn
+          
+          return (
+            <button
+              key={question.id}
+              onClick={() => canOpen && onQuestionClick(question.threadId, question.id)}
+              onTouchStart={(e) => {
               // Optimize for mobile tap events
-              e.currentTarget.style.opacity = '0.8'
+              if (canOpen) {
+                e.currentTarget.style.opacity = '0.8'
+              }
             }}
             onTouchEnd={(e) => {
-              e.currentTarget.style.opacity = '1'
+              if (canOpen) {
+                e.currentTarget.style.opacity = '1'
+              }
             }}
             style={{
               width: '100%',
@@ -163,28 +172,33 @@ export function PageRelatedQuestions({
               padding: '8px 0',
               background: 'none',
               border: 'none',
-              cursor: 'pointer',
+              cursor: canOpen ? 'pointer' : 'default',
               textAlign: 'left',
-              transition: 'all 0.2s ease',
+              transition: canOpen ? 'all 0.2s ease' : 'none',
               borderRadius: 4,
               boxSizing: 'border-box',
               overflow: 'hidden', // Prevent content from overflowing
+              opacity: isOtherUser ? 0.7 : 1,
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#F9FAFB'
-              e.currentTarget.style.paddingLeft = '4px'
-              e.currentTarget.style.paddingRight = '4px'
+              if (canOpen) {
+                e.currentTarget.style.backgroundColor = '#F9FAFB'
+                e.currentTarget.style.paddingLeft = '4px'
+                e.currentTarget.style.paddingRight = '4px'
+              }
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'transparent'
-              e.currentTarget.style.paddingLeft = '0'
-              e.currentTarget.style.paddingRight = '0'
+              if (canOpen) {
+                e.currentTarget.style.backgroundColor = 'transparent'
+                e.currentTarget.style.paddingLeft = '0'
+                e.currentTarget.style.paddingRight = '0'
+              }
             }}
           >
             {/* Question text - styled as footnote */}
             <div style={{
               fontSize: 11,
-              color: '#6B7280',
+              color: isOtherUser ? '#9CA3AF' : '#6B7280',
               lineHeight: 1.5,
               overflow: 'hidden',
               textOverflow: 'ellipsis',
@@ -202,7 +216,7 @@ export function PageRelatedQuestions({
             {question.answer && (
               <div style={{
                 fontSize: 11,
-                color: '#6B7280',
+                color: isOtherUser ? '#9CA3AF' : '#6B7280',
                 lineHeight: 1.5,
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
@@ -221,7 +235,8 @@ export function PageRelatedQuestions({
               </div>
             )}
           </button>
-        ))}
+          )
+        })}
       </div>
       
       {/* CSS for shimmer animation */}

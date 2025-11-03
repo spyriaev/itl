@@ -17,7 +17,8 @@ from models import (
     CreateThreadRequest, ThreadResponse, CreateMessageRequest, MessageResponse,
     ThreadWithMessagesResponse, Document, ChatThread, PageQuestionsResponse,
     DocumentStructureResponse, ExtractStructureRequest,
-    UserPlanResponse, UserUsageResponse, SetUserPlanRequest
+    UserPlanResponse, UserUsageResponse, SetUserPlanRequest,
+    ShareDocumentRequest, ShareDocumentResponse, ShareStatusResponse
 )
 from repository import (
     create_document, list_documents, get_document_by_id, update_document_progress,
@@ -26,7 +27,10 @@ from repository import (
     save_document_structure, get_document_structure, get_chapter_by_page,
     get_user_plan, set_user_plan, get_user_usage, increment_user_usage,
     check_storage_limit, check_file_count_limit, check_single_file_limit,
-    check_tokens_limit, check_questions_limit
+    check_tokens_limit, check_questions_limit,
+    create_document_share, get_document_share_by_token, revoke_document_share,
+    get_active_document_share, record_share_access, get_document_by_id_or_share,
+    check_user_has_document_access
 )
 from pdf_utils import extract_pdf_outline
 
@@ -204,7 +208,7 @@ async def get_document_view_url(
     user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db)
 ):
-    """Get signed URL for viewing a document"""
+    """Get signed URL for viewing a document. Works for owned and shared documents."""
     # Check database connectivity
     if not test_database_connection():
         raise HTTPException(
@@ -212,8 +216,8 @@ async def get_document_view_url(
             detail="Database not available"
         )
     
-    # Get document and verify ownership
-    document = get_document_by_id(db, document_id, user_id)
+    # Get document and verify ownership or shared access
+    document = get_document_by_id_or_share(db, document_id, user_id)
     if not document:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -272,7 +276,7 @@ async def update_view_progress(
             detail="Page number must be greater than 0"
         )
     
-    # Update progress
+    # Update progress (works for owned and shared documents)
     success = update_document_progress(db, document_id, request.page, user_id)
     if not success:
         raise HTTPException(
@@ -281,6 +285,237 @@ async def update_view_progress(
         )
     
     return {"message": "Progress updated successfully"}
+
+# Document sharing API endpoints
+@app.post("/api/documents/{document_id}/share", response_model=ShareDocumentResponse)
+async def create_share_endpoint(
+    document_id: str,
+    request: ShareDocumentRequest,
+    user_id: str = Depends(get_current_user_id),
+    db: Session = Depends(get_db)
+):
+    """Create a share link for a document"""
+    # Check database connectivity
+    if not test_database_connection():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database not available"
+        )
+    
+    # Verify document exists and belongs to user
+    document = get_document_by_id(db, document_id, user_id)
+    if not document:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found"
+        )
+    
+    # Check if there's already an active share
+    existing_share = get_active_document_share(db, document_id)
+    if existing_share:
+        # Return existing share
+        base_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
+        share_url = f"{base_url}/share/{existing_share.share_token}"
+        return ShareDocumentResponse(
+            shareToken=existing_share.share_token,
+            shareUrl=share_url,
+            createdAt=existing_share.created_at.isoformat(),
+            expiresAt=existing_share.expires_at.isoformat() if existing_share.expires_at else None
+        )
+    
+    # Parse expires_at if provided
+    expires_at = None
+    if request.expiresAt:
+        try:
+            expires_at = datetime.fromisoformat(request.expiresAt.replace('Z', '+00:00'))
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid expiresAt format. Use ISO 8601 format."
+            )
+    
+    # Create new share
+    share = create_document_share(db, document_id, user_id, expires_at)
+    
+    # Generate share URL
+    base_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
+    share_url = f"{base_url}/share/{share.share_token}"
+    
+    return ShareDocumentResponse(
+        shareToken=share.share_token,
+        shareUrl=share_url,
+        createdAt=share.created_at.isoformat(),
+        expiresAt=share.expires_at.isoformat() if share.expires_at else None
+    )
+
+@app.get("/api/documents/{document_id}/share", response_model=ShareStatusResponse)
+async def get_share_status_endpoint(
+    document_id: str,
+    user_id: str = Depends(get_current_user_id),
+    db: Session = Depends(get_db)
+):
+    """Get share status for a document"""
+    # Check database connectivity
+    if not test_database_connection():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database not available"
+        )
+    
+    # Verify document exists and belongs to user
+    document = get_document_by_id(db, document_id, user_id)
+    if not document:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found"
+        )
+    
+    # Get active share if exists
+    share = get_active_document_share(db, document_id)
+    
+    if not share:
+        return ShareStatusResponse(
+            hasActiveShare=False
+        )
+    
+    # Generate share URL
+    base_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
+    share_url = f"{base_url}/share/{share.share_token}"
+    
+    return ShareStatusResponse(
+        hasActiveShare=True,
+        shareToken=share.share_token,
+        shareUrl=share_url,
+        createdAt=share.created_at.isoformat(),
+        revokedAt=share.revoked_at.isoformat() if share.revoked_at else None,
+        expiresAt=share.expires_at.isoformat() if share.expires_at else None
+    )
+
+@app.delete("/api/documents/{document_id}/share")
+async def revoke_share_endpoint(
+    document_id: str,
+    user_id: str = Depends(get_current_user_id),
+    db: Session = Depends(get_db)
+):
+    """Revoke a share link for a document"""
+    # Check database connectivity
+    if not test_database_connection():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database not available"
+        )
+    
+    # Revoke share
+    success = revoke_document_share(db, document_id, user_id)
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Active share not found"
+        )
+    
+    return {"message": "Share revoked successfully"}
+
+@app.get("/api/documents/shared/{share_token}")
+async def get_shared_document_info(
+    share_token: str,
+    db: Session = Depends(get_db)
+):
+    """Get document information by share token (no auth required)"""
+    # Check database connectivity
+    if not test_database_connection():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database not available"
+        )
+    
+    # Get share
+    share = get_document_share_by_token(db, share_token)
+    if not share:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Share not found or expired"
+        )
+    
+    # Get document
+    document = db.query(Document).filter(Document.id == share.document_id).first()
+    if not document:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found"
+        )
+    
+    # Return document metadata (without storage_key for security)
+    return {
+        "id": str(document.id),
+        "title": document.title,
+        "sizeBytes": document.size_bytes,
+        "mime": document.mime,
+        "createdAt": document.created_at.isoformat()
+    }
+
+@app.get("/api/documents/shared/{share_token}/access")
+async def get_shared_document_access(
+    share_token: str,
+    user_id: str = Depends(get_current_user_id),
+    db: Session = Depends(get_db)
+):
+    """Get access to a shared document (requires auth, records access)"""
+    # Check database connectivity
+    if not test_database_connection():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database not available"
+        )
+    
+    # Get share
+    share = get_document_share_by_token(db, share_token)
+    if not share:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Share not found or expired"
+        )
+    
+    # Record access (document will appear in user's list)
+    record_share_access(db, str(share.id), user_id)
+    
+    # Get document
+    document = db.query(Document).filter(Document.id == share.document_id).first()
+    if not document:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found"
+        )
+    
+    try:
+        # Create signed URL (expires in 1 hour)
+        if not supabase:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Supabase storage not available"
+            )
+            
+        signed_url_response = supabase.storage.from_('pdfs').create_signed_url(
+            document.storage_key,
+            expires_in=3600
+        )
+        
+        if not signed_url_response.get('signedURL'):
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to create signed URL"
+            )
+        
+        return {
+            "url": signed_url_response['signedURL'],
+            "lastViewedPage": document.last_viewed_page or 1,
+            "title": document.title,
+            "documentId": str(document.id)
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create signed URL: {str(e)}"
+        )
 
 # Chat API endpoints
 @app.post("/api/documents/{document_id}/chat/threads", response_model=ThreadResponse, status_code=status.HTTP_201_CREATED)
@@ -298,8 +533,15 @@ async def create_chat_thread_endpoint(
             detail="Database not available"
         )
     
-    # Verify document exists and belongs to user
-    document = get_document_by_id(db, document_id, user_id)
+    # Verify document exists and user has access (ownership or shared)
+    if not check_user_has_document_access(db, document_id, user_id):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found"
+        )
+    
+    # Get document for title
+    document = db.query(Document).filter(Document.id == uuid.UUID(document_id)).first()
     if not document:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -317,7 +559,7 @@ async def list_chat_threads_endpoint(
     user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db)
 ):
-    """List chat threads for a document"""
+    """List chat threads for a document. Works for owned and shared documents."""
     # Check database connectivity
     if not test_database_connection():
         raise HTTPException(
@@ -325,9 +567,8 @@ async def list_chat_threads_endpoint(
             detail="Database not available"
         )
     
-    # Verify document exists and belongs to user
-    document = get_document_by_id(db, document_id, user_id)
-    if not document:
+    # Verify document exists and user has access (ownership or shared)
+    if not check_user_has_document_access(db, document_id, user_id):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Document not found"
@@ -350,9 +591,8 @@ async def get_page_questions_endpoint(
             detail="Database not available"
         )
     
-    # Verify document exists and belongs to user
-    document = get_document_by_id(db, document_id, user_id)
-    if not document:
+    # Verify document exists and user has access (ownership or shared)
+    if not check_user_has_document_access(db, document_id, user_id):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Document not found"
@@ -737,7 +977,7 @@ async def get_document_structure_endpoint(
     user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db)
 ):
-    """Get document structure"""
+    """Get document structure. Works for owned and shared documents."""
     # Check database connectivity
     if not test_database_connection():
         raise HTTPException(
@@ -745,9 +985,8 @@ async def get_document_structure_endpoint(
             detail="Database not available"
         )
     
-    # Verify document exists and belongs to user
-    document = get_document_by_id(db, document_id, user_id)
-    if not document:
+    # Verify document exists and user has access (ownership or shared)
+    if not check_user_has_document_access(db, document_id, user_id):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Document not found"
@@ -772,7 +1011,7 @@ async def get_chapter_for_page(
     user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db)
 ):
-    """Get chapter/section information for a specific page"""
+    """Get chapter/section information for a specific page. Works for owned and shared documents."""
     # Check database connectivity
     if not test_database_connection():
         raise HTTPException(
@@ -780,9 +1019,8 @@ async def get_chapter_for_page(
             detail="Database not available"
         )
     
-    # Verify document exists and belongs to user
-    document = get_document_by_id(db, document_id, user_id)
-    if not document:
+    # Verify document exists and user has access (ownership or shared)
+    if not check_user_has_document_access(db, document_id, user_id):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Document not found"

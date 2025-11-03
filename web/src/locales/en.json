@@ -31,7 +31,9 @@
     "modifiedLabel": "Modified:",
     "unknownSize": "Unknown size",
     "unknownDate": "Unknown date",
-    "invalidDate": "Invalid date"
+    "invalidDate": "Invalid date",
+    "shared": "Shared",
+    "share": "Share"
   },
   "chatPanel": {
     "assistant": "Assistant",
@@ -177,5 +179,29 @@
       "button": "Get 1-month free trial →",
       "badge": "SOON BEST OFFER"
     }
+  },
+  "shareDocument": {
+    "title": "Share Document",
+    "share": "Share",
+    "close": "Close",
+    "description": "Create a share link to allow others to access this document and see all questions and answers.",
+    "createLink": "Create Share Link",
+    "creating": "Creating...",
+    "copy": "Copy Link",
+    "copied": "Copied!",
+    "revoke": "Revoke Link",
+    "revoking": "Revoking...",
+    "loading": "Loading...",
+    "errorLoading": "Failed to load share status",
+    "errorCreating": "Failed to create share link",
+    "errorRevoking": "Failed to revoke share link",
+    "errorCopying": "Failed to copy link"
+  },
+  "sharedDocument": {
+    "loading": "Loading shared document...",
+    "error": "Error",
+    "errorLoading": "Failed to load shared document",
+    "invalidToken": "Invalid or expired share token",
+    "backToLibrary": "Back to Library"
   }
 }

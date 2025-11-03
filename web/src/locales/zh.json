@@ -31,7 +31,9 @@
     "modifiedLabel": "修改：",
     "unknownSize": "未知大小",
     "unknownDate": "未知日期",
-    "invalidDate": "无效日期"
+    "invalidDate": "无效日期",
+    "shared": "已共享",
+    "share": "分享"
   },
   "chatPanel": {
     "assistant": "助手",
@@ -177,5 +179,29 @@
       "button": "获得 1 个月免费试用 →",
       "badge": "即将推出 最佳优惠"
     }
+  },
+  "shareDocument": {
+    "title": "分享文档",
+    "share": "分享",
+    "close": "关闭",
+    "description": "创建分享链接以允许其他人访问此文档并查看所有问题和答案。",
+    "createLink": "创建分享链接",
+    "creating": "创建中...",
+    "copy": "复制链接",
+    "copied": "已复制！",
+    "revoke": "撤销链接",
+    "revoking": "撤销中...",
+    "loading": "加载中...",
+    "errorLoading": "加载分享状态失败",
+    "errorCreating": "创建分享链接失败",
+    "errorRevoking": "撤销分享链接失败",
+    "errorCopying": "复制链接失败"
+  },
+  "sharedDocument": {
+    "loading": "正在加载共享文档...",
+    "error": "错误",
+    "errorLoading": "加载共享文档失败",
+    "invalidToken": "无效或已过期的分享令牌",
+    "backToLibrary": "返回库"
   }
 }

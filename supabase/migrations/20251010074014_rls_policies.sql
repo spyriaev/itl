@@ -7,16 +7,44 @@ alter table public.document_chunks enable row level security;
 -- ============================================================
 
 -- Policy: Users can view their own documents
-create policy "Users can view their own documents"
-  on public.documents
-  for select
-  using (auth.uid() = owner_id);
+-- First, drop the "Anyone can view documents" policy from migration 0004 if it exists
+DROP POLICY IF EXISTS "Anyone can view documents" ON public.documents;
+
+-- Use DO block to safely create policy only if it doesn't exist
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies 
+    WHERE schemaname = 'public' 
+    AND tablename = 'documents' 
+    AND policyname = 'Users can view their own documents'
+  ) THEN
+    CREATE POLICY "Users can view their own documents"
+      ON public.documents
+      FOR SELECT
+      USING (auth.uid() = owner_id);
+  END IF;
+END $$;
 
 -- Policy: Users can insert their own documents
-create policy "Users can insert their own documents"
-  on public.documents
-  for insert
-  with check (auth.uid() = owner_id);
+-- First, drop the "Anyone can insert documents" policy from migration 0004 if it exists
+DROP POLICY IF EXISTS "Anyone can insert documents" ON public.documents;
+
+-- Use DO block to safely create policy only if it doesn't exist
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies 
+    WHERE schemaname = 'public' 
+    AND tablename = 'documents' 
+    AND policyname = 'Users can insert their own documents'
+  ) THEN
+    CREATE POLICY "Users can insert their own documents"
+      ON public.documents
+      FOR INSERT
+      WITH CHECK (auth.uid() = owner_id);
+  END IF;
+END $$;
 
 -- Policy: Users can update their own documents
 create policy "Users can update their own documents"

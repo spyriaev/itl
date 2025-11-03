@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { useTranslation } from "react-i18next"
 import { fetchDocuments, type DocumentMetadata } from "../../services/uploadService"
+import { ShareDocumentButton } from "./ShareDocumentButton"
 
 interface DocumentListProps {
   refreshTrigger?: number
@@ -222,12 +223,45 @@ export function DocumentList({ refreshTrigger, onDocumentClick, loadingDocumentI
                 </svg>
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span className="document-name" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {doc.title || t("documentList.untitledDocument")}
-                  </span>
-                  {doc.status === 'uploaded' && (
-                    <span className="document-questions-badge">{Math.floor(Math.random() * 10) + 1}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'space-between', marginBottom: 4 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
+                    <span className="document-name" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>
+                      {doc.title || t("documentList.untitledDocument")}
+                    </span>
+                    {(doc.isShared || doc.hasActiveShare) && (
+                      <span style={{ 
+                        fontSize: 11, 
+                        color: '#6B7280', 
+                        backgroundColor: '#F3F4F6', 
+                        padding: '2px 6px', 
+                        borderRadius: 4,
+                        flexShrink: 0
+                      }}>
+                        {t("documentList.shared")}
+                      </span>
+                    )}
+                    {doc.status === 'uploaded' && (
+                      <span className="document-questions-badge" style={{ flexShrink: 0 }}>{Math.floor(Math.random() * 10) + 1}</span>
+                    )}
+                  </div>
+                  {!doc.isShared && doc.status === "uploaded" && (
+                    <div 
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                      }}
+                      onMouseDown={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                      }}
+                      style={{ cursor: 'default', flexShrink: 0 }}
+                    >
+                      <ShareDocumentButton 
+                        documentId={doc.id}
+                        onShareCreated={loadDocuments}
+                        onShareRevoked={loadDocuments}
+                      />
+                    </div>
                   )}
                 </div>
                 <div style={{ display: 'flex', gap: 12, marginTop: 8, color: '#6e7787', fontSize: 13 }}>
@@ -255,6 +289,7 @@ export function DocumentList({ refreshTrigger, onDocumentClick, loadingDocumentI
                 <th>{t("documentList.size")}</th>
                 <th>{t("documentList.lastModified")}</th>
                 <th>{t("documentList.questions")}</th>
+                <th style={{ width: 100 }}>{t("documentList.share")}</th>
               </tr>
             </thead>
             <tbody className="document-table-body">
@@ -268,26 +303,42 @@ export function DocumentList({ refreshTrigger, onDocumentClick, loadingDocumentI
                   }}
                 >
                   <td>
-                    <div className="document-name-cell">
-                      <div className="document-icon-container">
-                        <PageBadge currentPage={doc.lastViewedPage} />
-                        <svg
-                          className="document-icon"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                          <polyline points="14 2 14 8 20 8"></polyline>
-                          <line x1="16" y1="13" x2="8" y2="13"></line>
-                          <line x1="16" y1="17" x2="8" y2="17"></line>
-                          <polyline points="10 9 9 9 8 9"></polyline>
-                        </svg>
+                    <div className="document-name-cell" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
+                        <div className="document-icon-container">
+                          <PageBadge currentPage={doc.lastViewedPage} />
+                          <svg
+                            className="document-icon"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                            <line x1="16" y1="13" x2="8" y2="13"></line>
+                            <line x1="16" y1="17" x2="8" y2="17"></line>
+                            <polyline points="10 9 9 9 8 9"></polyline>
+                          </svg>
+                        </div>
+                        <span className="document-name" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>
+                          {doc.title || t("documentList.untitledDocument")}
+                        </span>
                       </div>
-                      <span className="document-name">{doc.title || t("documentList.untitledDocument")}</span>
+                      {(doc.isShared || doc.hasActiveShare) && (
+                        <span style={{ 
+                          fontSize: 11, 
+                          color: '#6B7280', 
+                          backgroundColor: '#F3F4F6', 
+                          padding: '2px 6px', 
+                          borderRadius: 4,
+                          flexShrink: 0
+                        }}>
+                          {t("documentList.shared")}
+                        </span>
+                      )}
                     </div>
                   </td>
                   <td className="document-size">
@@ -299,6 +350,20 @@ export function DocumentList({ refreshTrigger, onDocumentClick, loadingDocumentI
                   <td>
                     {doc.status === "uploaded" && (
                       <span className="document-questions-badge">{Math.floor(Math.random() * 10) + 1}</span>
+                    )}
+                  </td>
+                  <td
+                    onClick={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    style={{ cursor: 'default' }}
+                  >
+                    {/* Show share button only for owned documents (not shared from others) */}
+                    {!doc.isShared && doc.status === "uploaded" && (
+                      <ShareDocumentButton 
+                        documentId={doc.id}
+                        onShareCreated={loadDocuments}
+                        onShareRevoked={loadDocuments}
+                      />
                     )}
                   </td>
                 </tr>

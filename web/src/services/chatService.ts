@@ -48,6 +48,9 @@ export interface PageQuestion {
   content: string
   answer?: string | null  // First assistant response to this question
   createdAt: string
+  userId?: string  // ID of the user who asked the question
+  isOwn?: boolean  // Whether this question belongs to the current user
+  canOpenThread?: boolean  // Whether the thread can be opened (only for own questions)
 }
 
 export interface PageQuestionsData {

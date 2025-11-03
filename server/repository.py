@@ -1,7 +1,8 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import desc, and_
+from sqlalchemy import desc, and_, or_
 from typing import List, Optional, Dict, Any
 import uuid
+import secrets
 from datetime import datetime, date, timedelta
 from models import (
     Document, CreateDocumentRequest, DocumentResponse,
@@ -9,7 +10,8 @@ from models import (
     CreateMessageRequest, MessageResponse, ThreadWithMessagesResponse,
     PageQuestionResponse, PageQuestionsResponse, DocumentStructure,
     DocumentStructureItem, DocumentStructureResponse,
-    UserPlan, PlanLimits, UserUsage, UserPlanResponse, PlanLimitsResponse, UserUsageResponse
+    UserPlan, PlanLimits, UserUsage, UserPlanResponse, PlanLimitsResponse, UserUsageResponse,
+    DocumentShare, DocumentShareAccess, ShareDocumentResponse, ShareStatusResponse
 )
 
 def create_document(db: Session, request: CreateDocumentRequest, user_id: str) -> DocumentResponse:
@@ -40,13 +42,59 @@ def create_document(db: Session, request: CreateDocumentRequest, user_id: str) -
     )
 
 def list_documents(db: Session, user_id: str, limit: int = 50, offset: int = 0) -> List[DocumentResponse]:
-    """List documents for a user with pagination"""
-    documents = db.query(Document)\
-        .filter(Document.owner_id == uuid.UUID(user_id))\
-        .order_by(desc(Document.created_at))\
-        .offset(offset)\
-        .limit(limit)\
+    """List documents for a user with pagination. Includes owned documents and shared documents."""
+    user_uuid = uuid.UUID(user_id)
+    
+    # Get owned documents
+    owned_docs = db.query(Document)\
+        .filter(Document.owner_id == user_uuid)\
         .all()
+    
+    owned_ids = {doc.id for doc in owned_docs}
+    
+    # Get shared documents (documents the user has access to)
+    shared_docs = db.query(Document)\
+        .join(DocumentShare, DocumentShare.document_id == Document.id)\
+        .join(DocumentShareAccess, DocumentShareAccess.share_id == DocumentShare.id)\
+        .filter(DocumentShareAccess.user_id == user_uuid)\
+        .filter(DocumentShare.revoked_at.is_(None))\
+        .filter(
+            or_(
+                DocumentShare.expires_at.is_(None),
+                DocumentShare.expires_at > datetime.utcnow()
+            )
+        )\
+        .all()
+    
+    shared_ids = {doc.id for doc in shared_docs}
+    
+    # Combine and deduplicate (in case user owns a document they also have shared access to)
+    all_docs = {doc.id: doc for doc in owned_docs}
+    all_docs.update({doc.id: doc for doc in shared_docs})
+    
+    # Get all document IDs to check for active shares
+    all_doc_ids = list(all_docs.keys())
+    
+    # Check which owned documents have active shares
+    active_shares = db.query(DocumentShare)\
+        .filter(DocumentShare.document_id.in_(all_doc_ids))\
+        .filter(DocumentShare.created_by == user_uuid)\
+        .filter(DocumentShare.revoked_at.is_(None))\
+        .filter(
+            or_(
+                DocumentShare.expires_at.is_(None),
+                DocumentShare.expires_at > datetime.utcnow()
+            )
+        )\
+        .all()
+    
+    documents_with_active_shares = {share.document_id for share in active_shares}
+    
+    # Sort by created_at descending
+    sorted_docs = sorted(all_docs.values(), key=lambda d: d.created_at, reverse=True)
+    
+    # Apply pagination
+    paginated_docs = sorted_docs[offset:offset + limit]
     
     return [
         DocumentResponse(
@@ -57,9 +105,11 @@ def list_documents(db: Session, user_id: str, limit: int = 50, offset: int = 0) 
             mime=doc.mime,
             status=doc.status,
             createdAt=doc.created_at.isoformat(),
-            lastViewedPage=doc.last_viewed_page
+            lastViewedPage=doc.last_viewed_page,
+            isShared=doc.id in shared_ids and doc.id not in owned_ids,
+            hasActiveShare=doc.id in documents_with_active_shares
         )
-        for doc in documents
+        for doc in paginated_docs
     ]
 
 def get_document_by_id(db: Session, document_id: str, owner_id: str) -> Optional[Document]:
@@ -75,16 +125,14 @@ def get_document_by_id(db: Session, document_id: str, owner_id: str) -> Optional
     except ValueError:
         return None
 
-def update_document_progress(db: Session, document_id: str, page: int, owner_id: str) -> bool:
-    """Update the last viewed page and timestamp for a document"""
+def update_document_progress(db: Session, document_id: str, page: int, user_id: str) -> bool:
+    """Update the last viewed page and timestamp for a document. Works for owned and shared documents."""
     try:
         doc_uuid = uuid.UUID(document_id)
-        owner_uuid = uuid.UUID(owner_id)
+        user_uuid = uuid.UUID(user_id)
         
-        document = db.query(Document)\
-            .filter(Document.id == doc_uuid)\
-            .filter(Document.owner_id == owner_uuid)\
-            .first()
+        # Check if user owns the document or has shared access
+        document = get_document_by_id_or_share(db, document_id, user_id)
         
         if not document:
             return False
@@ -229,29 +277,89 @@ def update_thread_title(db: Session, thread_id: str, user_id: str, title: str) -
     except ValueError:
         return False
 
-def get_page_questions(db: Session, document_id: str, page_number: int, user_id: str, limit: Optional[int] = None) -> PageQuestionsResponse:
-    """Get user questions asked on a specific page"""
+def check_user_has_document_access(db: Session, document_id: str, user_id: str) -> bool:
+    """Check if user has access to document (either owns it or has shared access)"""
     try:
         doc_uuid = uuid.UUID(document_id)
         user_uuid = uuid.UUID(user_id)
         
-        # Get total count of user messages for this page
-        total_count = db.query(ChatMessage)\
-            .join(ChatThread)\
-            .filter(ChatThread.document_id == doc_uuid)\
-            .filter(ChatThread.user_id == user_uuid)\
-            .filter(ChatMessage.page_context == page_number)\
-            .filter(ChatMessage.role == 'user')\
-            .count()
+        # Check if user owns the document
+        owned = db.query(Document)\
+            .filter(Document.id == doc_uuid)\
+            .filter(Document.owner_id == user_uuid)\
+            .first()
         
-        # Get questions with thread info
-        query = db.query(ChatMessage, ChatThread)\
-            .join(ChatThread, ChatMessage.thread_id == ChatThread.id)\
-            .filter(ChatThread.document_id == doc_uuid)\
-            .filter(ChatThread.user_id == user_uuid)\
-            .filter(ChatMessage.page_context == page_number)\
-            .filter(ChatMessage.role == 'user')\
-            .order_by(desc(ChatMessage.created_at))
+        if owned:
+            return True
+        
+        # Check if user has shared access
+        shared_access = db.query(DocumentShareAccess)\
+            .join(DocumentShare, DocumentShare.id == DocumentShareAccess.share_id)\
+            .filter(DocumentShare.document_id == doc_uuid)\
+            .filter(DocumentShareAccess.user_id == user_uuid)\
+            .filter(DocumentShare.revoked_at.is_(None))\
+            .filter(
+                or_(
+                    DocumentShare.expires_at.is_(None),
+                    DocumentShare.expires_at > datetime.utcnow()
+                )
+            )\
+            .first()
+        
+        return shared_access is not None
+    except ValueError:
+        return False
+
+def get_page_questions(db: Session, document_id: str, page_number: int, user_id: str, limit: Optional[int] = None) -> PageQuestionsResponse:
+    """Get questions asked on a specific page. For shared documents, returns all questions with ownership info."""
+    try:
+        doc_uuid = uuid.UUID(document_id)
+        user_uuid = uuid.UUID(user_id)
+        
+        # Check if user has access through sharing
+        has_shared_access = check_user_has_document_access(db, document_id, user_id)
+        
+        # Check if user owns the document
+        document = db.query(Document)\
+            .filter(Document.id == doc_uuid)\
+            .first()
+        
+        is_owner = document and document.owner_id == user_uuid
+        
+        # If user has shared access or owns document, show all questions
+        # Otherwise, show only own questions
+        if has_shared_access or is_owner:
+            # Get all questions from all users for this page
+            total_count = db.query(ChatMessage)\
+                .join(ChatThread)\
+                .filter(ChatThread.document_id == doc_uuid)\
+                .filter(ChatMessage.page_context == page_number)\
+                .filter(ChatMessage.role == 'user')\
+                .count()
+            
+            query = db.query(ChatMessage, ChatThread)\
+                .join(ChatThread, ChatMessage.thread_id == ChatThread.id)\
+                .filter(ChatThread.document_id == doc_uuid)\
+                .filter(ChatMessage.page_context == page_number)\
+                .filter(ChatMessage.role == 'user')\
+                .order_by(desc(ChatMessage.created_at))
+        else:
+            # Get only user's own questions
+            total_count = db.query(ChatMessage)\
+                .join(ChatThread)\
+                .filter(ChatThread.document_id == doc_uuid)\
+                .filter(ChatThread.user_id == user_uuid)\
+                .filter(ChatMessage.page_context == page_number)\
+                .filter(ChatMessage.role == 'user')\
+                .count()
+            
+            query = db.query(ChatMessage, ChatThread)\
+                .join(ChatThread, ChatMessage.thread_id == ChatThread.id)\
+                .filter(ChatThread.document_id == doc_uuid)\
+                .filter(ChatThread.user_id == user_uuid)\
+                .filter(ChatMessage.page_context == page_number)\
+                .filter(ChatMessage.role == 'user')\
+                .order_by(desc(ChatMessage.created_at))
         
         # Apply limit only if specified
         if limit is not None:
@@ -271,6 +379,9 @@ def get_page_questions(db: Session, document_id: str, page_number: int, user_id:
                 .first()
             
             answer_content = answer_msg.content if answer_msg else None
+            question_user_id = str(thread.user_id)
+            is_own = question_user_id == user_id
+            can_open = is_own  # Can only open own threads
             
             questions.append(
                 PageQuestionResponse(
@@ -279,7 +390,10 @@ def get_page_questions(db: Session, document_id: str, page_number: int, user_id:
                     threadTitle=thread.title,
                     content=msg.content,
                     answer=answer_content,
-                    createdAt=msg.created_at.isoformat()
+                    createdAt=msg.created_at.isoformat(),
+                    userId=question_user_id,
+                    isOwn=is_own,
+                    canOpenThread=can_open
                 )
             )
         
@@ -767,3 +881,139 @@ def check_questions_limit(db: Session, user_id: str) -> tuple[bool, Optional[str
         return False, f"Question limit exceeded. Maximum: {usage_data.limits.maxQuestionsPerMonth} questions per month"
     
     return True, None
+
+# Document sharing related repository functions
+def create_document_share(db: Session, document_id: str, user_id: str, expires_at: Optional[datetime] = None) -> DocumentShare:
+    """Create a new share for a document"""
+    # Generate unique token (32 bytes = 64 hex characters)
+    share_token = secrets.token_urlsafe(32)
+    
+    # Ensure uniqueness
+    while db.query(DocumentShare).filter(DocumentShare.share_token == share_token).first():
+        share_token = secrets.token_urlsafe(32)
+    
+    share = DocumentShare(
+        id=uuid.uuid4(),
+        document_id=uuid.UUID(document_id),
+        share_token=share_token,
+        created_by=uuid.UUID(user_id),
+        expires_at=expires_at
+    )
+    
+    db.add(share)
+    db.commit()
+    db.refresh(share)
+    
+    return share
+
+def get_document_share_by_token(db: Session, share_token: str) -> Optional[DocumentShare]:
+    """Get a document share by token, checking validity"""
+    share = db.query(DocumentShare)\
+        .filter(DocumentShare.share_token == share_token)\
+        .first()
+    
+    if not share:
+        return None
+    
+    # Check if revoked
+    if share.revoked_at:
+        return None
+    
+    # Check if expired
+    if share.expires_at and share.expires_at < datetime.utcnow():
+        return None
+    
+    return share
+
+def get_active_document_share(db: Session, document_id: str) -> Optional[DocumentShare]:
+    """Get active share for a document (not revoked, not expired)"""
+    doc_uuid = uuid.UUID(document_id)
+    
+    share = db.query(DocumentShare)\
+        .filter(DocumentShare.document_id == doc_uuid)\
+        .filter(DocumentShare.revoked_at.is_(None))\
+        .filter(
+            or_(
+                DocumentShare.expires_at.is_(None),
+                DocumentShare.expires_at > datetime.utcnow()
+            )
+        )\
+        .order_by(desc(DocumentShare.created_at))\
+        .first()
+    
+    return share
+
+def revoke_document_share(db: Session, document_id: str, user_id: str) -> bool:
+    """Revoke a document share (set revoked_at to current time)"""
+    try:
+        doc_uuid = uuid.UUID(document_id)
+        user_uuid = uuid.UUID(user_id)
+        
+        share = db.query(DocumentShare)\
+            .filter(DocumentShare.document_id == doc_uuid)\
+            .filter(DocumentShare.created_by == user_uuid)\
+            .filter(DocumentShare.revoked_at.is_(None))\
+            .first()
+        
+        if not share:
+            return False
+        
+        share.revoked_at = datetime.utcnow()
+        db.commit()
+        return True
+    except ValueError:
+        return False
+
+def record_share_access(db: Session, share_id: str, user_id: str) -> bool:
+    """Record that a user accessed a shared document. Returns True if new record created, False if already exists."""
+    try:
+        share_uuid = uuid.UUID(share_id)
+        user_uuid = uuid.UUID(user_id)
+        
+        # Check if access record already exists
+        existing = db.query(DocumentShareAccess)\
+            .filter(DocumentShareAccess.share_id == share_uuid)\
+            .filter(DocumentShareAccess.user_id == user_uuid)\
+            .first()
+        
+        if existing:
+            return False  # Already recorded
+        
+        # Create new access record
+        access = DocumentShareAccess(
+            id=uuid.uuid4(),
+            share_id=share_uuid,
+            user_id=user_uuid
+        )
+        
+        db.add(access)
+        db.commit()
+        return True
+    except ValueError:
+        return False
+
+def get_document_by_id_or_share(db: Session, document_id: str, user_id: str) -> Optional[Document]:
+    """Get a document by ID, checking ownership or shared access"""
+    try:
+        doc_uuid = uuid.UUID(document_id)
+        user_uuid = uuid.UUID(user_id)
+        
+        # Try to get document
+        document = db.query(Document)\
+            .filter(Document.id == doc_uuid)\
+            .first()
+        
+        if not document:
+            return None
+        
+        # Check ownership
+        if document.owner_id == user_uuid:
+            return document
+        
+        # Check shared access
+        if check_user_has_document_access(db, document_id, user_id):
+            return document
+        
+        return None
+    except ValueError:
+        return None
