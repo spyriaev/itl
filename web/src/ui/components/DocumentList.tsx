@@ -98,7 +98,6 @@ export function DocumentList({ refreshTrigger, onDocumentClick, loadingDocumentI
   if (loading) {
     return (
       <div className="document-list-loading">
-        <div className="document-list-loading-icon">⏳</div>
         <p className="document-list-loading-text">{t("documentList.loadingDocuments")}</p>
       </div>
     )

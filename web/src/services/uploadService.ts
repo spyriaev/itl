@@ -1,5 +1,6 @@
 import { supabase, uploadPdfToStorage } from '../lib/supabase'
 import { extractDocumentStructure } from './documentService'
+import { getPdfFromCache, savePdfToCache, initCache } from './pdfCache'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
 
@@ -228,8 +229,51 @@ export interface DocumentViewInfo {
 
 /**
  * Get signed URL for viewing a document
+ * Checks cache first, then loads from server if not cached
  */
 export async function getDocumentViewUrl(documentId: string): Promise<DocumentViewInfo> {
+  // Initialize cache
+  await initCache()
+
+  // Check cache first
+  const cached = await getPdfFromCache(documentId)
+  if (cached) {
+    console.log(`[getDocumentViewUrl] Using cached PDF for document ${documentId}`)
+    
+    // Get metadata from server to get lastViewedPage and title
+    const token = await getAuthToken()
+    if (!token) {
+      throw new Error('Not authenticated')
+    }
+
+    try {
+      const response = await fetch(`${API_URL}/api/documents/${documentId}/view`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+
+      if (response.ok) {
+        const metadata = await response.json()
+        // Return cached blob URL with metadata from server
+        return {
+          url: cached.url,
+          lastViewedPage: metadata.lastViewedPage,
+          title: metadata.title
+        }
+      }
+    } catch (error) {
+      console.warn('[getDocumentViewUrl] Failed to fetch metadata, using cached URL only:', error)
+      // Fallback: return cached URL with default values
+      return {
+        url: cached.url,
+        lastViewedPage: 1,
+        title: ''
+      }
+    }
+  }
+
+  // Not in cache, fetch from server
   const token = await getAuthToken()
   if (!token) {
     throw new Error('Not authenticated')
@@ -246,7 +290,36 @@ export async function getDocumentViewUrl(documentId: string): Promise<DocumentVi
     throw new Error(error.error || 'Failed to get view URL')
   }
 
-  return response.json()
+  const viewInfo = await response.json()
+
+  // Download PDF blob and cache it
+  try {
+    console.log(`[getDocumentViewUrl] Downloading PDF for caching: ${documentId}`)
+    const pdfResponse = await fetch(viewInfo.url)
+    if (pdfResponse.ok) {
+      const blob = await pdfResponse.blob()
+      
+      // Save to cache asynchronously (don't block return)
+      savePdfToCache(documentId, blob, viewInfo.url).catch((error) => {
+        console.warn('[getDocumentViewUrl] Failed to cache PDF:', error)
+      })
+      
+      // Create blob URL for immediate use
+      const blobUrl = URL.createObjectURL(blob)
+      return {
+        url: blobUrl,
+        lastViewedPage: viewInfo.lastViewedPage,
+        title: viewInfo.title
+      }
+    } else {
+      console.warn('[getDocumentViewUrl] Failed to download PDF for caching')
+    }
+  } catch (error) {
+    console.warn('[getDocumentViewUrl] Error caching PDF, using original URL:', error)
+  }
+
+  // Return original signed URL if caching failed
+  return viewInfo
 }
 
 /**

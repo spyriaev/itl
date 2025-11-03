@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router-dom"
 import { useAuth } from "../../contexts/AuthContext"
 import { getUserUsage, getUserPlan, setUserPlan, formatBytes, calculatePercentage, type UserUsage as UserUsageType, type UserPlan } from "../../services/limitService"
+import { getCacheStats, clearCache, initCache } from "../../services/pdfCache"
 import "../styles/upload-page.css"
 
 export function UserProfile() {
@@ -19,10 +20,47 @@ export function UserProfile() {
   const [isMobile, setIsMobile] = useState(false)
   const [isTablet, setIsTablet] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [cacheStats, setCacheStats] = useState<{ fileCount: number; totalSizeMB: number; maxSizeMB: number; availableSizeMB: number } | null>(null)
+  const [clearingCache, setClearingCache] = useState(false)
+  const [activeSection, setActiveSection] = useState<'usage' | 'cache'>('usage')
 
   useEffect(() => {
     loadData()
+    loadCacheStats()
   }, [])
+
+  const loadCacheStats = async () => {
+    try {
+      await initCache()
+      const stats = await getCacheStats()
+      setCacheStats({
+        fileCount: stats.fileCount,
+        totalSizeMB: stats.totalSizeMB,
+        maxSizeMB: stats.maxSizeMB,
+        availableSizeMB: stats.availableSizeMB
+      })
+    } catch (error) {
+      console.error('Failed to load cache stats:', error)
+    }
+  }
+
+  const handleClearCache = async () => {
+    if (!confirm(t("profile.cacheClearConfirm"))) {
+      return
+    }
+
+    try {
+      setClearingCache(true)
+      await clearCache()
+      await loadCacheStats()
+      alert(t("profile.cacheCleared"))
+    } catch (error) {
+      console.error('Failed to clear cache:', error)
+      alert(t("profile.cacheClearError"))
+    } finally {
+      setClearingCache(false)
+    }
+  }
 
   useEffect(() => {
     const checkScreenSize = () => {
@@ -206,8 +244,23 @@ export function UserProfile() {
           <nav style={styles.nav}>
             <a 
               href="#" 
-              onClick={(e) => { e.preventDefault() }}
-              style={styles.navItemActive}
+              onClick={(e) => { 
+                e.preventDefault()
+                setActiveSection('usage')
+                if (isMobile) setSidebarOpen(false)
+              }}
+              style={activeSection === 'usage' ? styles.navItemActive : styles.navItem}
+              onMouseEnter={(e) => {
+                if (activeSection !== 'usage') {
+                  Object.assign(e.currentTarget.style, styles.navItemHover)
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (activeSection !== 'usage') {
+                  e.currentTarget.style.backgroundColor = 'transparent'
+                  e.currentTarget.style.color = 'rgba(0, 0, 0, 0.6)'
+                }
+              }}
             >
               <span style={styles.navIcon}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -217,6 +270,34 @@ export function UserProfile() {
                 </svg>
               </span>
               <span>{t("profile.usage")}</span>
+            </a>
+            <a 
+              href="#" 
+              onClick={(e) => { 
+                e.preventDefault()
+                setActiveSection('cache')
+                if (isMobile) setSidebarOpen(false)
+              }}
+              style={activeSection === 'cache' ? styles.navItemActive : styles.navItem}
+              onMouseEnter={(e) => {
+                if (activeSection !== 'cache') {
+                  Object.assign(e.currentTarget.style, styles.navItemHover)
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (activeSection !== 'cache') {
+                  e.currentTarget.style.backgroundColor = 'transparent'
+                  e.currentTarget.style.color = 'rgba(0, 0, 0, 0.6)'
+                }
+              }}
+            >
+              <span style={styles.navIcon}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                  <path d="M9 9h6v6H9z"></path>
+                </svg>
+              </span>
+              <span>{t("profile.cache")}</span>
             </a>
           </nav>
 
@@ -245,121 +326,184 @@ export function UserProfile() {
         )}
 
         <div style={styles.contentWrapper}>
-          {/* Upgrade Cards */}
-          {availablePlans.length > 0 && (
-            <div style={{
-              ...styles.upgradeGrid,
-              ...(isMobile ? styles.upgradeGridMobile : {}),
-              ...(isTablet ? styles.upgradeGridTablet : {}),
-            }}>
-              {availablePlans.map((planType) => (
-                <div key={planType} style={styles.upgradeCard}>
-                  <div style={styles.upgradeCardContent}>
-                    <div style={styles.upgradeCardHeader}>
-                      <div style={styles.upgradeCardTitle}>{t(`plans.${planType}.title`)}</div>
-                      <div style={styles.upgradeCardDescription}>
-                        {t(`plans.${planType}.description`) || `Upgrade to ${planType}`}
+          {activeSection === 'usage' && (
+            <>
+              {/* Upgrade Cards */}
+              {availablePlans.length > 0 && (
+                <div style={{
+                  ...styles.upgradeGrid,
+                  ...(isMobile ? styles.upgradeGridMobile : {}),
+                  ...(isTablet ? styles.upgradeGridTablet : {}),
+                }}>
+                  {availablePlans.map((planType) => (
+                    <div key={planType} style={styles.upgradeCard}>
+                      <div style={styles.upgradeCardContent}>
+                        <div style={styles.upgradeCardHeader}>
+                          <div style={styles.upgradeCardTitle}>{t(`plans.${planType}.title`)}</div>
+                          <div style={styles.upgradeCardDescription}>
+                            {t(`plans.${planType}.description`) || `Upgrade to ${planType}`}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => handlePlanChange(planType as 'beta' | 'base' | 'plus')}
+                          disabled={changingPlan}
+                          style={styles.upgradeButton}
+                          onMouseEnter={(e) => {
+                            if (!changingPlan) {
+                              Object.assign(e.currentTarget.style, styles.upgradeButtonHover)
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = '#2d66f5'
+                            e.currentTarget.style.transform = 'none'
+                          }}
+                        >
+                          {t("profile.upgrade")} to {t(`plans.${planType}.title`)}
+                        </button>
                       </div>
                     </div>
-                    <button
-                      onClick={() => handlePlanChange(planType as 'beta' | 'base' | 'plus')}
-                      disabled={changingPlan}
-                      style={styles.upgradeButton}
-                      onMouseEnter={(e) => {
-                        if (!changingPlan) {
-                          Object.assign(e.currentTarget.style, styles.upgradeButtonHover)
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = '#2d66f5'
-                        e.currentTarget.style.transform = 'none'
-                      }}
-                    >
-                      {t("profile.upgrade")} to {t(`plans.${planType}.title`)}
-                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Current Plan Card */}
+              <div style={styles.currentPlanCard}>
+                <div style={{
+                  ...styles.currentPlanGrid,
+                  ...(isMobile ? styles.currentPlanGridMobile : {}),
+                  ...(isTablet ? styles.currentPlanGridTablet : {}),
+                }}>
+                  <div style={styles.currentPlanLeft}>
+                    <div style={styles.currentPlanHeader}>
+                      <div style={styles.currentPlanTitle}>
+                        {getPlanDisplayName()}
+                        <span style={styles.currentBadge}>{t("profile.current")}</span>
+                      </div>
+                      <div style={styles.currentPlanDescription}>
+                        {t("profile.planStarted")}: {new Date(plan.startedAt).toLocaleDateString()}
+                      </div>
+                      <div style={styles.currentPlanDescription}>
+                        {t("profile.periodReset")}: {new Date(usage.periodEnd).toLocaleDateString()}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={styles.currentPlanRight}>
+                    <div style={styles.usageCard}>
+                      <div style={styles.usageCardHeader}>
+                        <div style={styles.usageCardTitle}>{t("profile.usageTitle")}</div>
+                      </div>
+                      <div style={styles.usageCardContent}>
+                        {/* Storage */}
+                        <div style={styles.usageStat}>
+                          <div style={styles.usageStatHeader}>
+                            <span>{t("profile.storage")}</span>
+                            <span>{formatBytes(usage.storageBytesUsed)} / {formatBytes(usage.limits.maxStorageBytes)}</span>
+                          </div>
+                          <div style={styles.progressBarContainer}>
+                            <div style={{...styles.progressBar, width: `${storagePercent}%`}}></div>
+                          </div>
+                        </div>
+
+                        {/* Files */}
+                        {usage.limits.maxFiles && (
+                          <div style={styles.usageStat}>
+                            <div style={styles.usageStatHeader}>
+                              <span>{t("profile.files")}</span>
+                              <span>{usage.filesCount} / {usage.limits.maxFiles}</span>
+                            </div>
+                            <div style={styles.progressBarContainer}>
+                              <div style={{...styles.progressBar, width: `${filesPercent}%`}}></div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Tokens */}
+                        <div style={styles.usageStat}>
+                          <div style={styles.usageStatHeader}>
+                            <span>{t("profile.tokens")}</span>
+                            <span>{usage.tokensUsed.toLocaleString()} / {usage.limits.maxTokensPerMonth.toLocaleString()}</span>
+                          </div>
+                          <div style={styles.progressBarContainer}>
+                            <div style={{...styles.progressBar, width: `${tokensPercent}%`}}></div>
+                          </div>
+                        </div>
+
+                        {/* Questions */}
+                        <div style={styles.usageStat}>
+                          <div style={styles.usageStatHeader}>
+                            <span>{t("profile.questions")}</span>
+                            <span>{usage.questionsCount} / {usage.limits.maxQuestionsPerMonth}</span>
+                          </div>
+                          <div style={styles.progressBarContainer}>
+                            <div style={{...styles.progressBar, width: `${questionsPercent}%`}}></div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              ))}
-            </div>
+              </div>
+            </>
           )}
 
-          {/* Current Plan Card */}
-          <div style={styles.currentPlanCard}>
-            <div style={{
-              ...styles.currentPlanGrid,
-              ...(isMobile ? styles.currentPlanGridMobile : {}),
-              ...(isTablet ? styles.currentPlanGridTablet : {}),
-            }}>
-              <div style={styles.currentPlanLeft}>
-                <div style={styles.currentPlanHeader}>
-                  <div style={styles.currentPlanTitle}>
-                    {getPlanDisplayName()}
-                    <span style={styles.currentBadge}>{t("profile.current")}</span>
-                  </div>
-                  <div style={styles.currentPlanDescription}>
-                    {t("profile.planStarted")}: {new Date(plan.startedAt).toLocaleDateString()}
-                  </div>
-                  <div style={styles.currentPlanDescription}>
-                    {t("profile.periodReset")}: {new Date(usage.periodEnd).toLocaleDateString()}
+          {activeSection === 'cache' && cacheStats !== null && (
+            <div style={styles.cacheSection}>
+              <div style={styles.cacheCard}>
+                <div style={styles.cacheCardHeader}>
+                  <div style={styles.cacheCardTitle}>{t("profile.cacheTitle")}</div>
+                  <div style={styles.cacheCardDescription}>
+                    {t("profile.cacheDescription")}
                   </div>
                 </div>
-              </div>
-              <div style={styles.currentPlanRight}>
-                <div style={styles.usageCard}>
-                  <div style={styles.usageCardHeader}>
-                    <div style={styles.usageCardTitle}>{t("profile.usageTitle")}</div>
-                  </div>
-                  <div style={styles.usageCardContent}>
-                    {/* Storage */}
-                    <div style={styles.usageStat}>
-                      <div style={styles.usageStatHeader}>
-                        <span>{t("profile.storage")}</span>
-                        <span>{formatBytes(usage.storageBytesUsed)} / {formatBytes(usage.limits.maxStorageBytes)}</span>
-                      </div>
-                      <div style={styles.progressBarContainer}>
-                        <div style={{...styles.progressBar, width: `${storagePercent}%`}}></div>
-                      </div>
+                <div style={styles.cacheCardContent}>
+                  <div style={styles.cacheStats}>
+                    <div style={styles.cacheStat}>
+                      <span style={styles.cacheStatLabel}>{t("profile.cacheFiles")}:</span>
+                      <span style={styles.cacheStatValue}>{cacheStats.fileCount}</span>
                     </div>
-
-                    {/* Files */}
-                    {usage.limits.maxFiles && (
-                      <div style={styles.usageStat}>
-                        <div style={styles.usageStatHeader}>
-                          <span>{t("profile.files")}</span>
-                          <span>{usage.filesCount} / {usage.limits.maxFiles}</span>
-                        </div>
-                        <div style={styles.progressBarContainer}>
-                          <div style={{...styles.progressBar, width: `${filesPercent}%`}}></div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Tokens */}
-                    <div style={styles.usageStat}>
-                      <div style={styles.usageStatHeader}>
-                        <span>{t("profile.tokens")}</span>
-                        <span>{usage.tokensUsed.toLocaleString()} / {usage.limits.maxTokensPerMonth.toLocaleString()}</span>
-                      </div>
-                      <div style={styles.progressBarContainer}>
-                        <div style={{...styles.progressBar, width: `${tokensPercent}%`}}></div>
-                      </div>
+                    <div style={styles.cacheStat}>
+                      <span style={styles.cacheStatLabel}>{t("profile.cacheSize")}:</span>
+                      <span style={styles.cacheStatValue}>
+                        {cacheStats.totalSizeMB.toFixed(2)} MB / {cacheStats.maxSizeMB} MB
+                      </span>
                     </div>
-
-                    {/* Questions */}
-                    <div style={styles.usageStat}>
-                      <div style={styles.usageStatHeader}>
-                        <span>{t("profile.questions")}</span>
-                        <span>{usage.questionsCount} / {usage.limits.maxQuestionsPerMonth}</span>
-                      </div>
-                      <div style={styles.progressBarContainer}>
-                        <div style={{...styles.progressBar, width: `${questionsPercent}%`}}></div>
-                      </div>
+                    <div style={styles.cacheStat}>
+                      <span style={styles.cacheStatLabel}>{t("profile.cacheAvailable")}:</span>
+                      <span style={styles.cacheStatValue}>
+                        {cacheStats.availableSizeMB.toFixed(2)} MB
+                      </span>
                     </div>
                   </div>
+                  <div style={styles.cacheProgressContainer}>
+                    <div style={{
+                      ...styles.cacheProgressBar,
+                      width: `${Math.min(100, (cacheStats.totalSizeMB / cacheStats.maxSizeMB) * 100)}%`
+                    }}></div>
+                  </div>
+                  <button
+                    onClick={handleClearCache}
+                    disabled={clearingCache || cacheStats.fileCount === 0}
+                    style={{
+                      ...styles.cacheClearButton,
+                      ...((clearingCache || cacheStats.fileCount === 0) ? styles.cacheClearButtonDisabled : {})
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!clearingCache && cacheStats.fileCount > 0) {
+                        e.currentTarget.style.backgroundColor = '#dc2626'
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!clearingCache && cacheStats.fileCount > 0) {
+                        e.currentTarget.style.backgroundColor = '#ef4444'
+                      }
+                    }}
+                  >
+                    {clearingCache ? t("profile.cacheClearing") : t("profile.cacheClear")}
+                  </button>
                 </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>
@@ -699,6 +843,89 @@ const styles: Record<string, React.CSSProperties> = {
     width: '40px',
     height: '40px',
     animation: 'spin 1s linear infinite',
+  },
+  cacheSection: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '24px',
+  },
+  cacheCard: {
+    borderRadius: '12px',
+    padding: '24px',
+    backgroundColor: '#ffffff',
+    border: '1px solid rgba(0, 0, 0, 0.1)',
+    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+  },
+  cacheCardHeader: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '4px',
+    marginBottom: '16px',
+  },
+  cacheCardTitle: {
+    fontSize: '16px',
+    fontWeight: 500,
+    color: '#171a1f',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+  },
+  cacheCardDescription: {
+    fontSize: '14px',
+    color: 'rgba(0, 0, 0, 0.6)',
+    lineHeight: '1.5',
+  },
+  cacheCardContent: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '16px',
+  },
+  cacheStats: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+  },
+  cacheStat: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    fontSize: '14px',
+  },
+  cacheStatLabel: {
+    color: 'rgba(0, 0, 0, 0.6)',
+  },
+  cacheStatValue: {
+    color: '#171a1f',
+    fontWeight: 500,
+  },
+  cacheProgressContainer: {
+    width: '100%',
+    height: '8px',
+    backgroundColor: 'rgba(0, 0, 0, 0.1)',
+    borderRadius: '4px',
+    overflow: 'hidden',
+  },
+  cacheProgressBar: {
+    height: '100%',
+    backgroundColor: '#2d66f5',
+    transition: 'width 0.3s ease',
+  },
+  cacheClearButton: {
+    padding: '12px 16px',
+    borderRadius: '8px',
+    border: 'none',
+    backgroundColor: '#ef4444',
+    color: '#ffffff',
+    fontSize: '14px',
+    fontWeight: 500,
+    cursor: 'pointer',
+    transition: 'all 0.2s',
+    alignSelf: 'flex-start',
+  },
+  cacheClearButtonDisabled: {
+    backgroundColor: 'rgba(0, 0, 0, 0.1)',
+    color: 'rgba(0, 0, 0, 0.4)',
+    cursor: 'not-allowed',
   },
   // Mobile styles
   sidebarOverlay: {
