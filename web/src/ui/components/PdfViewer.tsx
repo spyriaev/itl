@@ -1197,6 +1197,175 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
     }
   }
 
+  const fitToTextWidth = async () => {
+    // Предотвращаем множественные одновременные вызовы
+    if (isZoomingRef.current) {
+      return
+    }
+
+    if (!pdfDocumentRef.current || !scrollContainerRef.current) {
+      return
+    }
+
+    try {
+      isZoomingRef.current = true
+      const oldScale = scale
+
+      // Получаем текущую страницу
+      const page = await pdfDocumentRef.current.getPage(currentPage)
+
+      // Проверяем, что компонент еще смонтирован и документ существует
+      if (!pdfDocumentRef.current || !scrollContainerRef.current) {
+        isZoomingRef.current = false
+        return
+      }
+
+      // Получаем доступную ширину контейнера
+      const container = scrollContainerRef.current
+      if (!container) {
+        isZoomingRef.current = false
+        return
+      }
+
+      const containerRect = container.getBoundingClientRect()
+      const availableWidth = containerRect.width - 48 // Учитываем padding (24px с каждой стороны)
+
+      // Находим текстовый слой текущей страницы
+      // react-pdf создает структуру: .react-pdf__Page__textContent > span
+      const pageElement = pageRefs.current[currentPage - 1]
+      if (!pageElement) {
+        // Если страница не найдена, fallback на fitToWidth
+        isZoomingRef.current = false
+        await fitToWidth()
+        return
+      }
+
+      // Ищем текстовый контент внутри страницы
+      const textContent = pageElement.querySelector('.react-pdf__Page__textContent')
+      if (!textContent) {
+        // Если текстовый слой не загружен, fallback на fitToWidth
+        isZoomingRef.current = false
+        await fitToWidth()
+        return
+      }
+
+      // Находим все текстовые элементы (span)
+      const textSpans = textContent.querySelectorAll('span')
+      if (textSpans.length === 0) {
+        // Если нет текстовых элементов, fallback на fitToWidth
+        isZoomingRef.current = false
+        await fitToWidth()
+        return
+      }
+
+      // Вычисляем границы текста (минимальная левая и максимальная правая координаты)
+      let minTextLeft = Infinity
+      let maxTextRight = -Infinity
+      const textContentRect = textContent.getBoundingClientRect()
+      
+      textSpans.forEach((span) => {
+        const rect = span.getBoundingClientRect()
+        // Получаем координаты относительно текстового контента
+        const relativeLeft = rect.left - textContentRect.left
+        const relativeRight = rect.right - textContentRect.left
+        minTextLeft = Math.min(minTextLeft, relativeLeft)
+        maxTextRight = Math.max(maxTextRight, relativeRight)
+      })
+
+      // Если не удалось найти текст, fallback на fitToWidth
+      if (maxTextRight === -Infinity || minTextLeft === Infinity) {
+        isZoomingRef.current = false
+        await fitToWidth()
+        return
+      }
+
+      // Вычисляем реальную ширину текста (с учетом левой и правой границ)
+      const textWidthAtCurrentScale = maxTextRight - minTextLeft
+
+      // Вычисляем ширину текста в масштабе 1.0
+      const textWidthAtScale1 = textWidthAtCurrentScale / oldScale
+
+      // Вычисляем оптимальный scale на основе ширины текста
+      let optimalScale: number
+      
+      if (isMobile || isTablet) {
+        // Для планшета и мобильных: текст должен полностью помещаться по ширине
+        optimalScale = availableWidth / textWidthAtScale1
+      } else {
+        // Для десктопа: текст помещается по ширине без ограничений
+        optimalScale = availableWidth / textWidthAtScale1
+      }
+      
+      // Ограничиваем scale разумными пределами
+      // Минимальный scale 0.1 (10%) для очень широких текстов
+      // Максимальный scale 3.0 (300%)
+      optimalScale = Math.max(0.1, Math.min(optimalScale, 3.0))
+
+      // Очищаем предыдущий таймаут, если он есть
+      if (updateVisiblePageRangeTimeoutRef.current) {
+        clearTimeout(updateVisiblePageRangeTimeoutRef.current)
+        updateVisiblePageRangeTimeoutRef.current = null
+      }
+
+      const scaleRatio = optimalScale / oldScale
+      
+      // Recalculate page heights and widths proportionally to new scale
+      setPageHeights(prev => {
+        const newHeights = new Map()
+        prev.forEach((height, pageNum) => {
+          newHeights.set(pageNum, height * scaleRatio)
+        })
+        return newHeights
+      })
+      setPageWidths(prev => {
+        const newWidths = new Map()
+        prev.forEach((width, pageNum) => {
+          newWidths.set(pageNum, width * scaleRatio)
+        })
+        return newWidths
+      })
+      
+      // Update ref synchronously before setState to prevent race conditions
+      currentScaleRef.current = optimalScale
+      setScale(optimalScale)
+
+      // Update visible range after a brief delay to allow state to update
+      updateVisiblePageRangeTimeoutRef.current = setTimeout(() => {
+        // Проверяем, что компонент еще смонтирован
+        if (!scrollContainerRef.current) {
+          isZoomingRef.current = false
+          return
+        }
+
+        updateVisiblePageRange()
+        requestAnimationFrame(() => {
+          if (!scrollContainerRef.current) {
+            isZoomingRef.current = false
+            return
+          }
+
+          updateVisiblePage()
+          setTimeout(() => {
+            isZoomingRef.current = false
+          }, 200)
+        })
+      }, 50)
+    } catch (error) {
+      console.error('Error fitting to text width:', error)
+      isZoomingRef.current = false
+
+      // Очищаем таймаут в случае ошибки
+      if (updateVisiblePageRangeTimeoutRef.current) {
+        clearTimeout(updateVisiblePageRangeTimeoutRef.current)
+        updateVisiblePageRangeTimeoutRef.current = null
+      }
+
+      // Fallback на fitToWidth в случае ошибки
+      isZoomingRef.current = false
+      await fitToWidth()
+    }
+  }
+
   const toggleFullscreen = useCallback(() => {
     if (!document.fullscreenElement) {
       document.documentElement.requestFullscreen().then(() => {
@@ -1374,6 +1543,7 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
             justifyContent: 'center',
             padding: 24,
             overflow: 'auto',
+            overflowX: 'hidden',
             marginRight: isChatVisible ? (isMobile ? 0 : 400) : 0,
             transition: 'margin-right 0.3s ease-out',
           }}>
@@ -1703,6 +1873,7 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
         onZoomIn={zoomIn}
         onZoomOut={zoomOut}
         onFitToWidth={fitToWidth}
+        onFitToTextWidth={fitToTextWidth}
         isTablet={isTablet}
         isChatVisible={isChatVisible}
         scrollContainerRef={scrollContainerRef}

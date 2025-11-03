@@ -5,6 +5,7 @@ interface ZoomControlProps {
   onZoomIn: () => void
   onZoomOut: () => void
   onFitToWidth?: () => void
+  onFitToTextWidth?: () => void
   isTablet?: boolean
   isChatVisible?: boolean
   scrollContainerRef?: React.RefObject<HTMLDivElement>
@@ -16,6 +17,7 @@ export function ZoomControl({
   onZoomIn,
   onZoomOut,
   onFitToWidth,
+  onFitToTextWidth,
   isTablet = false,
   isChatVisible = false,
   scrollContainerRef,
@@ -210,6 +212,45 @@ export function ZoomControl({
             <rect x="3" y="3" width="18" height="18" rx="2" />
             <line x1="9" y1="3" x2="9" y2="21" />
             <line x1="3" y1="9" x2="21" y2="9" />
+          </svg>
+        </button>
+      )}
+
+      {/* Fit to Text Width Button */}
+      {onFitToTextWidth && (
+        <button
+          onClick={onFitToTextWidth}
+          style={{
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            padding: 4,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'white',
+            transition: 'opacity 0.2s',
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.7')}
+          onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
+          aria-label="Fit to text width"
+          title="Подобрать ширину по тексту"
+        >
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M4 6h16" />
+            <path d="M4 12h16" />
+            <path d="M4 18h16" />
+            <path d="M6 6l-2 2 2 2" />
+            <path d="M18 18l2-2-2-2" />
           </svg>
         </button>
       )}
