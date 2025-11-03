@@ -14,6 +14,7 @@ interface ChatInputProps {
   currentPage?: number
   selectedLevel?: number | null | 'none'
   onContextChange?: (level: number | null | 'none') => void
+  isMobile?: boolean
 }
 
 export function ChatInput({ 
@@ -26,13 +27,16 @@ export function ChatInput({
   contextItems = [],
   currentPage = 1,
   selectedLevel = null,
-  onContextChange
+  onContextChange,
+  isMobile = false
 }: ChatInputProps) {
   const { t } = useTranslation()
   const defaultPlaceholder = placeholder || t("chatInput.askQuestion")
   const [isFocused, setIsFocused] = useState(false)
   const [hasText, setHasText] = useState(false)
+  const [isContextMenuOpen, setIsContextMenuOpen] = useState(false)
   const editorRef = useRef<HTMLDivElement>(null)
+  const contextMenuRef = useRef<HTMLDivElement>(null)
 
   // Sync external value with contentEditable
   React.useEffect(() => {
@@ -100,6 +104,37 @@ export function ChatInput({
     }
   }
 
+  const handleMobileContextChange = (value: string) => {
+    if (!onContextChange) return
+    if (value === 'page') {
+      onContextChange(null)
+    } else if (value === 'none') {
+      onContextChange('none')
+    } else if (value === 'chapter') {
+      const currentChapter = contextItems.find(item => item.level === 1)
+      if (currentChapter) {
+        onContextChange(currentChapter.level)
+      }
+    }
+    setIsContextMenuOpen(false)
+  }
+
+  // Close menu when clicking outside
+  React.useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (contextMenuRef.current && !contextMenuRef.current.contains(event.target as Node)) {
+        setIsContextMenuOpen(false)
+      }
+    }
+
+    if (isContextMenuOpen) {
+      document.addEventListener('click', handleClickOutside)
+      return () => {
+        document.removeEventListener('click', handleClickOutside)
+      }
+    }
+  }, [isContextMenuOpen])
+
   const getContextDisplay = () => {
     if (selectedLevel === 'none') return ''
     if (selectedLevel === null) return `${t("chatMessage.page")} ${currentPage}`
@@ -141,7 +176,7 @@ export function ChatInput({
       {/* Context selector */}
       {onContextChange && (
         <div style={styles.repoSection}>
-          <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: '4px', width: '100%' }}>
+          <div ref={contextMenuRef} style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: '4px', width: '100%' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '100%' }}>
               <svg 
                 xmlns="http://www.w3.org/2000/svg" 
@@ -221,16 +256,144 @@ export function ChatInput({
                   strokeLinejoin="miter"
                 />
               </svg>
-              <select
-                value={getSelectedValue()}
-                onChange={handleContextChange}
-                disabled={disabled || isStreaming}
-                style={styles.select}
-              >
-                <option value="none">{t("chatInput.noContext")}</option>
-                <option value="page">{t("chatInput.currentPage")}</option>
-                {hasChapter && <option value="chapter">{t("chatInput.currentChapter")}</option>}
-              </select>
+              {isMobile ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setIsContextMenuOpen(!isContextMenuOpen)
+                    }}
+                    disabled={disabled || isStreaming}
+                    style={{
+                      ...styles.select,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      cursor: (disabled || isStreaming) ? 'not-allowed' : 'pointer',
+                      padding: '6px 8px',
+                      paddingRight: '2.5rem',
+                    }}
+                  >
+                    <span style={{ 
+                      flex: 1, 
+                      textAlign: 'left',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}>
+                      {getSelectedValue() === 'none' ? t("chatInput.noContext") :
+                       getSelectedValue() === 'page' ? t("chatInput.currentPage") :
+                       t("chatInput.currentChapter")}
+                    </span>
+                  </button>
+                  {isContextMenuOpen && (
+                    <div style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      right: 0,
+                      marginTop: 4,
+                      backgroundColor: 'white',
+                      border: '1px solid #E5E7EB',
+                      borderRadius: 8,
+                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                      zIndex: 1000,
+                      overflow: 'hidden',
+                      minWidth: 200,
+                      animation: 'fadeInMenu 0.15s ease-out',
+                    }}>
+                      <button
+                        type="button"
+                        onClick={() => handleMobileContextChange('none')}
+                        style={{
+                          width: '100%',
+                          padding: '8px 12px',
+                          backgroundColor: getSelectedValue() === 'none' ? '#EFF6FF' : 'transparent',
+                          border: 'none',
+                          fontSize: 13,
+                          color: getSelectedValue() === 'none' ? '#2d66f5' : '#374151',
+                          cursor: 'pointer',
+                          textAlign: 'left',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                        }}
+                      >
+                        {getSelectedValue() === 'none' && (
+                          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M11.6667 3.5L5.25 9.91667L2.33334 7" stroke="#2d66f5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        )}
+                        {t("chatInput.noContext")}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleMobileContextChange('page')}
+                        style={{
+                          width: '100%',
+                          padding: '8px 12px',
+                          backgroundColor: getSelectedValue() === 'page' ? '#EFF6FF' : 'transparent',
+                          border: 'none',
+                          fontSize: 13,
+                          color: getSelectedValue() === 'page' ? '#2d66f5' : '#374151',
+                          cursor: 'pointer',
+                          textAlign: 'left',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          borderTop: '1px solid #F3F4F6',
+                        }}
+                      >
+                        {getSelectedValue() === 'page' && (
+                          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M11.6667 3.5L5.25 9.91667L2.33334 7" stroke="#2d66f5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        )}
+                        {t("chatInput.currentPage")}
+                      </button>
+                      {hasChapter && (
+                        <button
+                          type="button"
+                          onClick={() => handleMobileContextChange('chapter')}
+                          style={{
+                            width: '100%',
+                            padding: '8px 12px',
+                            backgroundColor: getSelectedValue() === 'chapter' ? '#EFF6FF' : 'transparent',
+                            border: 'none',
+                            fontSize: 13,
+                            color: getSelectedValue() === 'chapter' ? '#2d66f5' : '#374151',
+                            cursor: 'pointer',
+                            textAlign: 'left',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 8,
+                            borderTop: '1px solid #F3F4F6',
+                          }}
+                        >
+                          {getSelectedValue() === 'chapter' && (
+                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                              <path d="M11.6667 3.5L5.25 9.91667L2.33334 7" stroke="#2d66f5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          )}
+                          {t("chatInput.currentChapter")}
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <select
+                  value={getSelectedValue()}
+                  onChange={handleContextChange}
+                  disabled={disabled || isStreaming}
+                  style={styles.select}
+                >
+                  <option value="none">{t("chatInput.noContext")}</option>
+                  <option value="page">{t("chatInput.currentPage")}</option>
+                  {hasChapter && <option value="chapter">{t("chatInput.currentChapter")}</option>}
+                </select>
+              )}
             </div>
             {getContextDisplay() && (
               <div style={styles.contextDisplay}>

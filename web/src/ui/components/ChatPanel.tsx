@@ -299,15 +299,18 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
 
       {/* Thread selector */}
       <div style={{ 
-        padding: '16px', 
+        padding: '16px',
         borderBottom: '1px solid #E5E7EB',
         minWidth: 0,
         maxWidth: '100%',
         boxSizing: 'border-box',
+        overflow: isMobile ? 'visible' : 'hidden',
+        position: 'relative',
       }}>
         <ThreadSelector 
           documentId={documentId} 
           onNewThread={handleNewThread}
+          isMobile={isMobile}
         />
       </div>
 
@@ -457,6 +460,7 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
           currentPage={currentPage || 1}
           selectedLevel={selectedLevel}
           onContextChange={handleContextChange}
+          isMobile={isMobile}
         />
       </div>
 

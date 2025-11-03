@@ -6,9 +6,10 @@ import '../styles/text-elements.css'
 interface ThreadSelectorProps {
   documentId: string
   onNewThread: () => void
+  isMobile?: boolean
 }
 
-export function ThreadSelector({ documentId, onNewThread }: ThreadSelectorProps) {
+export function ThreadSelector({ documentId, onNewThread, isMobile = false }: ThreadSelectorProps) {
   const { t } = useTranslation()
   const { threads, activeThread, selectThread, isLoading } = useChat()
   const [isOpen, setIsOpen] = useState(false)
@@ -51,7 +52,12 @@ export function ThreadSelector({ documentId, onNewThread }: ThreadSelectorProps)
   }, [isOpen])
 
   return (
-    <div ref={menuRef} style={{ position: 'relative', width: '100%', minWidth: 0, maxWidth: '100%' }}>
+    <div ref={menuRef} style={{ 
+      position: 'relative', 
+      width: '100%', 
+      minWidth: 0, 
+      maxWidth: '100%',
+    }}>
       {/* Trigger button - minimal style */}
       <button
         onClick={() => setIsOpen(!isOpen)}
@@ -165,8 +171,8 @@ export function ThreadSelector({ documentId, onNewThread }: ThreadSelectorProps)
         <div style={{
           position: 'absolute',
           top: '100%',
-          left: 0,
-          right: 0,
+          left: isMobile ? -16 : 0,
+          right: isMobile ? -16 : 0,
           marginTop: 4,
           backgroundColor: 'white',
           border: '1px solid #E5E7EB',
@@ -178,7 +184,7 @@ export function ThreadSelector({ documentId, onNewThread }: ThreadSelectorProps)
           overflowX: 'hidden',
           animation: 'fadeInMenu 0.15s ease-out',
           minWidth: 0,
-          maxWidth: '100%',
+          boxSizing: 'border-box',
         }}>
           {/* New conversation item */}
           <button

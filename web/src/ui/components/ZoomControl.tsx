@@ -26,8 +26,8 @@ export function ZoomControl({
   const zoomPercentage = Math.round(scale * 100)
   const [leftPosition, setLeftPosition] = useState<string | number>('50%')
   
-  // На планшете при открытом ассистенте ZoomControl должен быть под панелью
-  const zIndex = isTablet && isChatVisible ? 1500 : 2000
+  // На планшете и мобильном при открытом ассистенте ZoomControl должен быть под панелью
+  const zIndex = (isTablet || isMobile) && isChatVisible ? 1500 : 2000
 
   // Вычисляем позицию зум контрола
   useEffect(() => {
