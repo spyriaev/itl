@@ -384,9 +384,9 @@ body {
 
 .document-page-badge {
   position: absolute;
-  top: -6px;
+  bottom: -6px;
   right: -6px;
-  background-color: #1dd75b;
+  background-color: #2d66f5;
   color: #ffffff;
   font-size: 9px;
   font-weight: 700;

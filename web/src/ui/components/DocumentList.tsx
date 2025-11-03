@@ -240,8 +240,8 @@ export function DocumentList({ refreshTrigger, onDocumentClick, loadingDocumentI
                         {t("documentList.shared")}
                       </span>
                     )}
-                    {doc.status === 'uploaded' && (
-                      <span className="document-questions-badge" style={{ flexShrink: 0 }}>{Math.floor(Math.random() * 10) + 1}</span>
+                    {doc.status === 'uploaded' && doc.questionsCount !== undefined && doc.questionsCount > 0 && (
+                      <span className="document-questions-badge" style={{ flexShrink: 0 }}>{doc.questionsCount}</span>
                     )}
                   </div>
                   {!doc.isShared && doc.status === "uploaded" && (
@@ -348,8 +348,8 @@ export function DocumentList({ refreshTrigger, onDocumentClick, loadingDocumentI
                     {loadingDocumentId === doc.id ? t("documentList.loading") : (doc.status === "uploaded" ? formatDate(doc.createdAt) : t("documentList.loading"))}
                   </td>
                   <td>
-                    {doc.status === "uploaded" && (
-                      <span className="document-questions-badge">{Math.floor(Math.random() * 10) + 1}</span>
+                    {doc.status === "uploaded" && doc.questionsCount !== undefined && doc.questionsCount > 0 && (
+                      <span className="document-questions-badge">{doc.questionsCount}</span>
                     )}
                   </td>
                   <td

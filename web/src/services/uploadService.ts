@@ -38,6 +38,7 @@ export interface DocumentMetadata {
   lastViewedPage?: number | null
   isShared?: boolean  // Whether this document is shared (not owned by current user)
   hasActiveShare?: boolean  // Whether this document has an active share link (created by current user)
+  questionsCount?: number  // Number of questions asked for this document
 }
 
 /**

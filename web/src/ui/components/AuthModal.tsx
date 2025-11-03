@@ -23,9 +23,18 @@ export function AuthModal({ onClose, onAuthSuccess }: AuthModalProps) {
   // Call onAuthSuccess when user becomes authenticated
   React.useEffect(() => {
     if (user && onAuthSuccess) {
-      onAuthSuccess()
+      // Reset loading state
+      setLoading(false)
+      // Close modal first, then call success callback
+      if (onClose) {
+        onClose()
+      }
+      // Small delay to ensure modal closes before redirect
+      setTimeout(() => {
+        onAuthSuccess()
+      }, 100)
     }
-  }, [user, onAuthSuccess])
+  }, [user, onAuthSuccess, onClose])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -39,19 +48,19 @@ export function AuthModal({ onClose, onAuthSuccess }: AuthModalProps) {
 
       if (error) {
         setError(error.message)
+        setLoading(false)
       } else {
         if (mode === 'signup') {
           setError(t("authModal.signUpSuccess"))
+          setLoading(false)
         } else {
+          // Wait for user to be set via auth state change
           // onAuthSuccess will be called via useEffect when user is set
-          if (onClose) {
-            onClose()
-          }
+          // Keep loading true until user is set
         }
       }
     } catch (err) {
       setError(t("authModal.unexpectedError"))
-    } finally {
       setLoading(false)
     }
   }

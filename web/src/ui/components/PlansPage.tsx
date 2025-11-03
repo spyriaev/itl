@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../../contexts/AuthContext'
@@ -16,15 +16,20 @@ export function PlansPage() {
   const [isMonthly, setIsMonthly] = useState(true)
   const [showAuthModal, setShowAuthModal] = useState(false)
 
+  // Redirect if user is already authenticated
+  useEffect(() => {
+    if (!loading && user) {
+      navigate('/app')
+    }
+  }, [user, loading, navigate])
+
   const handleTryClick = () => {
     setShowAuthModal(true)
   }
 
   const handleAuthSuccess = () => {
     setShowAuthModal(false)
-    setTimeout(() => {
-      navigate('/app')
-    }, 100)
+    navigate('/app')
   }
 
   if (loading) {
@@ -33,6 +38,10 @@ export function PlansPage() {
         <div style={styles.spinner}></div>
       </div>
     )
+  }
+
+  if (user) {
+    return null // Will redirect
   }
 
   // Pricing data

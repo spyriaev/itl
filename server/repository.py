@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import desc, and_, or_
+from sqlalchemy import desc, and_, or_, func
 from typing import List, Optional, Dict, Any
 import uuid
 import secrets
@@ -38,7 +38,8 @@ def create_document(db: Session, request: CreateDocumentRequest, user_id: str) -
         sizeBytes=db_document.size_bytes,
         mime=db_document.mime,
         status=db_document.status,
-        createdAt=db_document.created_at.isoformat()
+        createdAt=db_document.created_at.isoformat(),
+        questionsCount=0
     )
 
 def list_documents(db: Session, user_id: str, limit: int = 50, offset: int = 0) -> List[DocumentResponse]:
@@ -96,6 +97,22 @@ def list_documents(db: Session, user_id: str, limit: int = 50, offset: int = 0) 
     # Apply pagination
     paginated_docs = sorted_docs[offset:offset + limit]
     
+    # Get questions count for each document
+    # Count all user messages (questions) for each document
+    questions_counts = {}
+    if paginated_docs:
+        doc_ids = [doc.id for doc in paginated_docs]
+        questions_counts_result = db.query(
+            ChatThread.document_id,
+            func.count(ChatMessage.id).label('count')
+        ).join(ChatMessage, ChatMessage.thread_id == ChatThread.id)\
+         .filter(ChatThread.document_id.in_(doc_ids))\
+         .filter(ChatMessage.role == 'user')\
+         .group_by(ChatThread.document_id)\
+         .all()
+        
+        questions_counts = {doc_id: count for doc_id, count in questions_counts_result}
+    
     return [
         DocumentResponse(
             id=str(doc.id),
@@ -107,7 +124,8 @@ def list_documents(db: Session, user_id: str, limit: int = 50, offset: int = 0) 
             createdAt=doc.created_at.isoformat(),
             lastViewedPage=doc.last_viewed_page,
             isShared=doc.id in shared_ids and doc.id not in owned_ids,
-            hasActiveShare=doc.id in documents_with_active_shares
+            hasActiveShare=doc.id in documents_with_active_shares,
+            questionsCount=questions_counts.get(doc.id, 0)
         )
         for doc in paginated_docs
     ]

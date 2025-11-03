@@ -129,6 +129,7 @@ class DocumentResponse(BaseModel):
     lastViewedPage: Optional[int] = None
     isShared: Optional[bool] = False  # True if document is shared (not owned by current user)
     hasActiveShare: Optional[bool] = False  # True if document has an active share link (created by current user)
+    questionsCount: Optional[int] = 0  # Number of questions asked for this document
     
     class Config:
         from_attributes = True
