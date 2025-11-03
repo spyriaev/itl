@@ -1,0 +1,110 @@
+/* Design System Buttons */
+
+/* Primary Button (Button 414) */
+.button-primary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px;
+  height: 36px;
+  font-family: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  font-size: 14px;
+  line-height: 22px;
+  font-weight: 400;
+  color: #FFFFFF;
+  background: #2D66F5;
+  opacity: 1;
+  border: none;
+  border-radius: 4px;
+  box-shadow: 0px 4px 9px rgba(45, 102, 245, 0.11), 0px 0px 2px rgba(45, 102, 245, 0.12);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  gap: 6px;
+}
+
+.button-primary:hover:not(:disabled) {
+  color: #FFFFFF;
+  background: #1353F4;
+}
+
+.button-primary:active:not(:disabled) {
+  color: #FFFFFF;
+  background: #093FC7;
+}
+
+.button-primary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Secondary Button (Button 413) */
+.button-secondary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px;
+  height: 36px;
+  font-family: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  font-size: 14px;
+  line-height: 22px;
+  font-weight: 400;
+  color: #2D66F5;
+  background: #F0F4FE;
+  opacity: 1;
+  border: none;
+  border-radius: 4px;
+  box-shadow: 0px 4px 9px rgba(45, 102, 245, 0.11), 0px 0px 2px rgba(45, 102, 245, 0.12);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  gap: 6px;
+}
+
+.button-secondary:hover:not(:disabled) {
+  color: #2D66F5;
+  background: #D8E2FD;
+}
+
+.button-secondary:active:not(:disabled) {
+  color: #2D66F5;
+  background: #C0D1FC;
+}
+
+.button-secondary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.button-secondary .icon {
+  width: 16px;
+  height: 16px;
+  fill: #2D66F5;
+}
+
+/* Tablet (iPad) responsive adjustments */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .button-primary,
+  .button-secondary {
+    white-space: nowrap !important;
+    min-width: fit-content !important;
+  }
+}
+
+/* Mobile responsive adjustments */
+@media (max-width: 768px) {
+  .button-primary,
+  .button-secondary {
+    font-size: 13px;
+    padding: 0 10px;
+    height: 32px;
+  }
+}
+
+@media (max-width: 480px) {
+  .button-primary,
+  .button-secondary {
+    font-size: 12px;
+    padding: 0 8px;
+    height: 30px;
+  }
+}
+

@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useChat } from '../../contexts/ChatContext'
+import '../styles/text-elements.css'
 
 interface ThreadSelectorProps {
   documentId: string
@@ -123,6 +124,7 @@ export function ThreadSelector({ documentId, onNewThread }: ThreadSelectorProps)
             flex: 1,
             minWidth: 0,
             maxWidth: '100%',
+            color: '#374151',
           }}>
             {activeThread ? activeThread.title : t("threadSelector.conversations")}
           </span>
@@ -276,6 +278,11 @@ export function ThreadSelector({ documentId, onNewThread }: ThreadSelectorProps)
                 onMouseEnter={(e) => {
                   if (activeThread?.id !== thread.id) {
                     e.currentTarget.style.backgroundColor = '#F9FAFB'
+                    // Ensure text color stays gray, not blue
+                    const textDiv = e.currentTarget.querySelector('div > div:first-child') as HTMLElement
+                    if (textDiv) {
+                      textDiv.style.color = '#111827'
+                    }
                   }
                 }}
                 onMouseLeave={(e) => {
@@ -316,6 +323,7 @@ export function ThreadSelector({ documentId, onNewThread }: ThreadSelectorProps)
                     fontSize: 13,
                     color: activeThread?.id === thread.id ? '#2d66f5' : '#111827',
                     width: '100%',
+                    transition: 'color 0.15s ease',
                   }}>
                     {thread.title}
                   </div>

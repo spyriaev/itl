@@ -1,5 +1,6 @@
 import React from 'react'
 import { createRoot } from 'react-dom/client'
+import { BrowserRouter } from 'react-router-dom'
 import './lib/i18n'
 import { App } from './ui/App'
 
@@ -24,4 +25,8 @@ window.addEventListener('unhandledrejection', (event) => {
 })
 
 const root = createRoot(document.getElementById('root')!)
-root.render(<App />)
+root.render(
+  <BrowserRouter>
+    <App />
+  </BrowserRouter>
+)

@@ -75,5 +75,35 @@
   },
   "chatMessage": {
     "page": "Página"
+  },
+  "landing": {
+    "betaAccess": "Acceso Beta Exclusivo. Se Requiere Invitación",
+    "contact": "Contacto",
+    "plans": "Planes",
+    "tryInnesi": "Prueba Innesi Reader →",
+    "heroTitle": "Sumérgete en el conocimiento con inteligencia artificial",
+    "heroSubtitle": "¿Alguna vez has sentido que te \"ahogas\" en nuevo material? ¿Pasas horas leyendo, pero la esencia se escapa?",
+    "downloadApps": "iOS, Android, MacOS, Windows",
+    "startOnWeb": "Comenzar en la web",
+    "soon": "PRÓXIMAMENTE",
+    "featuresTitle": "Características que te encantarán",
+    "feature1Title": "Todos tus archivos importantes, siempre seguros y accesibles.",
+    "feature1Desc": "Tu disco duro digital seguro en la nube - accesible desde cualquier lugar, en cualquier momento.",
+    "feature2Title": "Compartir archivos hecho simple.",
+    "feature2Desc": "Comparte archivos con colegas, amigos o familiares con solo unos clics. Tú controlas quién puede acceder y editar el contenido compartido.",
+    "feature2Cta": "Sube un archivo para compartir →",
+    "feature3Title": "Colaboración en tiempo real: Edición de documentos y vistas previas",
+    "feature3Desc": "Trabaja en proyectos juntos en tiempo real. Comenta, edita y lluvia de ideas directamente en la nube, sin necesidad de descargar. Previsualiza archivos antes de abrirlos.",
+    "feature3Cta": "Prueba Porta para tu equipo →",
+    "feature4Title": "Respaldo y Sincronización Automática",
+    "feature4Desc": "Relájate sabiendo que tus archivos se respaldan y sincronizan automáticamente en todos tus dispositivos.",
+    "footer": {
+      "aboutUs": "Acerca de nosotros",
+      "ourProducts": "Nuestros productos",
+      "privacy": "Privacidad",
+      "terms": "Términos",
+      "havingQuestion": "¿Tienes alguna pregunta? Contacta",
+      "support": "soporte."
+    }
   }
 }

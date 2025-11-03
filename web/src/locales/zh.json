@@ -75,5 +75,35 @@
   },
   "chatMessage": {
     "page": "页面"
+  },
+  "landing": {
+    "betaAccess": "独家测试版访问。需要邀请",
+    "contact": "联系",
+    "plans": "计划",
+    "tryInnesi": "试用 Innesi Reader →",
+    "heroTitle": "通过人工智能沉浸于知识中",
+    "heroSubtitle": "你是否曾经感到在新材料中\"溺水\"？花数小时阅读，但精髓却溜走了？",
+    "downloadApps": "iOS, Android, MacOS, Windows",
+    "startOnWeb": "在网页上开始",
+    "soon": "即将推出",
+    "featuresTitle": "您会喜欢的功能",
+    "feature1Title": "您所有重要的文件，始终安全且可访问。",
+    "feature1Desc": "您在云中的安全数字硬盘驱动器 - 随时随地可访问。",
+    "feature2Title": "文件共享变得简单。",
+    "feature2Desc": "只需点击几下即可与同事、朋友或家人共享文件。您可以控制谁可以访问和编辑共享内容。",
+    "feature2Cta": "上传文件进行共享 →",
+    "feature3Title": "实时协作：文档编辑和预览",
+    "feature3Desc": "实时协作处理项目。直接在云端评论、编辑和头脑风暴，无需下载。在打开文件之前预览文件。",
+    "feature3Cta": "为您的团队试用 Porta →",
+    "feature4Title": "自动备份和同步",
+    "feature4Desc": "放心，您的文件会自动备份并同步到所有设备。",
+    "footer": {
+      "aboutUs": "关于我们",
+      "ourProducts": "我们的产品",
+      "privacy": "隐私",
+      "terms": "条款",
+      "havingQuestion": "有疑问？联系",
+      "support": "支持。"
+    }
   }
 }

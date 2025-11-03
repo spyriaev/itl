@@ -1,0 +1,23 @@
+/* Prevent dark blue hover on text elements - use light gray instead */
+/* Apply to text elements inside buttons */
+button:hover span,
+button:hover div {
+  color: #9CA3AF !important;
+}
+
+/* Exception: Keep blue color for elements that explicitly have blue in their style (like active states) */
+/* Note: This uses attribute selector which checks the style attribute string */
+button span[style*="#2d66f5"],
+button div[style*="#2d66f5"],
+button span[style*="2d66f5"],
+button div[style*="2d66f5"] {
+  color: inherit !important;
+}
+
+button:hover span[style*="#2d66f5"],
+button:hover div[style*="#2d66f5"],
+button:hover span[style*="2d66f5"],
+button:hover div[style*="2d66f5"] {
+  color: #2d66f5 !important;
+}
+

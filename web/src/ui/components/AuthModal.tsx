@@ -1,21 +1,31 @@
 import React, { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../../contexts/AuthContext'
+import '../styles/buttons.css'
+import '../styles/typography.css'
 
 interface AuthModalProps {
   onClose?: () => void
+  onAuthSuccess?: () => void
 }
 
-export function AuthModal({ onClose }: AuthModalProps) {
+export function AuthModal({ onClose, onAuthSuccess }: AuthModalProps) {
   const { t } = useTranslation()
+  const { user } = useAuth()
   const [mode, setMode] = useState<'signin' | 'signup'>('signin')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const [hoveredSubmit, setHoveredSubmit] = useState(false)
   const [hoveredGoogle, setHoveredGoogle] = useState(false)
   const { signIn, signUp, signInWithGoogle } = useAuth()
+
+  // Call onAuthSuccess when user becomes authenticated
+  React.useEffect(() => {
+    if (user && onAuthSuccess) {
+      onAuthSuccess()
+    }
+  }, [user, onAuthSuccess])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -32,8 +42,11 @@ export function AuthModal({ onClose }: AuthModalProps) {
       } else {
         if (mode === 'signup') {
           setError(t("authModal.signUpSuccess"))
-        } else if (onClose) {
-          onClose()
+        } else {
+          // onAuthSuccess will be called via useEffect when user is set
+          if (onClose) {
+            onClose()
+          }
         }
       }
     } catch (err) {
@@ -61,11 +74,24 @@ export function AuthModal({ onClose }: AuthModalProps) {
 
   return (
     <div style={styles.overlay}>
-      <div style={styles.modal}>
+      <div style={styles.modal} data-auth-modal>
         <div style={styles.header}>
-          <h2 style={styles.title}>
+          <h2 className="text-heading-small">
             {mode === 'signin' ? t("authModal.signIn") : t("authModal.signUp")}
           </h2>
+          {onClose && (
+            <button
+              type="button"
+              aria-label="Close"
+              onClick={onClose}
+              style={styles.closeButton}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          )}
         </div>
 
         <div style={styles.tabs}>
@@ -127,12 +153,7 @@ export function AuthModal({ onClose }: AuthModalProps) {
 
           <button
             type="submit"
-            style={{
-              ...styles.submitButton,
-              ...(hoveredSubmit ? styles.submitButtonHover : {}),
-            }}
-            onMouseEnter={() => setHoveredSubmit(true)}
-            onMouseLeave={() => setHoveredSubmit(false)}
+            className="button-primary"
             disabled={loading}
           >
             {loading ? t("authModal.loading") : mode === 'signin' ? t("authModal.signIn") : t("authModal.signUp")}
@@ -194,19 +215,27 @@ const styles: { [key: string]: React.CSSProperties } = {
   modal: {
     backgroundColor: 'white',
     borderRadius: '12px',
-    padding: '32px',
+    padding: '28px',
     width: '100%',
-    maxWidth: '420px',
+    maxWidth: '400px',
     boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+    position: 'relative',
   },
   header: {
-    marginBottom: '24px',
+    marginBottom: '20px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: '12px',
   },
-  title: {
-    fontSize: '24px',
-    fontWeight: 'bold',
-    color: '#1a1a1a',
-    margin: 0,
+  closeButton: {
+    background: 'transparent',
+    border: 'none',
+    padding: '6px',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    lineHeight: 0,
+    color: '#6b7280',
   },
   tabs: {
     display: 'flex',
@@ -219,17 +248,20 @@ const styles: { [key: string]: React.CSSProperties } = {
     padding: '12px',
     border: 'none',
     background: 'none',
-    fontSize: '16px',
-    fontWeight: '500',
-    color: '#6b7280',
+    fontSize: '14px',
+    lineHeight: '22px',
+    fontFamily: "'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif",
+    fontWeight: '400',
+    color: '#565E6C',
     cursor: 'pointer',
     borderBottom: '2px solid transparent',
     marginBottom: '-2px',
     transition: 'all 0.2s',
   },
   tabActive: {
-    color: '#3b82f6',
-    borderBottomColor: '#3b82f6',
+    fontWeight: '700',
+    color: '#171A1F',
+    borderBottomColor: '#171A1F',
   },
   form: {
     display: 'flex',
@@ -243,14 +275,20 @@ const styles: { [key: string]: React.CSSProperties } = {
   },
   label: {
     fontSize: '14px',
-    fontWeight: '500',
-    color: '#374151',
+    lineHeight: '22px',
+    fontFamily: "'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif",
+    fontWeight: '400',
+    color: '#323842',
   },
   input: {
     padding: '10px 12px',
     border: '1px solid #d1d5db',
-    borderRadius: '6px',
-    fontSize: '16px',
+    borderRadius: '4px',
+    fontSize: '14px',
+    lineHeight: '22px',
+    fontFamily: "'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif",
+    fontWeight: '400',
+    color: '#323842',
     transition: 'border-color 0.2s',
   },
   error: {
@@ -260,24 +298,6 @@ const styles: { [key: string]: React.CSSProperties } = {
     borderRadius: '6px',
     color: '#dc2626',
     fontSize: '14px',
-  },
-  submitButton: {
-    padding: '12px',
-    backgroundColor: '#3b82f6',
-    color: 'white',
-    border: 'none',
-    borderRadius: '6px',
-    fontSize: '16px',
-    fontWeight: '600',
-    cursor: 'pointer',
-    transition: 'all 0.2s ease-in-out',
-    boxShadow: '0 2px 4px rgba(59, 130, 246, 0.2)',
-  },
-  submitButtonHover: {
-    backgroundColor: '#1d4ed8 !important',
-    transform: 'translateY(-2px)',
-    boxShadow: '0 6px 16px rgba(59, 130, 246, 0.4)',
-    color: 'white !important',
   },
   divider: {
     position: 'relative',
@@ -318,22 +338,38 @@ const styles: { [key: string]: React.CSSProperties } = {
   },
 }
 
-// Add divider line using ::before pseudo-element effect
+// Add divider line and responsive styles
 const dividerStyle = document.createElement('style')
 dividerStyle.textContent = `
   input:focus {
     outline: none;
-    border-color: #3b82f6;
+    border-color: #2d66f5;
   }
   button:disabled {
     opacity: 0.6;
     cursor: not-allowed;
   }
-  button[type="submit"]:hover:not(:disabled) {
-    background-color: #1d4ed8 !important;
-    transform: translateY(-2px);
-    box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4) !important;
-    color: white !important;
+  @media (max-width: 768px) {
+    [data-auth-modal] {
+      max-width: 360px !important;
+      padding: 20px !important;
+    }
+    [data-auth-modal] h2 {
+      font-size: 20px !important;
+    }
+    [data-auth-modal] input,
+    [data-auth-modal] button {
+      font-size: 14px !important;
+    }
+  }
+  @media (max-width: 480px) {
+    [data-auth-modal] {
+      max-width: 320px !important;
+      padding: 16px !important;
+    }
+    [data-auth-modal] h2 {
+      font-size: 18px !important;
+    }
   }
 `
 document.head.appendChild(dividerStyle)

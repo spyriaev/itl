@@ -2,11 +2,13 @@
 
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
+import { useNavigate } from "react-router-dom"
 import { useAuth } from "../../contexts/AuthContext"
 import { LanguageSelector } from "./LanguageSelector"
 
 export function UserMenu() {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const { user, signOut } = useAuth()
   const [isOpen, setIsOpen] = useState(false)
 
@@ -18,6 +20,7 @@ export function UserMenu() {
 
   const handleSignOut = async () => {
     await signOut()
+    navigate('/')
   }
 
   return (

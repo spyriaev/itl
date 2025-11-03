@@ -75,5 +75,35 @@
   },
   "chatMessage": {
     "page": "Page"
+  },
+  "landing": {
+    "betaAccess": "Exclusive Beta Access. Invitation Required",
+    "contact": "Contact",
+    "plans": "Plans",
+    "tryInnesi": "Try Innesi Reader →",
+    "heroTitle": "Immerse yourself in knowledge with artificial intelligence",
+    "heroSubtitle": "Have you ever felt like you're \"drowning\" in new material? Spending hours reading, but the essence slips away?",
+    "downloadApps": "iOS, Android, MacOS, Windows",
+    "startOnWeb": "Start on web",
+    "soon": "SOON",
+    "featuresTitle": "Features you'll love",
+    "feature1Title": "All your important files, always safe and accessible.",
+    "feature1Desc": "Your secure digital hard drive in the cloud - accessible from anywhere, at any time.",
+    "feature2Title": "File sharing made simple.",
+    "feature2Desc": "Share files with colleagues, friends, or family with just a few clicks. You control who can access and edit the shared content.",
+    "feature2Cta": "Upload a file to share →",
+    "feature3Title": "Real-time collaboration: Document editing & previews",
+    "feature3Desc": "Work on projects together in real-time. Comment, edit, and brainstorm directly in the cloud, without the need for downloading. Preview files before you open them.",
+    "feature3Cta": "Try Porta for your team →",
+    "feature4Title": "Automatic Backup & Sync",
+    "feature4Desc": "Relax knowing your files are automatically backed up and synced across all your devices.",
+    "footer": {
+      "aboutUs": "About us",
+      "ourProducts": "Our products",
+      "privacy": "Privacy",
+      "terms": "Terms",
+      "havingQuestion": "Having question? Contact",
+      "support": "support."
+    }
   }
 }
