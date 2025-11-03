@@ -34,6 +34,7 @@ export interface DocumentMetadata {
   mime: string
   status: string
   createdAt: string
+  lastViewedPage?: number | null
 }
 
 /**

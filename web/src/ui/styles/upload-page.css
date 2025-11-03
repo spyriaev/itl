@@ -373,11 +373,40 @@ body {
   gap: 12px;
 }
 
+.document-icon-container {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.document-page-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  background-color: #1dd75b;
+  color: #ffffff;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 5px;
+  border-radius: 8px;
+  line-height: 1;
+  min-width: 16px;
+  text-align: center;
+  z-index: 2;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
 .document-icon {
   width: 24px;
   height: 24px;
   color: #6e7787;
   flex-shrink: 0;
+  position: relative;
+  z-index: 1;
 }
 
 .document-name {

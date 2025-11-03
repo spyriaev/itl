@@ -79,6 +79,7 @@ class DocumentResponse(BaseModel):
     mime: Optional[str] = None
     status: str
     createdAt: str
+    lastViewedPage: Optional[int] = None
     
     class Config:
         from_attributes = True

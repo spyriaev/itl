@@ -55,7 +55,8 @@ def list_documents(db: Session, user_id: str, limit: int = 50, offset: int = 0) 
             sizeBytes=doc.size_bytes,
             mime=doc.mime,
             status=doc.status,
-            createdAt=doc.created_at.isoformat()
+            createdAt=doc.created_at.isoformat(),
+            lastViewedPage=doc.last_viewed_page
         )
         for doc in documents
     ]
