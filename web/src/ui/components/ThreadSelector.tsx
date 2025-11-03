@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { useChat } from '../../contexts/ChatContext'
 import '../styles/text-elements.css'
@@ -13,7 +14,9 @@ export function ThreadSelector({ documentId, onNewThread, isMobile = false }: Th
   const { t } = useTranslation()
   const { threads, activeThread, selectThread, isLoading } = useChat()
   const [isOpen, setIsOpen] = useState(false)
+  const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0, width: 0 })
   const menuRef = useRef<HTMLDivElement>(null)
+  const buttonRef = useRef<HTMLButtonElement>(null)
 
   const formatTime = (timestamp: string) => {
     const date = new Date(timestamp)
@@ -34,22 +37,48 @@ export function ThreadSelector({ documentId, onNewThread, isMobile = false }: Th
     setIsOpen(false)
   }
 
-  // Close menu when clicking outside
+  // Update menu position when opening
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setIsOpen(false)
-      }
+    if (isOpen && isMobile && buttonRef.current) {
+      // Use requestAnimationFrame to ensure button is rendered
+      requestAnimationFrame(() => {
+        if (buttonRef.current) {
+          const buttonRect = buttonRef.current.getBoundingClientRect()
+          setMenuPosition({
+            top: buttonRect.bottom + 4,
+            left: buttonRect.left,
+            width: buttonRect.width
+          })
+        }
+      })
+    } else if (!isOpen) {
+      // Reset position when closing
+      setMenuPosition({ top: 0, left: 0, width: 0 })
     }
+  }, [isOpen, isMobile])
 
-    if (isOpen) {
-      // Use click instead of mousedown to allow button clicks to process first
-      document.addEventListener('click', handleClickOutside)
+  // Close menu when clicking outside (only for desktop)
+  useEffect(() => {
+    if (!isMobile && isOpen) {
+      const handleClickOutside = (event: MouseEvent) => {
+        if (menuRef.current && buttonRef.current && 
+            !menuRef.current.contains(event.target as Node) &&
+            !buttonRef.current.contains(event.target as Node)) {
+          setIsOpen(false)
+        }
+      }
+
+      // Use a small delay to avoid immediate closure
+      const timeoutId = setTimeout(() => {
+        document.addEventListener('click', handleClickOutside)
+      }, 0)
+
       return () => {
+        clearTimeout(timeoutId)
         document.removeEventListener('click', handleClickOutside)
       }
     }
-  }, [isOpen])
+  }, [isOpen, isMobile])
 
   return (
     <div ref={menuRef} style={{ 
@@ -60,7 +89,11 @@ export function ThreadSelector({ documentId, onNewThread, isMobile = false }: Th
     }}>
       {/* Trigger button - minimal style */}
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        ref={buttonRef}
+        onClick={(e) => {
+          e.stopPropagation()
+          setIsOpen(!isOpen)
+        }}
         disabled={isLoading}
         style={{
           width: '100%',
@@ -167,25 +200,53 @@ export function ThreadSelector({ documentId, onNewThread, isMobile = false }: Th
       </button>
 
       {/* Context menu */}
-      {isOpen && (
-        <div style={{
-          position: 'absolute',
-          top: '100%',
-          left: isMobile ? -16 : 0,
-          right: isMobile ? -16 : 0,
-          marginTop: 4,
-          backgroundColor: 'white',
-          border: '1px solid #E5E7EB',
-          borderRadius: 8,
-          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-          zIndex: 1000,
-          maxHeight: 320,
-          overflowY: 'auto',
-          overflowX: 'hidden',
-          animation: 'fadeInMenu 0.15s ease-out',
-          minWidth: 0,
-          boxSizing: 'border-box',
-        }}>
+      {isOpen && (() => {
+        const menuContent = (
+          <>
+            {isMobile && (
+              <div
+                onMouseDown={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setIsOpen(false)
+                }}
+                style={{
+                  position: 'fixed',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  backgroundColor: 'rgba(0, 0, 0, 0.3)',
+                  zIndex: 2999,
+                  pointerEvents: 'auto',
+                }}
+              />
+            )}
+            <div 
+              ref={isMobile ? null : menuRef}
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                position: isMobile ? 'fixed' : 'absolute',
+                top: isMobile ? `${menuPosition.top}px` : '100%',
+                left: isMobile ? `${menuPosition.left}px` : (isMobile ? -16 : 0),
+                width: isMobile ? `${menuPosition.width}px` : undefined,
+                right: isMobile ? undefined : (isMobile ? -16 : 0),
+                marginTop: isMobile ? 0 : 4,
+                backgroundColor: 'white',
+                border: '1px solid #E5E7EB',
+                borderRadius: 8,
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                zIndex: isMobile ? 3000 : 2000,
+                maxHeight: isMobile ? '60vh' : 320,
+                overflowY: 'auto',
+                overflowX: 'hidden',
+                animation: 'fadeInMenu 0.15s ease-out',
+                minWidth: 0,
+                boxSizing: 'border-box',
+              }}>
           {/* New conversation item */}
           <button
             onClick={(e) => {
@@ -364,8 +425,14 @@ export function ThreadSelector({ documentId, onNewThread, isMobile = false }: Th
               </button>
             ))
           )}
-        </div>
-      )}
+            </div>
+          </>
+        )
+
+        return isMobile && typeof document !== 'undefined' 
+          ? createPortal(menuContent, document.body)
+          : menuContent
+      })()}
 
       {/* Styles */}
       <style>{`
@@ -373,6 +440,16 @@ export function ThreadSelector({ documentId, onNewThread, isMobile = false }: Th
           from {
             opacity: 0;
             transform: translateY(-4px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        @keyframes slideUpMenu {
+          from {
+            opacity: 0;
+            transform: translateY(100%);
           }
           to {
             opacity: 1;

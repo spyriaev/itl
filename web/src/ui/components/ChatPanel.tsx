@@ -304,8 +304,9 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
         minWidth: 0,
         maxWidth: '100%',
         boxSizing: 'border-box',
-        overflow: isMobile ? 'visible' : 'hidden',
+        overflow: 'visible',
         position: 'relative',
+        zIndex: 1,
       }}>
         <ThreadSelector 
           documentId={documentId} 
@@ -348,6 +349,8 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
         overflowY: 'auto',
         padding: '16px 0',
         backgroundColor: '#FAFAFA',
+        position: 'relative',
+        zIndex: 0,
       }}>
         {messages.length === 0 ? (
           <div style={{
