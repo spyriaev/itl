@@ -15,7 +15,7 @@ export function UserMenu() {
   if (!user) return null
 
   const getInitials = (email: string) => {
-    return email.substring(0, 2).toUpperCase()
+    return email.substring(0, 1).toUpperCase()
   }
 
   const handleSignOut = async () => {
