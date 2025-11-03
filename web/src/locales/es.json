@@ -203,5 +203,16 @@
     "errorLoading": "Error al cargar el documento compartido",
     "invalidToken": "Token de compartición inválido o expirado",
     "backToLibrary": "Volver a la Biblioteca"
+  },
+  "textSelection": {
+    "explainWithExample": "Explicar con ejemplo",
+    "whatDoesThisMean": "¿Qué significa esto?",
+    "moreInfo": "Más información",
+    "questionExplainWithExample": "Explicar con ejemplo: {text}",
+    "questionWhatDoesThisMean": "¿Qué significa: {text}?",
+    "questionMoreInfo": "Dar más información sobre: {text}",
+    "selectedText": "Texto seleccionado",
+    "close": "Cerrar",
+    "generatingAnswer": "Generando respuesta..."
   }
 }

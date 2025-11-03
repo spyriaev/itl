@@ -7,6 +7,8 @@ import { ChatProvider, useChat } from '../../contexts/ChatContext'
 import { ChatPanel } from './ChatPanel'
 import { PageRelatedQuestions } from './PageRelatedQuestions'
 import { ZoomControl } from './ZoomControl'
+import { TextSelectionMenu } from './TextSelectionMenu'
+import { FloatingAnswer } from './FloatingAnswer'
 import 'react-pdf/dist/Page/AnnotationLayer.css'
 import 'react-pdf/dist/Page/TextLayer.css'
 
@@ -73,6 +75,15 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
   const [visiblePageRange, setVisiblePageRange] = useState<{ start: number, end: number }>({ start: 1, end: 10 })
   const [assistantButtonPosition, setAssistantButtonPosition] = useState<{ right: number | string, bottom: number | string }>({ right: 24, bottom: 24 })
 
+  // Text selection state
+  const [selectionMenu, setSelectionMenu] = useState<{ position: { top: number; left: number }, selectedText: string, pageNumber: number } | null>(null)
+  const [floatingAnswer, setFloatingAnswer] = useState<{ selectedText: string, question: string, answer: string, isStreaming: boolean, position?: { top: number; left: number }, questionTimestamp: number } | null>(null)
+  const [selectedTextRange, setSelectedTextRange] = useState<Range | null>(null)
+  const [initialChatInputValue, setInitialChatInputValue] = useState<string>('')
+  const selectionRangeRef = useRef<Range | null>(null)
+  const questionTimestampRef = useRef<number | null>(null)
+  const questionPageNumberRef = useRef<number | null>(null)
+
   // Refs для отслеживания скролла
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const pageRefs = useRef<(HTMLDivElement | null)[]>([])
@@ -101,7 +112,7 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
   const renderCompleteCalledRef = useRef(false)
 
   // Get chat context for navigation and assistant state
-  const { navigateToMessage, isStreaming } = useChat()
+  const { navigateToMessage, isStreaming, startNewConversation, activeThread, sendMessage } = useChat()
 
   // Cooldown для форс-восстановления, чтобы не зациклиться пока страницы ещё не смонтировались
   const lastForceRestoreRef = useRef(0)
@@ -455,6 +466,385 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
     }
     navigateToMessage(threadId, messageId)
   }, [isChatVisible, navigateToMessage])
+
+  // Handle text selection
+  const handleTextSelection = useCallback((e: MouseEvent) => {
+    const selection = window.getSelection()
+    if (!selection || selection.rangeCount === 0) {
+      setSelectionMenu(null)
+      setSelectedTextRange(null)
+      selectionRangeRef.current = null
+      return
+    }
+
+    const range = selection.getRangeAt(0)
+    const selectedText = range.toString().trim()
+
+    // Check if selection is empty or too short
+    if (!selectedText || selectedText.length < 2) {
+      setSelectionMenu(null)
+      setSelectedTextRange(null)
+      selectionRangeRef.current = null
+      return
+    }
+
+    // Limit maximum selection length (prevent selecting entire page)
+    const MAX_SELECTION_LENGTH = 5000 // characters
+    if (selectedText.length > MAX_SELECTION_LENGTH) {
+      setSelectionMenu(null)
+      setSelectedTextRange(null)
+      selectionRangeRef.current = null
+      return
+    }
+
+    // Check if both start and end containers are within PDF text layers
+    const startContainer = range.startContainer
+    const endContainer = range.endContainer
+    
+    const getTextLayerForNode = (node: Node): HTMLElement | null => {
+      if (node.nodeType === Node.TEXT_NODE) {
+        return (node.parentElement?.closest('.react-pdf__Page__textContent') as HTMLElement) || null
+      } else if (node.nodeType === Node.ELEMENT_NODE) {
+        return (node as HTMLElement).closest('.react-pdf__Page__textContent') as HTMLElement | null
+      }
+      return null
+    }
+
+    const startTextLayer = getTextLayerForNode(startContainer)
+    const endTextLayer = getTextLayerForNode(endContainer)
+
+    // Both start and end must be in text layers
+    if (!startTextLayer || !endTextLayer) {
+      setSelectionMenu(null)
+      setSelectedTextRange(null)
+      selectionRangeRef.current = null
+      return
+    }
+
+    // Both must be in the same text layer (same page)
+    if (startTextLayer !== endTextLayer) {
+      setSelectionMenu(null)
+      setSelectedTextRange(null)
+      selectionRangeRef.current = null
+      return
+    }
+
+    const textLayerElement = startTextLayer
+
+    // Additional check: verify that the common ancestor is also within the same text layer
+    const commonAncestor = range.commonAncestorContainer
+    const commonAncestorTextLayer = getTextLayerForNode(commonAncestor)
+    
+    if (!commonAncestorTextLayer || commonAncestorTextLayer !== textLayerElement) {
+      setSelectionMenu(null)
+      setSelectedTextRange(null)
+      selectionRangeRef.current = null
+      return
+    }
+
+    // Additional safety check: ensure the selection doesn't span too many elements
+    // Count direct text nodes in the selection to ensure it's reasonable
+    let textNodeCount = 0
+    const maxTextNodes = 100 // Reasonable limit for a selection
+    
+    try {
+      const walker = document.createTreeWalker(
+        range.commonAncestorContainer,
+        NodeFilter.SHOW_TEXT,
+        {
+          acceptNode: (node) => {
+            // Only count nodes that are actually within the range
+            const nodeRange = document.createRange()
+            nodeRange.selectNodeContents(node)
+            const startComparison = range.compareBoundaryPoints(Range.START_TO_START, nodeRange)
+            const endComparison = range.compareBoundaryPoints(Range.END_TO_END, nodeRange)
+            
+            // Node is within range if it's not completely before start or after end
+            if (startComparison <= 0 && endComparison >= 0 && node.textContent && node.textContent.trim().length > 0) {
+              textNodeCount++
+              return NodeFilter.FILTER_ACCEPT
+            }
+            return NodeFilter.FILTER_SKIP
+          }
+        }
+      )
+      
+      walker.nextNode() // Start walking
+      while (walker.nextNode() && textNodeCount < maxTextNodes) {
+        // Continue counting
+      }
+      
+      // If we hit the limit, the selection is too large
+      if (textNodeCount >= maxTextNodes) {
+        setSelectionMenu(null)
+        setSelectedTextRange(null)
+        selectionRangeRef.current = null
+        return
+      }
+    } catch (err) {
+      // If walker fails, reject the selection to be safe
+      console.warn('Error validating selection range:', err)
+      setSelectionMenu(null)
+      setSelectedTextRange(null)
+      selectionRangeRef.current = null
+      return
+    }
+
+    // Find the page number by finding the page container
+    let pageElement = textLayerElement.closest('[data-page-number]') || textLayerElement.closest('.react-pdf__Page')
+    let pageNumber = currentPage
+
+    if (pageElement) {
+      // Try to extract page number from data attribute or parent
+      const pageNumberAttr = pageElement.getAttribute('data-page-number')
+      if (pageNumberAttr) {
+        pageNumber = parseInt(pageNumberAttr, 10)
+      } else {
+        // Find page number by checking which page ref contains this element
+        for (let i = 0; i < pageRefs.current.length; i++) {
+          if (pageRefs.current[i]?.contains(textLayerElement)) {
+            pageNumber = i + 1
+            break
+          }
+        }
+      }
+    }
+
+    // Get selection position for menu - position at the end of selection
+    // Create a range that only contains the end of the selection
+    const endRange = range.cloneRange()
+    endRange.collapse(false) // Collapse to end point
+    const endPoint = endRange.getBoundingClientRect()
+    
+    // Also get full selection rect for fallback
+    const fullRect = range.getBoundingClientRect()
+    
+    // Use end point if available, otherwise use right edge of full selection
+    const endX = endPoint.width > 0 ? endPoint.right : fullRect.right
+    const endY = endPoint.height > 0 ? endPoint.bottom : fullRect.bottom
+    
+    // Calculate menu position at the end of selection
+    // Since menu uses position: fixed, we use viewport coordinates directly
+    let menuLeft = endX
+    let menuTop = endY + 8
+    
+    // Ensure menu doesn't go off screen (adjust if needed)
+    const menuWidth = 200 // Approximate menu width
+    const menuHeight = 150 // Approximate menu height
+    
+    // Adjust horizontal position if menu would go off right edge
+    if (menuLeft + menuWidth > window.innerWidth) {
+      menuLeft = fullRect.left - menuWidth
+    }
+    
+    // Adjust vertical position if menu would go off bottom edge
+    if (menuTop + menuHeight > window.innerHeight) {
+      menuTop = fullRect.top - menuHeight - 8
+    }
+    
+    // Ensure menu doesn't go off left edge
+    if (menuLeft < 0) {
+      menuLeft = 8
+    }
+    
+    // Ensure menu doesn't go off top edge
+    if (menuTop < 0) {
+      menuTop = endY + 8
+    }
+    
+    const menuPosition = {
+      top: menuTop,
+      left: menuLeft
+    }
+
+    // Save range for animation
+    selectionRangeRef.current = range.cloneRange()
+    setSelectedTextRange(range.cloneRange())
+    setSelectionMenu({
+      position: menuPosition,
+      selectedText,
+      pageNumber
+    })
+  }, [currentPage])
+
+  // Handle text selection menu option click
+  const handleSelectionOptionClick = useCallback(async (option: string, question: string) => {
+    if (!selectionMenu) return
+
+    const { selectedText, pageNumber } = selectionMenu
+
+    // Close menu immediately when option is clicked
+    setSelectionMenu(null)
+    setSelectedTextRange(null)
+    selectionRangeRef.current = null
+
+    // Show floating answer with loading state
+    // Note: position is optional and will center the modal if not provided
+    const answerPosition = undefined
+
+    const timestamp = Date.now()
+    questionTimestampRef.current = timestamp
+    questionPageNumberRef.current = pageNumber
+
+    setFloatingAnswer({
+      selectedText,
+      question,
+      answer: '',
+      isStreaming: true,
+      position: answerPosition,
+      questionTimestamp: timestamp
+    })
+
+    try {
+      // Send message without opening chat panel
+      if (activeThread) {
+        // Use existing thread
+        await sendMessage(question, pageNumber, 'page', undefined)
+      } else {
+        // Start new conversation
+        await startNewConversation(documentId, question, pageNumber, 'page', undefined)
+      }
+
+      // The answer will be updated through the streaming callback
+      // We'll track it in a separate effect
+    } catch (err) {
+      console.error('Failed to send message:', err)
+      setFloatingAnswer(prev => prev ? {
+        ...prev,
+        answer: 'Error sending message. Please try again.',
+        isStreaming: false
+      } : null)
+    }
+  }, [selectionMenu, activeThread, sendMessage, startNewConversation, documentId])
+
+  // Track streaming answer updates
+  useEffect(() => {
+    if (floatingAnswer?.isStreaming && messages.length > 0 && questionPageNumberRef.current !== null) {
+      // Find assistant messages for the current page
+      const pageMessages = messages.filter(msg => 
+        msg.role === 'assistant' && 
+        msg.pageContext === questionPageNumberRef.current
+      )
+      
+      if (pageMessages.length === 0) {
+        return
+      }
+
+      // Try to find message by timestamp first
+      let lastAssistantMessage = null
+      
+      if (questionTimestampRef.current) {
+        const relevantMessages = pageMessages.filter(msg => {
+          try {
+            const msgTimestamp = new Date(msg.createdAt).getTime()
+            return msgTimestamp >= questionTimestampRef.current!
+          } catch {
+            return false
+          }
+        })
+        
+        if (relevantMessages.length > 0) {
+          lastAssistantMessage = relevantMessages[relevantMessages.length - 1]
+        }
+      }
+      
+      // Fallback: use the last assistant message for this page
+      if (!lastAssistantMessage) {
+        lastAssistantMessage = pageMessages[pageMessages.length - 1]
+      }
+
+      if (lastAssistantMessage && lastAssistantMessage.content.length > 0) {
+        setFloatingAnswer(prev => {
+          if (!prev) return null
+          // Update answer if it's different or longer (streaming update)
+          if (prev.answer !== lastAssistantMessage.content) {
+            return {
+              ...prev,
+              answer: lastAssistantMessage.content,
+              isStreaming: isStreaming
+            }
+          }
+          return prev
+        })
+      }
+    }
+  }, [messages, floatingAnswer, isStreaming])
+
+  // Close menu when floating answer appears
+  useEffect(() => {
+    if (floatingAnswer) {
+      setSelectionMenu(null)
+      setSelectedTextRange(null)
+      selectionRangeRef.current = null
+    }
+  }, [floatingAnswer])
+
+  // Clear floating answer when streaming completes
+  useEffect(() => {
+    if (floatingAnswer && !isStreaming && floatingAnswer.isStreaming) {
+      setFloatingAnswer(prev => prev ? { ...prev, isStreaming: false } : null)
+    }
+  }, [isStreaming, floatingAnswer])
+
+  // Add text selection animation
+  const animatedTextRef = useRef<HTMLElement | null>(null)
+  
+  useEffect(() => {
+    if (!selectedTextRange || !floatingAnswer?.isStreaming) {
+      // Remove animation class from animated element
+      if (animatedTextRef.current) {
+        animatedTextRef.current.classList.remove('text-selection-animated')
+        animatedTextRef.current = null
+      }
+      return
+    }
+
+    // Apply animation to selected text using a safer approach
+    try {
+      const range = selectedTextRange.cloneRange()
+      
+      // Find the common ancestor container
+      const container = range.commonAncestorContainer
+      let targetElement: HTMLElement | null = null
+      
+      if (container.nodeType === Node.TEXT_NODE) {
+        targetElement = container.parentElement as HTMLElement
+      } else if (container.nodeType === Node.ELEMENT_NODE) {
+        targetElement = container as HTMLElement
+      }
+      
+      if (targetElement) {
+        // Add animation class to the parent element
+        targetElement.classList.add('text-selection-animated')
+        animatedTextRef.current = targetElement
+        
+        // Cleanup function
+        return () => {
+          if (animatedTextRef.current) {
+            animatedTextRef.current.classList.remove('text-selection-animated')
+            animatedTextRef.current = null
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Error applying text selection animation:', err)
+    }
+  }, [selectedTextRange, floatingAnswer?.isStreaming])
+
+  // Add mouseup event listener for text selection
+  useEffect(() => {
+    const handleMouseUp = (e: MouseEvent) => {
+      // Small delay to ensure selection is complete
+      setTimeout(() => {
+        handleTextSelection(e)
+      }, 10)
+    }
+
+    document.addEventListener('mouseup', handleMouseUp)
+    return () => {
+      document.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [handleTextSelection])
 
   // Функция для прокрутки к определенной странице
   const scrollToPage = useCallback((pageNumber: number) => {
@@ -1851,6 +2241,8 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
                   isVisible={true}
                   onToggle={() => setIsChatVisible(false)}
                   isMobile={!isTablet}
+                  initialInputValue={initialChatInputValue}
+                  onInitialInputValueUsed={() => setInitialChatInputValue('')}
                 />
               </div>
             </div>
@@ -1863,6 +2255,8 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
             isVisible={isChatVisible}
             onToggle={() => setIsChatVisible(!isChatVisible)}
             isMobile={false}
+            initialInputValue={initialChatInputValue}
+            onInitialInputValueUsed={() => setInitialChatInputValue('')}
           />
         )}
       </div>
@@ -1912,7 +2306,43 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
           )}
           <button
             aria-label="Open AI Assistant"
-            onClick={() => setIsChatVisible(true)}
+            onClick={() => {
+              // Always close selection menu when opening chat
+              setSelectionMenu(null)
+              setSelectedTextRange(null)
+              selectionRangeRef.current = null
+              
+              // Check if there's a text selection to copy BEFORE clearing
+              const selection = window.getSelection()
+              let selectedText = ''
+              
+              if (selection && selection.rangeCount > 0) {
+                const range = selection.getRangeAt(0)
+                selectedText = range.toString().trim()
+                
+                // Check if selection is within PDF text layer
+                const textContent = range.commonAncestorContainer
+                let textLayerElement: HTMLElement | null = null
+                
+                if (textContent.nodeType === Node.TEXT_NODE) {
+                  textLayerElement = (textContent.parentElement?.closest('.react-pdf__Page__textContent') as HTMLElement) || null
+                } else if (textContent.nodeType === Node.ELEMENT_NODE) {
+                  textLayerElement = (textContent as HTMLElement).closest('.react-pdf__Page__textContent') as HTMLElement | null
+                }
+                
+                if (textLayerElement && selectedText && selectedText.length > 0) {
+                  // Copy selected text to chat input
+                  setInitialChatInputValue(selectedText)
+                }
+              }
+              
+              // Clear browser selection after reading
+              if (selection) {
+                selection.removeAllRanges()
+              }
+              
+              setIsChatVisible(true)
+            }}
             style={{
               position: 'relative',
               width: '100%',
@@ -1944,7 +2374,39 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
         </div>
       )}
 
-      {/* Add CSS animation for light rotation */}
+      {/* Text Selection Menu */}
+      {selectionMenu && (
+        <TextSelectionMenu
+          position={selectionMenu.position}
+          selectedText={selectionMenu.selectedText}
+          onOptionClick={handleSelectionOptionClick}
+          onClose={() => {
+            setSelectionMenu(null)
+            setSelectedTextRange(null)
+            selectionRangeRef.current = null
+          }}
+        />
+      )}
+
+      {/* Floating Answer */}
+      {floatingAnswer && (
+        <FloatingAnswer
+          selectedText={floatingAnswer.selectedText}
+          question={floatingAnswer.question}
+          answer={floatingAnswer.answer}
+          isStreaming={floatingAnswer.isStreaming}
+          onClose={() => {
+            setFloatingAnswer(null)
+            setSelectedTextRange(null)
+            selectionRangeRef.current = null
+            questionTimestampRef.current = null
+            questionPageNumberRef.current = null
+          }}
+          position={floatingAnswer.position}
+        />
+      )}
+
+      {/* Add CSS animations */}
       <style>{`
         @keyframes rotate-light {
           from {
@@ -1953,6 +2415,24 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
           to {
             transform: translate(-50%, -50%) rotate(360deg);
           }
+        }
+
+        @keyframes textSelectionPulse {
+          0%, 100% {
+            background-color: rgba(37, 99, 235, 0.2);
+            box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.4);
+          }
+          50% {
+            background-color: rgba(37, 99, 235, 0.3);
+            box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.2);
+          }
+        }
+
+        .text-selection-animated {
+          animation: textSelectionPulse 1.5s ease-in-out infinite;
+          border-radius: 2px;
+          padding: 0 2px;
+          margin: 0 -2px;
         }
       `}</style>
     </div>

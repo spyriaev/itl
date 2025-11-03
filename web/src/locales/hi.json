@@ -203,5 +203,16 @@
     "errorLoading": "साझा किया गया दस्तावेज़ लोड करने में विफल",
     "invalidToken": "अमान्य या समाप्त साझाकरण टोकन",
     "backToLibrary": "लाइब्रेरी में वापस जाएं"
+  },
+  "textSelection": {
+    "explainWithExample": "उदाहरण के साथ समझाएं",
+    "whatDoesThisMean": "इसका क्या मतलब है?",
+    "moreInfo": "अधिक जानकारी",
+    "questionExplainWithExample": "उदाहरण के साथ समझाएं: {text}",
+    "questionWhatDoesThisMean": "इसका क्या मतलब है: {text}?",
+    "questionMoreInfo": "इसके बारे में अधिक जानकारी दें: {text}",
+    "selectedText": "चयनित पाठ",
+    "close": "बंद करें",
+    "generatingAnswer": "उत्तर उत्पन्न कर रहा है..."
   }
 }

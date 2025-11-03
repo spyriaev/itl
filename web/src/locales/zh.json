@@ -203,5 +203,16 @@
     "errorLoading": "加载共享文档失败",
     "invalidToken": "无效或已过期的分享令牌",
     "backToLibrary": "返回库"
+  },
+  "textSelection": {
+    "explainWithExample": "用例子解释",
+    "whatDoesThisMean": "这是什么意思？",
+    "moreInfo": "更多信息",
+    "questionExplainWithExample": "用例子解释：{text}",
+    "questionWhatDoesThisMean": "这是什么意思：{text}？",
+    "questionMoreInfo": "提供更多信息：{text}",
+    "selectedText": "选中的文本",
+    "close": "关闭",
+    "generatingAnswer": "正在生成答案..."
   }
 }

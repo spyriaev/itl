@@ -13,9 +13,11 @@ interface ChatPanelProps {
   isVisible: boolean
   onToggle: () => void
   isMobile?: boolean
+  initialInputValue?: string
+  onInitialInputValueUsed?: () => void
 }
 
-export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobile = false }: ChatPanelProps) {
+export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobile = false, initialInputValue, onInitialInputValueUsed }: ChatPanelProps) {
   const { t } = useTranslation()
   const {
     activeThread,
@@ -34,6 +36,14 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
   } = useChat()
 
   const [inputValue, setInputValue] = useState('')
+  
+  // Set initial input value when provided
+  useEffect(() => {
+    if (initialInputValue && isVisible) {
+      setInputValue(initialInputValue)
+      onInitialInputValueUsed?.()
+    }
+  }, [initialInputValue, isVisible, onInitialInputValueUsed])
   const [selectedLevel, setSelectedLevel] = useState<number | null | 'none'>(null)
   const [chapterInfo, setChapterInfo] = useState<ChapterInfo | null>(null)
   const [documentStructure, setDocumentStructure] = useState<any>(null)

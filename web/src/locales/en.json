@@ -203,5 +203,16 @@
     "errorLoading": "Failed to load shared document",
     "invalidToken": "Invalid or expired share token",
     "backToLibrary": "Back to Library"
+  },
+  "textSelection": {
+    "explainWithExample": "Explain with example",
+    "whatDoesThisMean": "What does this mean?",
+    "moreInfo": "More information",
+    "questionExplainWithExample": "Explain with example: {text}",
+    "questionWhatDoesThisMean": "What does this mean: {text}?",
+    "questionMoreInfo": "Give more information about: {text}",
+    "selectedText": "Selected text",
+    "close": "Close",
+    "generatingAnswer": "Generating answer..."
   }
 }

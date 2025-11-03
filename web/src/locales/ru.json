@@ -203,5 +203,16 @@
     "errorLoading": "Не удалось загрузить расшаренный документ",
     "invalidToken": "Недействительный или истёкший токен",
     "backToLibrary": "Вернуться в библиотеку"
+  },
+  "textSelection": {
+    "explainWithExample": "Объясни с примером",
+    "whatDoesThisMean": "Что это означает?",
+    "moreInfo": "Дай больше информации",
+    "questionExplainWithExample": "Объясни с примером: {text}",
+    "questionWhatDoesThisMean": "Что означает: {text}?",
+    "questionMoreInfo": "Дай больше информации о: {text}",
+    "selectedText": "Выделенный текст",
+    "close": "Закрыть",
+    "generatingAnswer": "Генерирую ответ..."
   }
 }
