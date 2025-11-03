@@ -60,7 +60,26 @@
   },
   "userMenu": {
     "user": "Usuario",
-    "signOut": "Cerrar sesión"
+    "signOut": "Cerrar sesión",
+    "profile": "Perfil"
+  },
+  "profile": {
+    "title": "Perfil de Usuario",
+    "close": "Cerrar",
+    "notAuthenticated": "Por favor, inicie sesión para ver su perfil",
+    "loadError": "Error al cargar los datos del perfil",
+    "planChangeError": "Error al cambiar el plan",
+    "retry": "Reintentar",
+    "noData": "No hay datos de perfil disponibles",
+    "currentPlan": "Plan Actual",
+    "planStarted": "Plan iniciado",
+    "periodReset": "El período se reinicia el",
+    "usageTitle": "Uso de Recursos",
+    "storage": "Almacenamiento",
+    "files": "Archivos",
+    "maxFileSize": "Tamaño Máximo de Archivo",
+    "tokens": "Tokens",
+    "questions": "Preguntas"
   },
   "chatInput": {
     "askQuestion": "Haz una pregunta sobre este documento...",

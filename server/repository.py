@@ -1,14 +1,15 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import desc
+from sqlalchemy import desc, and_
 from typing import List, Optional, Dict, Any
 import uuid
-from datetime import datetime
+from datetime import datetime, date, timedelta
 from models import (
     Document, CreateDocumentRequest, DocumentResponse,
     ChatThread, ChatMessage, CreateThreadRequest, ThreadResponse,
     CreateMessageRequest, MessageResponse, ThreadWithMessagesResponse,
     PageQuestionResponse, PageQuestionsResponse, DocumentStructure,
-    DocumentStructureItem, DocumentStructureResponse
+    DocumentStructureItem, DocumentStructureResponse,
+    UserPlan, PlanLimits, UserUsage, UserPlanResponse, PlanLimitsResponse, UserUsageResponse
 )
 
 def create_document(db: Session, request: CreateDocumentRequest, user_id: str) -> DocumentResponse:
@@ -459,3 +460,310 @@ def update_chat_message_context(
         return True
     except ValueError:
         return False
+
+# User plan and usage related repository functions
+def get_user_plan(db: Session, user_id: str) -> Optional[UserPlan]:
+    """Get the current active plan for a user"""
+    try:
+        user_uuid = uuid.UUID(user_id)
+        # Get the most recent active plan
+        plan = db.query(UserPlan)\
+            .filter(UserPlan.user_id == user_uuid)\
+            .filter(UserPlan.status == 'active')\
+            .order_by(desc(UserPlan.started_at))\
+            .first()
+        
+        return plan
+    except ValueError:
+        return None
+
+def set_user_plan(db: Session, user_id: str, plan_type: str) -> UserPlan:
+    """Set or change a user's plan. Deactivates old plan and creates a new one."""
+    try:
+        user_uuid = uuid.UUID(user_id)
+        
+        # Deactivate existing active plan
+        existing_plans = db.query(UserPlan)\
+            .filter(UserPlan.user_id == user_uuid)\
+            .filter(UserPlan.status == 'active')\
+            .all()
+        
+        for plan in existing_plans:
+            plan.status = 'expired'
+            plan.updated_at = datetime.utcnow()
+        
+        # Create new plan
+        new_plan = UserPlan(
+            id=uuid.uuid4(),
+            user_id=user_uuid,
+            plan_type=plan_type,
+            status='active',
+            started_at=datetime.utcnow()
+        )
+        
+        db.add(new_plan)
+        db.commit()
+        db.refresh(new_plan)
+        
+        return new_plan
+    except ValueError:
+        raise ValueError("Invalid user_id or plan_type")
+
+def get_plan_limits(db: Session, plan_type: str) -> Optional[PlanLimits]:
+    """Get limits for a specific plan type"""
+    return db.query(PlanLimits)\
+        .filter(PlanLimits.plan_type == plan_type)\
+        .first()
+
+def calculate_period_dates(start_date: date) -> tuple[date, date]:
+    """Calculate period start and end dates based on subscription start date.
+    Period resets monthly on the same day of month as the subscription started.
+    Returns (period_start, period_end) where period_end is the last day of the period.
+    """
+    period_start = start_date
+    
+    # Calculate period_end: same day next month minus 1 day (inclusive end)
+    if period_start.month == 12:
+        try:
+            period_end = date(period_start.year + 1, 1, period_start.day) - timedelta(days=1)
+        except ValueError:
+            period_end = date(period_start.year, 12, 31)
+    else:
+        try:
+            period_end = date(period_start.year, period_start.month + 1, period_start.day) - timedelta(days=1)
+        except ValueError:
+            # Handle cases where the day doesn't exist in next month (e.g., Jan 31 -> Feb)
+            # Use last day of the next month
+            if period_start.month + 1 == 2:
+                # February: use 28 (or 29 in leap year)
+                if period_start.year % 4 == 0 and (period_start.year % 100 != 0 or period_start.year % 400 == 0):
+                    period_end = date(period_start.year, 2, 29) - timedelta(days=1)
+                else:
+                    period_end = date(period_start.year, 2, 28) - timedelta(days=1)
+            else:
+                # Get last day of current month
+                if period_start.month + 1 in [4, 6, 9, 11]:
+                    period_end = date(period_start.year, period_start.month + 1, 30) - timedelta(days=1)
+                else:
+                    period_end = date(period_start.year, period_start.month + 1, 31) - timedelta(days=1)
+    
+    return period_start, period_end
+
+def get_or_create_user_usage(db: Session, user_id: str, plan_id: str) -> UserUsage:
+    """Get or create user usage record for current period based on plan start date"""
+    try:
+        user_uuid = uuid.UUID(user_id)
+        plan_uuid = uuid.UUID(plan_id)
+        
+        # Get the plan to determine period dates
+        plan = db.query(UserPlan).filter(UserPlan.id == plan_uuid).first()
+        if not plan:
+            raise ValueError("Plan not found")
+        
+        # Calculate current period based on plan start date
+        plan_start_date = plan.started_at.date()
+        current_date = date.today()
+        
+        # Find the period that contains today's date
+        # Periods reset monthly on the same day as the plan started
+        period_start = plan_start_date
+        
+        # If today is past the first period end, calculate the correct period
+        while True:
+            _, period_end = calculate_period_dates(period_start)
+            if current_date <= period_end:
+                break
+            # Move to next period
+            period_start = period_end + timedelta(days=1)
+        
+        # Try to get existing usage record (unique constraint is on user_id + period_start)
+        usage = db.query(UserUsage)\
+            .filter(UserUsage.user_id == user_uuid)\
+            .filter(UserUsage.period_start == period_start)\
+            .first()
+        
+        if usage:
+            # If plan_id changed, update it
+            if usage.plan_id != plan_uuid:
+                usage.plan_id = plan_uuid
+                db.commit()
+                db.refresh(usage)
+            return usage
+        
+        # Create new usage record
+        _, period_end = calculate_period_dates(period_start)
+        usage = UserUsage(
+            id=uuid.uuid4(),
+            user_id=user_uuid,
+            plan_id=plan_uuid,
+            period_start=period_start,
+            period_end=period_end,
+            storage_bytes_used=0,
+            files_count=0,
+            tokens_used=0,
+            questions_count=0
+        )
+        
+        db.add(usage)
+        try:
+            db.commit()
+            db.refresh(usage)
+        except Exception as e:
+            db.rollback()
+            # If there was a race condition and record was created by another thread,
+            # try to fetch it again
+            usage = db.query(UserUsage)\
+                .filter(UserUsage.user_id == user_uuid)\
+                .filter(UserUsage.period_start == period_start)\
+                .first()
+            if usage:
+                # If plan_id changed, update it
+                if usage.plan_id != plan_uuid:
+                    usage.plan_id = plan_uuid
+                    db.commit()
+                    db.refresh(usage)
+                return usage
+            raise
+        
+        return usage
+    except ValueError as e:
+        raise ValueError(f"Invalid user_id or plan_id: {e}")
+
+def get_user_usage(db: Session, user_id: str) -> Optional[UserUsageResponse]:
+    """Get current user usage with limits"""
+    try:
+        # Get user's active plan
+        plan = get_user_plan(db, user_id)
+        if not plan:
+            # Create default beta plan if none exists
+            plan = set_user_plan(db, user_id, 'beta')
+        
+        # Get or create usage record
+        usage = get_or_create_user_usage(db, user_id, str(plan.id))
+        
+        # Get plan limits
+        limits = get_plan_limits(db, plan.plan_type)
+        if not limits:
+            return None
+        
+        # Convert to response model
+        limits_response = PlanLimitsResponse(
+            planType=limits.plan_type,
+            maxStorageBytes=limits.max_storage_bytes,
+            maxFiles=limits.max_files,
+            maxSingleFileBytes=limits.max_single_file_bytes,
+            maxTokensPerMonth=limits.max_tokens_per_month,
+            maxQuestionsPerMonth=limits.max_questions_per_month
+        )
+        
+        return UserUsageResponse(
+            userId=str(usage.user_id),
+            planId=str(usage.plan_id),
+            planType=plan.plan_type,
+            periodStart=usage.period_start.isoformat(),
+            periodEnd=usage.period_end.isoformat(),
+            storageBytesUsed=usage.storage_bytes_used,
+            filesCount=usage.files_count,
+            tokensUsed=usage.tokens_used,
+            questionsCount=usage.questions_count,
+            limits=limits_response
+        )
+    except ValueError:
+        return None
+
+def increment_user_usage(
+    db: Session,
+    user_id: str,
+    storage_bytes: int = 0,
+    files: int = 0,
+    tokens: int = 0,
+    questions: int = 0
+) -> bool:
+    """Increment user usage counters"""
+    try:
+        # Get user's active plan
+        plan = get_user_plan(db, user_id)
+        if not plan:
+            plan = set_user_plan(db, user_id, 'beta')
+        
+        # Get or create usage record
+        usage = get_or_create_user_usage(db, user_id, str(plan.id))
+        
+        # Increment counters
+        if storage_bytes > 0:
+            usage.storage_bytes_used += storage_bytes
+        if files > 0:
+            usage.files_count += files
+        if tokens > 0:
+            usage.tokens_used += tokens
+        if questions > 0:
+            usage.questions_count += questions
+        
+        usage.updated_at = datetime.utcnow()
+        
+        db.commit()
+        return True
+    except ValueError:
+        return False
+
+def check_storage_limit(db: Session, user_id: str, file_size: int) -> tuple[bool, Optional[str]]:
+    """Check if user can upload a file of given size. Returns (allowed, error_message)"""
+    usage_data = get_user_usage(db, user_id)
+    if not usage_data:
+        return False, "Unable to determine usage limits"
+    
+    if usage_data.storageBytesUsed + file_size > usage_data.limits.maxStorageBytes:
+        max_mb = usage_data.limits.maxStorageBytes / (1024 * 1024)
+        used_mb = usage_data.storageBytesUsed / (1024 * 1024)
+        return False, f"Storage limit exceeded. Maximum: {max_mb:.1f} MB, Used: {used_mb:.1f} MB"
+    
+    return True, None
+
+def check_file_count_limit(db: Session, user_id: str) -> tuple[bool, Optional[str]]:
+    """Check if user can upload another file. Returns (allowed, error_message)"""
+    usage_data = get_user_usage(db, user_id)
+    if not usage_data:
+        return False, "Unable to determine usage limits"
+    
+    # NULL means unlimited
+    if usage_data.limits.maxFiles is None:
+        return True, None
+    
+    if usage_data.filesCount >= usage_data.limits.maxFiles:
+        return False, f"File limit exceeded. Maximum: {usage_data.limits.maxFiles} files"
+    
+    return True, None
+
+def check_single_file_limit(db: Session, user_id: str, file_size: int) -> tuple[bool, Optional[str]]:
+    """Check if single file size is within limit. Returns (allowed, error_message)"""
+    usage_data = get_user_usage(db, user_id)
+    if not usage_data:
+        return False, "Unable to determine usage limits"
+    
+    if file_size > usage_data.limits.maxSingleFileBytes:
+        max_mb = usage_data.limits.maxSingleFileBytes / (1024 * 1024)
+        return False, f"File size exceeds limit. Maximum: {max_mb:.1f} MB"
+    
+    return True, None
+
+def check_tokens_limit(db: Session, user_id: str, tokens_needed: int) -> tuple[bool, Optional[str]]:
+    """Check if user can use more tokens. Returns (allowed, error_message)"""
+    usage_data = get_user_usage(db, user_id)
+    if not usage_data:
+        return False, "Unable to determine usage limits"
+    
+    if usage_data.tokensUsed + tokens_needed > usage_data.limits.maxTokensPerMonth:
+        return False, f"Token limit exceeded. Maximum: {usage_data.limits.maxTokensPerMonth} tokens"
+    
+    return True, None
+
+def check_questions_limit(db: Session, user_id: str) -> tuple[bool, Optional[str]]:
+    """Check if user can ask another question. Returns (allowed, error_message)"""
+    usage_data = get_user_usage(db, user_id)
+    if not usage_data:
+        return False, "Unable to determine usage limits"
+    
+    if usage_data.questionsCount >= usage_data.limits.maxQuestionsPerMonth:
+        return False, f"Question limit exceeded. Maximum: {usage_data.limits.maxQuestionsPerMonth} questions per month"
+    
+    return True, None

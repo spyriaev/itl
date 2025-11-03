@@ -8,6 +8,7 @@ import logging
 import json
 import asyncio
 import uuid
+from datetime import datetime
 
 from database import get_db, test_database_connection, engine, supabase
 from auth import get_current_user_id
@@ -15,13 +16,17 @@ from models import (
     CreateDocumentRequest, DocumentResponse, Base, UpdateProgressRequest,
     CreateThreadRequest, ThreadResponse, CreateMessageRequest, MessageResponse,
     ThreadWithMessagesResponse, Document, ChatThread, PageQuestionsResponse,
-    DocumentStructureResponse, ExtractStructureRequest
+    DocumentStructureResponse, ExtractStructureRequest,
+    UserPlanResponse, UserUsageResponse, SetUserPlanRequest
 )
 from repository import (
     create_document, list_documents, get_document_by_id, update_document_progress,
     create_chat_thread, list_chat_threads, get_chat_thread_with_messages,
     create_chat_message, update_thread_title, get_page_questions,
-    save_document_structure, get_document_structure, get_chapter_by_page
+    save_document_structure, get_document_structure, get_chapter_by_page,
+    get_user_plan, set_user_plan, get_user_usage, increment_user_usage,
+    check_storage_limit, check_file_count_limit, check_single_file_limit,
+    check_tokens_limit, check_questions_limit
 )
 from pdf_utils import extract_pdf_outline
 
@@ -143,14 +148,38 @@ async def create_document_endpoint(
             detail="Only PDF files are allowed"
         )
     
-    # Validate file size (200MB limit)
-    if request.size_bytes > 200 * 1024 * 1024:
+    # Check resource limits
+    # Check single file size limit
+    allowed, error_msg = check_single_file_limit(db, user_id, request.size_bytes)
+    if not allowed:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="File size exceeds 200MB limit"
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=error_msg
         )
     
-    return create_document(db, request, user_id)
+    # Check storage limit
+    allowed, error_msg = check_storage_limit(db, user_id, request.size_bytes)
+    if not allowed:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=error_msg
+        )
+    
+    # Check file count limit
+    allowed, error_msg = check_file_count_limit(db, user_id)
+    if not allowed:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=error_msg
+        )
+    
+    # Create document
+    document_response = create_document(db, request, user_id)
+    
+    # Update usage counters
+    increment_user_usage(db, user_id, storage_bytes=request.size_bytes, files=1)
+    
+    return document_response
 
 @app.get("/api/documents", response_model=List[DocumentResponse])
 async def list_documents_endpoint(
@@ -397,6 +426,14 @@ async def send_chat_message(
     context_type = request.contextType if request.contextType is not None else None
     chapter_id = request.chapterId
     
+    # Check questions limit before proceeding
+    allowed, error_msg = check_questions_limit(db, user_id)
+    if not allowed:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=error_msg
+        )
+    
     # Determine if we should use context at all
     # None means "no context", so we need to check if it's explicitly "none" or None
     use_context = request.pageContext is not None or (context_type and context_type != "none")
@@ -423,20 +460,58 @@ async def send_chat_message(
         async def generate_response():
             """Generate streaming response without document context"""
             assistant_content = ""
+            tokens_used = 0
+            prompt_tokens = 0
+            completion_tokens = 0
             
             try:
                 # Stream AI response without PDF context
                 async for chunk in ai_service.generate_response_stream_no_context(ai_messages):
-                    assistant_content += chunk
-                    yield f"data: {json.dumps({'type': 'chunk', 'content': chunk})}\n\n"
+                    if isinstance(chunk, dict) and chunk.get('type') == 'usage':
+                        # Extract token usage info
+                        usage_data = chunk.get('usage', {})
+                        prompt_tokens = usage_data.get('prompt_tokens', 0)
+                        completion_tokens = usage_data.get('completion_tokens', 0)
+                        tokens_used = prompt_tokens + completion_tokens
+                    elif isinstance(chunk, str):
+                        assistant_content += chunk
+                        yield f"data: {json.dumps({'type': 'chunk', 'content': chunk})}\n\n"
                 
-                # Save complete assistant message
-                assistant_message = create_chat_message(
-                    db, thread_id, "assistant", assistant_content, 
+                # Save complete assistant message with token usage
+                from models import ChatMessage as ChatMessageModel
+                assistant_message_model = ChatMessageModel(
+                    id=uuid.uuid4(),
+                    thread_id=uuid.UUID(thread_id),
+                    role="assistant",
+                    content=assistant_content,
                     page_context=None,
                     context_type="none",
-                    chapter_id=None
+                    chapter_id=None,
+                    tokens_used=tokens_used if tokens_used > 0 else None,
+                    usage_tracked_at=datetime.utcnow() if tokens_used > 0 else None
                 )
+                db.add(assistant_message_model)
+                
+                # Update thread's updated_at timestamp
+                thread = db.query(ChatThread).filter(ChatThread.id == uuid.UUID(thread_id)).first()
+                if thread:
+                    thread.updated_at = datetime.utcnow()
+                
+                db.commit()
+                
+                assistant_message = MessageResponse(
+                    id=str(assistant_message_model.id),
+                    role=assistant_message_model.role,
+                    content=assistant_message_model.content,
+                    pageContext=assistant_message_model.page_context,
+                    contextType=assistant_message_model.context_type,
+                    chapterId=str(assistant_message_model.chapter_id) if assistant_message_model.chapter_id else None,
+                    createdAt=assistant_message_model.created_at.isoformat()
+                )
+                
+                # Update usage counters
+                if tokens_used > 0:
+                    increment_user_usage(db, user_id, tokens=tokens_used, questions=1)
                 
                 # Send completion signal
                 yield f"data: {json.dumps({'type': 'complete', 'messageId': assistant_message.id})}\n\n"
@@ -504,22 +579,65 @@ async def send_chat_message(
     async def generate_response():
         """Generate streaming response with context"""
         assistant_content = ""
+        tokens_used = 0
+        prompt_tokens = 0
+        completion_tokens = 0
         
         try:
             # Stream AI response with context type
             async for chunk in ai_service.generate_response_stream(
                 ai_messages, pdf_url, current_page, total_pages, context_type, chapter_info
             ):
-                assistant_content += chunk
-                yield f"data: {json.dumps({'type': 'chunk', 'content': chunk})}\n\n"
+                if isinstance(chunk, dict) and chunk.get('type') == 'usage':
+                    # Extract token usage info
+                    usage_data = chunk.get('usage', {})
+                    prompt_tokens = usage_data.get('prompt_tokens', 0)
+                    completion_tokens = usage_data.get('completion_tokens', 0)
+                    tokens_used = prompt_tokens + completion_tokens
+                elif isinstance(chunk, str):
+                    assistant_content += chunk
+                    yield f"data: {json.dumps({'type': 'chunk', 'content': chunk})}\n\n"
             
-            # Save complete assistant message
-            assistant_message = create_chat_message(
-                db, thread_id, "assistant", assistant_content, 
+            # Save complete assistant message with token usage
+            from models import ChatMessage as ChatMessageModel
+            assistant_message_model = ChatMessageModel(
+                id=uuid.uuid4(),
+                thread_id=uuid.UUID(thread_id),
+                role="assistant",
+                content=assistant_content,
                 page_context=current_page,
                 context_type=context_type,
-                chapter_id=chapter_id
+                chapter_id=uuid.UUID(chapter_id) if chapter_id else None,
+                tokens_used=tokens_used if tokens_used > 0 else None,
+                usage_tracked_at=datetime.utcnow() if tokens_used > 0 else None
             )
+            db.add(assistant_message_model)
+            
+            # Update thread's updated_at timestamp
+            thread = db.query(ChatThread).filter(ChatThread.id == uuid.UUID(thread_id)).first()
+            if thread:
+                thread.updated_at = datetime.utcnow()
+            
+            db.commit()
+            
+            assistant_message = MessageResponse(
+                id=str(assistant_message_model.id),
+                role=assistant_message_model.role,
+                content=assistant_message_model.content,
+                pageContext=assistant_message_model.page_context,
+                contextType=assistant_message_model.context_type,
+                chapterId=str(assistant_message_model.chapter_id) if assistant_message_model.chapter_id else None,
+                createdAt=assistant_message_model.created_at.isoformat()
+            )
+            
+            # Update usage counters
+            if tokens_used > 0:
+                # Check token limit before incrementing
+                allowed, error_msg = check_tokens_limit(db, user_id, tokens_used)
+                if not allowed:
+                    # Already exceeded, but we've used the tokens, so just log it
+                    pass
+                increment_user_usage(db, user_id, tokens=tokens_used, questions=1)
             
             # Send completion signal
             yield f"data: {json.dumps({'type': 'complete', 'messageId': assistant_message.id})}\n\n"
@@ -687,6 +805,86 @@ async def get_chapter_for_page(
         "pageFrom": chapter.page_from,
         "pageTo": chapter.page_to
     }
+
+# User plan and usage endpoints
+@app.get("/api/user/plan", response_model=UserPlanResponse)
+async def get_user_plan_endpoint(
+    user_id: str = Depends(get_current_user_id),
+    db: Session = Depends(get_db)
+):
+    """Get current user's plan"""
+    # Check database connectivity
+    if not test_database_connection():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database not available"
+        )
+    
+    plan = get_user_plan(db, user_id)
+    if not plan:
+        # Create default beta plan if none exists
+        plan = set_user_plan(db, user_id, 'beta')
+    
+    return UserPlanResponse(
+        id=str(plan.id),
+        userId=str(plan.user_id),
+        planType=plan.plan_type,
+        status=plan.status,
+        startedAt=plan.started_at.isoformat(),
+        expiresAt=plan.expires_at.isoformat() if plan.expires_at else None
+    )
+
+@app.post("/api/user/plan", response_model=UserPlanResponse)
+async def set_user_plan_endpoint(
+    request: SetUserPlanRequest,
+    user_id: str = Depends(get_current_user_id),
+    db: Session = Depends(get_db)
+):
+    """Set or change user's plan"""
+    # Check database connectivity
+    if not test_database_connection():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database not available"
+        )
+    
+    try:
+        plan = set_user_plan(db, user_id, request.planType)
+        return UserPlanResponse(
+            id=str(plan.id),
+            userId=str(plan.user_id),
+            planType=plan.plan_type,
+            status=plan.status,
+            startedAt=plan.started_at.isoformat(),
+            expiresAt=plan.expires_at.isoformat() if plan.expires_at else None
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+
+@app.get("/api/user/usage", response_model=UserUsageResponse)
+async def get_user_usage_endpoint(
+    user_id: str = Depends(get_current_user_id),
+    db: Session = Depends(get_db)
+):
+    """Get current user's resource usage"""
+    # Check database connectivity
+    if not test_database_connection():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database not available"
+        )
+    
+    usage_data = get_user_usage(db, user_id)
+    if not usage_data:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unable to retrieve usage data"
+        )
+    
+    return usage_data
 
 if __name__ == "__main__":
     import uvicorn

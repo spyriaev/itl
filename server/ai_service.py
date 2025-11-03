@@ -223,9 +223,22 @@ You do not have access to any PDF document context. Answer questions to the best
                 max_tokens=2000
             )
             
+            last_chunk = None
             async for chunk in stream:
+                last_chunk = chunk
                 if chunk.choices[0].delta.content:
                     yield chunk.choices[0].delta.content
+            
+            # Send usage information from the last chunk if available
+            if last_chunk and hasattr(last_chunk, 'usage') and last_chunk.usage:
+                yield {
+                    'type': 'usage',
+                    'usage': {
+                        'prompt_tokens': last_chunk.usage.prompt_tokens if hasattr(last_chunk.usage, 'prompt_tokens') else 0,
+                        'completion_tokens': last_chunk.usage.completion_tokens if hasattr(last_chunk.usage, 'completion_tokens') else 0,
+                        'total_tokens': last_chunk.usage.total_tokens if hasattr(last_chunk.usage, 'total_tokens') else 0
+                    }
+                }
                     
         except Exception as e:
             logger.error(f"Error generating AI response: {e}")
@@ -327,9 +340,22 @@ Instructions:
                 max_tokens=2000
             )
             
+            last_chunk = None
             async for chunk in stream:
+                last_chunk = chunk
                 if chunk.choices[0].delta.content:
                     yield chunk.choices[0].delta.content
+            
+            # Send usage information from the last chunk if available
+            if last_chunk and hasattr(last_chunk, 'usage') and last_chunk.usage:
+                yield {
+                    'type': 'usage',
+                    'usage': {
+                        'prompt_tokens': last_chunk.usage.prompt_tokens if hasattr(last_chunk.usage, 'prompt_tokens') else 0,
+                        'completion_tokens': last_chunk.usage.completion_tokens if hasattr(last_chunk.usage, 'completion_tokens') else 0,
+                        'total_tokens': last_chunk.usage.total_tokens if hasattr(last_chunk.usage, 'total_tokens') else 0
+                    }
+                }
                     
         except Exception as e:
             logger.error(f"Error generating AI response: {e}")

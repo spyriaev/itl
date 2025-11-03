@@ -158,15 +158,19 @@ class MockAIService:
         """
         logger.debug(f"🤖 Mock: Generating response without context")
         
-        # Имитируем задержку обработки запроса (3 секунды)
+        # Имитируем задержку обработки запроса
         logger.debug("⏳ Mock: Simulating AI processing delay...")
-        await asyncio.sleep(20)
+        await asyncio.sleep(2)
         
         # Получаем последнее сообщение пользователя
         last_message = messages[-1]["content"] if messages else "Не могу понять ваш вопрос"
         
         # Генерируем ответ
         response = await self._generate_mock_response(last_message, has_context=False)
+        
+        # Рассчитываем токены для prompt (приблизительно)
+        prompt_tokens = self._estimate_tokens(messages)
+        completion_tokens = self._estimate_tokens([{"content": response}])
         
         # Имитируем стриминг (выдаем текст постепенно)
         words = response.split()
@@ -176,6 +180,16 @@ class MockAIService:
             if i < len(words) - 1:  # Не задержка после последнего слова
                 delay = random.uniform(0.01, 0.05)  # Случайная задержка 10-50ms
                 await asyncio.sleep(delay)
+        
+        # Отправляем информацию об использовании токенов (как в реальном сервисе)
+        yield {
+            'type': 'usage',
+            'usage': {
+                'prompt_tokens': prompt_tokens,
+                'completion_tokens': completion_tokens,
+                'total_tokens': prompt_tokens + completion_tokens
+            }
+        }
     
     async def generate_response_stream(
         self, 
@@ -202,12 +216,23 @@ class MockAIService:
         """
         logger.debug(f"🤖 Mock: Generating response with context (page {current_page}, context: {context_type})")
         
-        # Имитируем задержку обработки запроса (3 секунды)
+        # Имитируем задержку обработки запроса
         logger.debug("⏳ Mock: Simulating AI processing delay...")
-        await asyncio.sleep(20)
+        await asyncio.sleep(2)
         
         # Получаем последнее сообщение пользователя
         last_message = messages[-1]["content"] if messages else "Не могу понять ваш вопрос"
+        
+        # Имитируем извлечение текста из PDF для расчета токенов контекста
+        context_pages = self.build_context_pages(current_page, total_pages, context_type, chapter_info)
+        pdf_text = await self.extract_text_from_pdf(pdf_url, context_pages)
+        
+        # Добавляем системное сообщение с контекстом (как в реальном сервисе)
+        system_message = {
+            "role": "system",
+            "content": f"Document content from pages {', '.join(map(str, context_pages))}:\n{pdf_text}"
+        }
+        all_messages = [system_message] + messages
         
         # Генерируем ответ
         response = await self._generate_mock_response(
@@ -217,6 +242,10 @@ class MockAIService:
             context_type=context_type
         )
         
+        # Рассчитываем токены для prompt (включая контекст PDF)
+        prompt_tokens = self._estimate_tokens(all_messages)
+        completion_tokens = self._estimate_tokens([{"content": response}])
+        
         # Имитируем стриминг
         words = response.split()
         for i, word in enumerate(words):
@@ -225,6 +254,16 @@ class MockAIService:
             if i < len(words) - 1:
                 delay = random.uniform(0.01, 0.05)
                 await asyncio.sleep(delay)
+        
+        # Отправляем информацию об использовании токенов (как в реальном сервисе)
+        yield {
+            'type': 'usage',
+            'usage': {
+                'prompt_tokens': prompt_tokens,
+                'completion_tokens': completion_tokens,
+                'total_tokens': prompt_tokens + completion_tokens
+            }
+        }
     
     def _generate_mock_page_content(self, page_num: int) -> str:
         """Генерирует реалистичное содержимое страницы для имитации"""
@@ -330,6 +369,32 @@ class MockAIService:
         """Получение информации о токене (для консистентности с реальным сервисом)"""
         logger.debug("Mock: Getting token info (no-op)")
         return None
+    
+    def _estimate_tokens(self, messages: List[dict]) -> int:
+        """
+        Приблизительная оценка количества токенов в сообщениях.
+        
+        Использует простое правило: примерно 4 символа = 1 токен для большинства языков.
+        Для более точной оценки можно было бы использовать библиотеку tiktoken,
+        но для mock сервиса достаточно приближения.
+        
+        Args:
+            messages: Список сообщений
+            
+        Returns:
+            Приблизительное количество токенов
+        """
+        total_chars = 0
+        for msg in messages:
+            content = msg.get("content", "")
+            if isinstance(content, str):
+                total_chars += len(content)
+        
+        # Примерно 4 символа = 1 токен (эмпирическое правило для большинства языков)
+        # Добавляем небольшой запас для специальных токенов (системные сообщения, роли)
+        estimated_tokens = int(total_chars / 4) + len(messages) * 3  # +3 токена на сообщение для роли и форматирования
+        
+        return max(estimated_tokens, 10)  # Минимум 10 токенов
 
 
 # Глобальный экземпляр

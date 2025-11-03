@@ -60,7 +60,26 @@
   },
   "userMenu": {
     "user": "User",
-    "signOut": "Sign out"
+    "signOut": "Sign out",
+    "profile": "Profile"
+  },
+  "profile": {
+    "title": "User Profile",
+    "close": "Close",
+    "notAuthenticated": "Please sign in to view your profile",
+    "loadError": "Failed to load profile data",
+    "planChangeError": "Failed to change plan",
+    "retry": "Retry",
+    "noData": "No profile data available",
+    "currentPlan": "Current Plan",
+    "planStarted": "Plan started",
+    "periodReset": "Period resets on",
+    "usageTitle": "Resource Usage",
+    "storage": "Storage",
+    "files": "Files",
+    "maxFileSize": "Max File Size",
+    "tokens": "Tokens",
+    "questions": "Questions"
   },
   "chatInput": {
     "askQuestion": "Ask a question about this document...",

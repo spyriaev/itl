@@ -60,7 +60,26 @@
   },
   "userMenu": {
     "user": "用户",
-    "signOut": "退出"
+    "signOut": "退出",
+    "profile": "个人资料"
+  },
+  "profile": {
+    "title": "用户资料",
+    "close": "关闭",
+    "notAuthenticated": "请登录以查看您的资料",
+    "loadError": "加载资料数据失败",
+    "planChangeError": "更改计划失败",
+    "retry": "重试",
+    "noData": "没有可用的资料数据",
+    "currentPlan": "当前计划",
+    "planStarted": "计划开始时间",
+    "periodReset": "周期重置时间",
+    "usageTitle": "资源使用",
+    "storage": "存储",
+    "files": "文件",
+    "maxFileSize": "最大文件大小",
+    "tokens": "令牌",
+    "questions": "问题"
   },
   "chatInput": {
     "askQuestion": "询问有关此文档的问题...",

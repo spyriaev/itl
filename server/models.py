@@ -1,10 +1,11 @@
-from sqlalchemy import Column, String, BigInteger, DateTime, Text, Integer, ForeignKey
+from sqlalchemy import Column, String, BigInteger, DateTime, Text, Integer, ForeignKey, Date
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from pydantic import BaseModel, Field
 from typing import Optional, List
+from datetime import date
 import uuid
 
 Base = declarative_base()
@@ -54,11 +55,57 @@ class ChatMessage(Base):
     page_context = Column(Integer, nullable=True)  # Page number when message was sent
     chapter_id = Column(UUID(as_uuid=True), ForeignKey("document_structure.id", ondelete="SET NULL"), nullable=True)
     context_type = Column(Text, default="page")  # 'page', 'chapter', 'section', 'document'
+    tokens_used = Column(Integer, nullable=True)  # Tokens used for this message (AI responses)
+    usage_tracked_at = Column(DateTime(timezone=True), nullable=True)  # When usage was tracked
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     # Relationships
     thread = relationship("ChatThread", back_populates="messages")
     chapter = relationship("DocumentStructure", foreign_keys=[chapter_id])
+
+class UserPlan(Base):
+    __tablename__ = "user_plans"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), nullable=False)
+    plan_type = Column(Text, nullable=False)  # 'beta', 'base', 'plus'
+    status = Column(Text, nullable=False, default='active')  # 'active', 'trial', 'expired'
+    started_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    expires_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    
+    # Relationships
+    usage_records = relationship("UserUsage", back_populates="plan", cascade="all, delete-orphan")
+
+class PlanLimits(Base):
+    __tablename__ = "plan_limits"
+    
+    plan_type = Column(Text, primary_key=True)
+    max_storage_bytes = Column(BigInteger, nullable=False)
+    max_files = Column(Integer, nullable=True)  # NULL means unlimited
+    max_single_file_bytes = Column(BigInteger, nullable=False)
+    max_tokens_per_month = Column(BigInteger, nullable=False)
+    max_questions_per_month = Column(Integer, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+class UserUsage(Base):
+    __tablename__ = "user_usage"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), nullable=False)
+    plan_id = Column(UUID(as_uuid=True), ForeignKey("user_plans.id", ondelete="CASCADE"), nullable=False)
+    period_start = Column(Date, nullable=False)
+    period_end = Column(Date, nullable=False)
+    storage_bytes_used = Column(BigInteger, default=0)
+    files_count = Column(Integer, default=0)
+    tokens_used = Column(BigInteger, default=0)
+    questions_count = Column(Integer, default=0)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    
+    # Relationships
+    plan = relationship("UserPlan", back_populates="usage_records")
 
 # Pydantic models for API requests/responses
 class CreateDocumentRequest(BaseModel):
@@ -199,3 +246,50 @@ class DocumentStructureResponse(BaseModel):
 
 class ExtractStructureRequest(BaseModel):
     force: bool = False
+
+# User plan and usage related models
+class UserPlanResponse(BaseModel):
+    id: str
+    userId: str
+    planType: str
+    status: str
+    startedAt: str
+    expiresAt: Optional[str] = None
+    
+    class Config:
+        from_attributes = True
+        populate_by_name = True
+
+class PlanLimitsResponse(BaseModel):
+    planType: str
+    maxStorageBytes: int
+    maxFiles: Optional[int] = None
+    maxSingleFileBytes: int
+    maxTokensPerMonth: int
+    maxQuestionsPerMonth: int
+    
+    class Config:
+        from_attributes = True
+        populate_by_name = True
+
+class UserUsageResponse(BaseModel):
+    userId: str
+    planId: str
+    planType: str
+    periodStart: str
+    periodEnd: str
+    storageBytesUsed: int
+    filesCount: int
+    tokensUsed: int
+    questionsCount: int
+    limits: PlanLimitsResponse
+    
+    class Config:
+        from_attributes = True
+        populate_by_name = True
+
+class SetUserPlanRequest(BaseModel):
+    planType: str = Field(..., pattern="^(beta|base|plus)$")
+    
+    class Config:
+        allow_population_by_field_name = True
