@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 
 interface Language {
@@ -18,6 +18,8 @@ const languages: Language[] = [
 export function LanguageSelector() {
   const { i18n } = useTranslation()
   const [isOpen, setIsOpen] = useState(false)
+  const [openUpward, setOpenUpward] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
 
   const currentLanguage = languages.find(lang => lang.code === i18n.language) || languages[0]
 
@@ -26,8 +28,21 @@ export function LanguageSelector() {
     setIsOpen(false)
   }
 
+  // Determine if dropdown should open upward
+  useEffect(() => {
+    if (isOpen && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect()
+      const spaceBelow = window.innerHeight - rect.bottom
+      const spaceAbove = rect.top
+      const dropdownHeight = 280 // Approximate height of dropdown with 5 languages
+      
+      // Open upward if not enough space below but enough space above
+      setOpenUpward(spaceBelow < dropdownHeight && spaceAbove > spaceBelow)
+    }
+  }, [isOpen])
+
   return (
-    <div style={{ position: 'relative' }}>
+    <div ref={containerRef} style={{ position: 'relative' }}>
       <button
         onClick={() => setIsOpen(!isOpen)}
         style={{
@@ -57,7 +72,7 @@ export function LanguageSelector() {
           viewBox="0 0 12 12"
           fill="none"
           style={{
-            transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+            transform: isOpen ? (openUpward ? 'rotate(0deg)' : 'rotate(180deg)') : 'rotate(0deg)',
             transition: 'transform 0.2s',
           }}
         >
@@ -85,11 +100,23 @@ export function LanguageSelector() {
             onClick={() => setIsOpen(false)}
           />
           <div
-            style={{
+            style={openUpward ? {
+              position: 'absolute',
+              bottom: '100%',
+              marginBottom: 8,
+              right: 0,
+              backgroundColor: 'white',
+              border: '1px solid #dee1e6',
+              borderRadius: 8,
+              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+              zIndex: 999,
+              minWidth: 180,
+              overflow: 'hidden',
+            } : {
               position: 'absolute',
               top: '100%',
-              right: 0,
               marginTop: 8,
+              right: 0,
               backgroundColor: 'white',
               border: '1px solid #dee1e6',
               borderRadius: 8,

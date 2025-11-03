@@ -23,11 +23,14 @@ export function UserMenu() {
     navigate('/')
   }
 
+  const photoURL = user.user_metadata?.avatar_url || user.user_metadata?.picture || null
+  const displayName = user.user_metadata?.full_name || user.user_metadata?.name || null
+
   return (
     <div className="user-menu">
       <button className="user-menu-trigger" onClick={() => setIsOpen(!isOpen)}>
-        {user.photoURL ? (
-          <img src={user.photoURL || "/placeholder.svg"} alt={user.email || "User"} className="user-avatar" />
+        {photoURL ? (
+          <img src={photoURL} alt={user.email || "User"} className="user-avatar" />
         ) : (
           <div
             className="user-avatar"
@@ -90,7 +93,7 @@ export function UserMenu() {
                   marginBottom: 4,
                 }}
               >
-                {user.displayName || t("userMenu.user")}
+                {displayName || t("userMenu.user")}
               </div>
               <div
                 style={{

@@ -225,5 +225,97 @@ a {
   [data-feature-card] {
     padding: 20px !important;
   }
+
+  /* Plans Page Mobile */
+  [data-plans-page] {
+    padding: 32px 12px !important;
+  }
+
+  [data-plans-title-section] {
+    margin-bottom: 32px !important;
+  }
+
+  [data-plans-title] {
+    font-size: 28px !important;
+    line-height: 36px !important;
+  }
+
+  [data-plans-subtitle] {
+    font-size: 14px !important;
+  }
+
+  [data-plans-offer] {
+    font-size: 13px !important;
+  }
+
+  [data-plans-billing] {
+    margin-bottom: 32px !important;
+  }
+
+  [data-plans-billing-toggle] {
+    width: 100% !important;
+    max-width: 280px !important;
+  }
+
+  [data-plans-monthly],
+  [data-plans-yearly] {
+    flex: 1 !important;
+    padding: 10px 16px !important;
+    font-size: 13px !important;
+  }
+
+  [data-plans-cards] {
+    grid-template-columns: 1fr !important;
+    gap: 24px !important;
+  }
+
+  [data-plan-card] {
+    padding: 24px !important;
+  }
+
+  [data-plan-title] {
+    font-size: 20px !important;
+    line-height: 28px !important;
+  }
+
+  [data-plan-price] {
+    font-size: 28px !important;
+    line-height: 36px !important;
+  }
+
+  [data-plan-button] {
+    width: 100% !important;
+    padding: 12px 20px !important;
+  }
+}
+
+/* Tablet responsive styles for Plans Page */
+@media (min-width: 769px) and (max-width: 1024px) {
+  [data-plans-page] {
+    padding: 60px 24px !important;
+  }
+
+  [data-plans-cards] {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 20px !important;
+  }
+
+  [data-plan-card]:last-child {
+    grid-column: 1 / -1 !important;
+    max-width: 500px !important;
+    margin: 0 auto !important;
+  }
+}
+
+/* Small tablets */
+@media (min-width: 481px) and (max-width: 768px) {
+  [data-plans-cards] {
+    grid-template-columns: 1fr !important;
+  }
+
+  [data-plan-card] {
+    max-width: 500px !important;
+    margin: 0 auto !important;
+  }
 }
 

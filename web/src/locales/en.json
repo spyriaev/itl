@@ -105,5 +105,44 @@
       "havingQuestion": "Having question? Contact",
       "support": "support."
     }
+  },
+  "plans": {
+    "title": "Simple pricing for every need",
+    "subtitle": "Choose a plan that best suits your business.",
+    "trialText": "Start 1-month free trial:",
+    "trialDetails": "no obligation, no activation fee.",
+    "monthlyBilling": "Monthly Billing",
+    "yearlyBilling": "Annually Billing",
+    "saveUpTo": "*Save up to 30%",
+    "perMonth": "/month",
+    "perYear": "/year",
+    "betaAccess": {
+      "title": "Beta Access",
+      "description": "One account user, log in once in a while.",
+      "feature1": "25 MB of storage",
+      "feature2": "Up to 10 pdf documents",
+      "feature3": "100 credits (~25 questions)",
+      "feature4": "Base models GigaChat",
+      "button": "Join using invite links →"
+    },
+    "base": {
+      "title": "Base",
+      "description": "A shared vault for family to store videos, photos, and family documents.",
+      "feature1": "25 MB of storage",
+      "feature2": "Unlimited documents",
+      "feature3": "100 credits (~25 questions)",
+      "feature4": "Base models GigaChat",
+      "button": "Get 1-month free trial →"
+    },
+    "plus": {
+      "title": "Plus",
+      "description": "Special design for freelancers, solopreneurs, and creators.",
+      "feature1": "250 MB of storage",
+      "feature2": "Unlimited documents",
+      "feature3": "1000 credits (~200)",
+      "feature4": "Pro models Deepseek, ChatGPT5",
+      "button": "Get 1-month free trial →",
+      "badge": "SOON BEST OFFER"
+    }
   }
 }

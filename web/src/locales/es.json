@@ -105,5 +105,44 @@
       "havingQuestion": "¿Tienes alguna pregunta? Contacta",
       "support": "soporte."
     }
+  },
+  "plans": {
+    "title": "Precios simples para cada necesidad",
+    "subtitle": "Elige un plan que mejor se adapte a tu negocio.",
+    "trialText": "Comienza 1 mes de prueba gratis:",
+    "trialDetails": "sin obligaciones, sin tarifa de activación.",
+    "monthlyBilling": "Facturación mensual",
+    "yearlyBilling": "Facturación anual",
+    "saveUpTo": "*Ahorra hasta 30%",
+    "perMonth": "/mes",
+    "perYear": "/año",
+    "betaAccess": {
+      "title": "Acceso Beta",
+      "description": "Un usuario de cuenta, inicia sesión de vez en cuando.",
+      "feature1": "25 MB de almacenamiento",
+      "feature2": "Hasta 10 documentos PDF",
+      "feature3": "100 créditos (~25 preguntas)",
+      "feature4": "Modelos base GigaChat",
+      "button": "Únete usando enlaces de invitación →"
+    },
+    "base": {
+      "title": "Base",
+      "description": "Una bóveda compartida para la familia para almacenar videos, fotos y documentos familiares.",
+      "feature1": "25 MB de almacenamiento",
+      "feature2": "Documentos ilimitados",
+      "feature3": "100 créditos (~25 preguntas)",
+      "feature4": "Modelos base GigaChat",
+      "button": "Obtén 1 mes de prueba gratis →"
+    },
+    "plus": {
+      "title": "Plus",
+      "description": "Diseño especial para freelancers, soloprenuers y creadores.",
+      "feature1": "250 MB de almacenamiento",
+      "feature2": "Documentos ilimitados",
+      "feature3": "1000 créditos (~200)",
+      "feature4": "Modelos Pro Deepseek, ChatGPT5",
+      "button": "Obtén 1 mes de prueba gratis →",
+      "badge": "PRÓXIMAMENTE MEJOR OFERTA"
+    }
   }
 }

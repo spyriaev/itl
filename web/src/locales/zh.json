@@ -105,5 +105,44 @@
       "havingQuestion": "有疑问？联系",
       "support": "支持。"
     }
+  },
+  "plans": {
+    "title": "适合各种需求的简单定价",
+    "subtitle": "选择最适合您业务的计划。",
+    "trialText": "开始 1 个月免费试用：",
+    "trialDetails": "无义务，无激活费。",
+    "monthlyBilling": "月度计费",
+    "yearlyBilling": "年度计费",
+    "saveUpTo": "*节省高达 30%",
+    "perMonth": "/月",
+    "perYear": "/年",
+    "betaAccess": {
+      "title": "测试版访问",
+      "description": "一个账户用户，偶尔登录。",
+      "feature1": "25 MB 存储空间",
+      "feature2": "最多 10 个 PDF 文档",
+      "feature3": "100 积分（约 25 个问题）",
+      "feature4": "基础模型 GigaChat",
+      "button": "使用邀请链接加入 →"
+    },
+    "base": {
+      "title": "基础版",
+      "description": "为家庭共享存储库，用于存储视频、照片和家庭文档。",
+      "feature1": "25 MB 存储空间",
+      "feature2": "无限文档",
+      "feature3": "100 积分（约 25 个问题）",
+      "feature4": "基础模型 GigaChat",
+      "button": "获得 1 个月免费试用 →"
+    },
+    "plus": {
+      "title": "增强版",
+      "description": "专为自由职业者、独立创业者和创作者设计。",
+      "feature1": "250 MB 存储空间",
+      "feature2": "无限文档",
+      "feature3": "1000 积分（约 200）",
+      "feature4": "专业模型 Deepseek、ChatGPT5",
+      "button": "获得 1 个月免费试用 →",
+      "badge": "即将推出 最佳优惠"
+    }
   }
 }
