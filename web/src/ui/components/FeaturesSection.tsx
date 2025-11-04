@@ -8,113 +8,96 @@ export function FeaturesSection() {
 
   return (
     <section style={styles.section} data-features-section>
-      <h2 className="text-heading-medium" data-features-title>{t("landing.featuresTitle")}</h2>
-      <div style={styles.grid} data-features-grid>
-        <div style={{...styles.feature, ...styles.feature1}} data-feature-card>
-          <h3 className="text-heading-small" data-feature-title>{t("landing.feature1Title")}</h3>
-          <p className="text-body" data-feature-desc>{t("landing.feature1Desc")}</p>
-          <div style={styles.featureIllustration1}>
-            <div style={styles.fileList}>
-              <div style={styles.fileItem}>
-                <div style={styles.fileIcon}></div>
-                <div style={styles.fileInfo}>
-                  <div style={styles.fileName}>Work Documents.zip</div>
-                  <div style={styles.fileSize}>2.4 MB</div>
-                </div>
-                <div style={styles.starIcon}>★</div>
-              </div>
-              <div style={styles.fileItem}>
-                <div style={styles.fileIcon}></div>
-                <div style={styles.fileInfo}>
-                  <div style={styles.fileName}>Freelancing</div>
-                  <div style={styles.fileSize}>1.2 MB</div>
-                </div>
-                <div style={styles.starIcon}>★</div>
-              </div>
-              <div style={styles.fileItem}>
-                <div style={styles.fileIcon}></div>
-                <div style={styles.fileInfo}>
-                  <div style={styles.fileName}>Quotation/Invoice.xlsx</div>
-                  <div style={styles.fileSize}>856 KB</div>
-                </div>
-                <div style={styles.starIcon}>★</div>
-              </div>
-            </div>
-          </div>
+      <div style={styles.container}>
+        <div style={styles.header}>
+          <h2 style={styles.title} data-features-title>{t("landing.featuresTitle")}</h2>
         </div>
-
-        <div style={{...styles.feature, ...styles.feature2}} data-feature-card>
-          <h3 className="text-heading-small" data-feature-title>{t("landing.feature2Title")}</h3>
-          <p className="text-body" data-feature-desc>{t("landing.feature2Desc")}</p>
-          <a href="#" className="button-text">{t("landing.feature2Cta")}</a>
-          <div style={styles.featureIllustration2}>
-            <div style={styles.shareModal}>
-              <div style={styles.shareModalTitle}>Share this file to</div>
-              <div style={styles.shareInput}>
-                <span>@Users or teams</span>
-                <button className="button-primary" style={{ fontSize: '12px', padding: '6px 12px', height: 'auto' }}>Add emails</button>
+        <div style={styles.grid} data-features-grid>
+          {/* Feature 1 */}
+          <div style={styles.cardWrapper}>
+            <a href="#" style={styles.card} data-feature-card>
+              <div style={styles.cardContent}>
+                <div>
+                  <h3 style={styles.cardTitle}>{t("landing.feature1Title")}</h3>
+                  <p style={styles.cardDescription}>{t("landing.feature1Desc")}</p>
+                </div>
+                <div style={styles.cardLink}>
+                  <span style={styles.linkText} className="link-text">Explore features ↗</span>
+                </div>
               </div>
-              <div style={styles.peopleList}>
-                <div style={styles.personItem}>
-                  <div style={styles.avatar}>JD</div>
-                  <div>
-                    <div style={styles.personName}>Joshua Davis</div>
-                    <div style={styles.personEmail}>joshua@example.com</div>
+              <figure style={styles.figure}>
+                <div style={styles.mediaContainer} className="media-container">
+                  <div style={styles.mediaInner}>
+                    <picture style={styles.picture}>
+                      <img 
+                        src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=640&q=80" 
+                        alt="Feature illustration" 
+                        style={styles.image}
+                        loading="lazy"
+                      />
+                    </picture>
                   </div>
                 </div>
-                <div style={styles.personItem}>
-                  <div style={styles.avatar}>SG</div>
-                  <div>
-                    <div style={styles.personName}>Sarah Green</div>
-                    <div style={styles.personEmail}>sarah@example.com</div>
-                  </div>
+              </figure>
+            </a>
+          </div>
+
+          {/* Feature 2 */}
+          <div style={styles.cardWrapper}>
+            <a href="#" style={styles.card} data-feature-card>
+              <div style={styles.cardContent}>
+                <div>
+                  <h3 style={styles.cardTitle}>{t("landing.feature2Title")}</h3>
+                  <p style={styles.cardDescription}>{t("landing.feature2Desc")}</p>
+                </div>
+                <div style={styles.cardLink}>
+                  <span style={styles.linkText} className="link-text">Learn more ↗</span>
                 </div>
               </div>
-            </div>
+              <figure style={styles.figure}>
+                <div style={styles.mediaContainer} className="media-container">
+                  <div style={styles.mediaInner}>
+                    <picture style={styles.picture}>
+                      <img 
+                        src="https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=640&q=80" 
+                        alt="Feature illustration" 
+                        style={styles.image}
+                        loading="lazy"
+                      />
+                    </picture>
+                  </div>
+                </div>
+              </figure>
+            </a>
           </div>
-        </div>
 
-        <div style={{...styles.feature, ...styles.feature3}} data-feature-card>
-          <h3 className="text-heading-small" data-feature-title>{t("landing.feature3Title")}</h3>
-          <p className="text-body" data-feature-desc>{t("landing.feature3Desc")}</p>
-          <a href="#" className="button-text">{t("landing.feature3Cta")}</a>
-          <div style={styles.featureIllustration3}>
-            <div style={styles.documentView}>
-              <div style={styles.docToolbar}>
-                <button style={styles.toolbarBtn}>Download</button>
-                <button style={styles.toolbarBtn}>Open in</button>
-                <button style={styles.toolbarBtn}>Save as</button>
-                <button className="button-primary" style={{ fontSize: '12px', padding: '6px 12px', height: 'auto', marginLeft: 'auto' }}>Share</button>
+          {/* Feature 3 */}
+          <div style={styles.cardWrapper}>
+            <a href="#" style={styles.card} data-feature-card>
+              <div style={styles.cardContent}>
+                <div>
+                  <h3 style={styles.cardTitle}>{t("landing.feature3Title")}</h3>
+                  <p style={styles.cardDescription}>{t("landing.feature3Desc")}</p>
+                </div>
+                <div style={styles.cardLink}>
+                  <span style={styles.linkText} className="link-text">Try it now →</span>
+                </div>
               </div>
-              <div style={styles.docContent}>
-                <div style={styles.docText}>Contract Document Content...</div>
-              </div>
-              <div style={styles.commentsSidebar}>
-                <div style={styles.commentsHeader}>Comments (12) Activities</div>
-              </div>
-              <div style={styles.addCommentBtn}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                </svg>
-                Add a comment
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div style={{...styles.feature, ...styles.feature4}} data-feature-card>
-          <h3 className="text-heading-small" data-feature-title>{t("landing.feature4Title")}</h3>
-          <p className="text-body" data-feature-desc>{t("landing.feature4Desc")}</p>
-          <div style={styles.featureIllustration4}>
-            <div style={styles.docStack}>
-              <div style={styles.doc3}></div>
-              <div style={styles.doc2}></div>
-              <div style={styles.doc1}>
-                <div style={styles.docIcon}>📄</div>
-                <div style={styles.docTitle}>Training doc.docx</div>
-                <div style={styles.docSaved}>Changes saved.</div>
-              </div>
-            </div>
+              <figure style={styles.figure}>
+                <div style={styles.mediaContainer} className="media-container">
+                  <div style={styles.mediaInner}>
+                    <picture style={styles.picture}>
+                      <img 
+                        src="https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=640&q=80" 
+                        alt="Feature illustration" 
+                        style={styles.image}
+                        loading="lazy"
+                      />
+                    </picture>
+                  </div>
+                </div>
+              </figure>
+            </a>
           </div>
         </div>
       </div>
@@ -124,275 +107,173 @@ export function FeaturesSection() {
 
 const styles: { [key: string]: React.CSSProperties } = {
   section: {
-    padding: '80px 32px',
+    backgroundColor: 'white',
+    color: '#171A1F',
+    padding: '40px 0 80px 0',
+    width: '100%',
+  },
+  container: {
     maxWidth: '1280px',
     margin: '0 auto',
-    backgroundColor: '#f9fafb',
+    padding: '0 32px',
+  },
+  header: {
+    textAlign: 'left',
+    marginBottom: '40px',
+    maxWidth: '600px',
   },
   title: {
-    marginBottom: '48px',
-    textAlign: 'center',
+    fontFamily: "'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif",
+    fontSize: '48px',
+    lineHeight: '56px',
+    fontWeight: '700',
+    color: '#171A1F',
+    margin: 0,
+    textWrap: 'balance',
   },
   grid: {
     display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
-    gap: '24px',
-  },
-  feature: {
-    borderRadius: '16px',
-    padding: '32px',
-    display: 'flex',
-    flexDirection: 'column',
+    gridTemplateColumns: '1fr',
     gap: '16px',
+    alignItems: 'stretch',
   },
-  feature1: {
-    backgroundColor: 'white',
+  cardWrapper: {
+    height: '100%',
   },
-  feature2: {
-    backgroundColor: '#FEF9C3',
-  },
-  feature3: {
-    backgroundColor: '#FCE7F3',
-  },
-  feature4: {
-    backgroundColor: '#D1FAE5',
-  },
-  featureIllustration1: {
-    marginTop: '16px',
-  },
-  fileList: {
+  card: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '12px',
-  },
-  fileItem: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
-    padding: '8px',
-    backgroundColor: '#f9fafb',
-    borderRadius: '8px',
-  },
-  fileIcon: {
-    width: '32px',
-    height: '32px',
-    backgroundColor: '#2d66f5',
-    borderRadius: '4px',
-  },
-  fileInfo: {
-    flex: 1,
-  },
-  fileName: {
-    fontSize: '14px',
-    lineHeight: '22px',
-    fontFamily: "'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif",
-    fontWeight: '400',
-    color: '#171A1F',
-  },
-  fileSize: {
-    fontSize: '14px',
-    lineHeight: '22px',
-    fontFamily: "'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif",
-    fontWeight: '400',
-    color: '#323842',
-  },
-  starIcon: {
-    color: '#fbbf24',
-    fontSize: '16px',
-  },
-  featureIllustration2: {
-    marginTop: '16px',
-  },
-  shareModal: {
+    height: '100%',
     backgroundColor: 'white',
     borderRadius: '12px',
-    padding: '20px',
-    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+    border: '1px solid #e5e7eb',
+    overflow: 'hidden',
+    textDecoration: 'none',
+    color: 'inherit',
+    transition: 'all 0.2s ease',
+    cursor: 'pointer',
   },
-  shareModalTitle: {
-    fontSize: '14px',
-    lineHeight: '22px',
+  cardContent: {
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'space-between',
+    flex: 1,
+    padding: '24px',
+    maxWidth: '600px',
+  },
+  cardTitle: {
     fontFamily: "'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif",
+    fontSize: '20px',
+    lineHeight: '28px',
     fontWeight: '700',
     color: '#171A1F',
-    marginBottom: '12px',
+    margin: '0 0 12px 0',
   },
-  shareInput: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '10px 12px',
-    border: '1px solid #e5e7eb',
-    borderRadius: '4px',
-    marginBottom: '16px',
-    fontSize: '14px',
-    lineHeight: '22px',
+  cardDescription: {
     fontFamily: "'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif",
+    fontSize: '16px',
+    lineHeight: '24px',
     fontWeight: '400',
     color: '#565E6C',
+    margin: 0,
+    textWrap: 'pretty',
   },
-  peopleList: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '12px',
+  cardLink: {
+    marginTop: '24px',
   },
-  personItem: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
-  },
-  avatar: {
-    width: '40px',
-    height: '40px',
-    borderRadius: '50%',
-    backgroundColor: '#2d66f5',
-    color: 'white',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: '14px',
-    fontWeight: '600',
-  },
-  personName: {
+  linkText: {
+    fontFamily: "'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif",
     fontSize: '14px',
     lineHeight: '22px',
-    fontFamily: "'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif",
     fontWeight: '400',
-    color: '#171A1F',
+    color: '#2D66F5',
+    textDecoration: 'none',
+    display: 'inline-block',
+    transition: 'color 0.2s',
   },
-  personEmail: {
-    fontSize: '14px',
-    lineHeight: '22px',
-    fontFamily: "'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif",
-    fontWeight: '400',
-    color: '#323842',
+  figure: {
+    margin: 0,
+    padding: '0 24px 24px 24px',
   },
-  featureIllustration3: {
-    marginTop: '16px',
-  },
-  documentView: {
-    backgroundColor: 'white',
-    borderRadius: '12px',
-    padding: '16px',
-    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+  mediaContainer: {
     position: 'relative',
-    minHeight: '200px',
-  },
-  docToolbar: {
-    display: 'flex',
-    gap: '8px',
-    marginBottom: '12px',
-    borderBottom: '1px solid #e5e7eb',
-    paddingBottom: '12px',
-  },
-  toolbarBtn: {
-    padding: '6px 12px',
-    border: '1px solid #e5e7eb',
-    borderRadius: '6px',
-    backgroundColor: 'white',
-    fontSize: '12px',
-    cursor: 'pointer',
-  },
-  docContent: {
-    padding: '12px',
-    minHeight: '100px',
-  },
-  docText: {
-    fontSize: '12px',
-    color: '#374151',
-    lineHeight: '1.6',
-  },
-  commentsSidebar: {
-    position: 'absolute',
-    right: '16px',
-    top: '60px',
-    width: '120px',
+    display: 'grid',
+    gridTemplateColumns: '1fr',
+    gridTemplateRows: '1fr',
+    borderRadius: '8px',
+    overflow: 'hidden',
     backgroundColor: '#f9fafb',
-    borderRadius: '8px',
-    padding: '12px',
+    border: '1px solid #e5e7eb',
   },
-  commentsHeader: {
-    fontSize: '14px',
-    lineHeight: '22px',
-    fontFamily: "'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif",
-    fontWeight: '700',
-    color: '#171A1F',
-  },
-  addCommentBtn: {
-    position: 'absolute',
-    bottom: '16px',
-    right: '16px',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '6px',
-    padding: '8px 12px',
-    backgroundColor: 'white',
-    borderRadius: '8px',
-    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
-    fontSize: '12px',
-    color: '#374151',
-    cursor: 'pointer',
-  },
-  featureIllustration4: {
-    marginTop: '16px',
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    height: '200px',
-  },
-  docStack: {
+  mediaInner: {
     position: 'relative',
-    width: '120px',
-    height: '160px',
+    zIndex: 1,
+    gridColumn: '1 / -1',
+    gridRow: '1 / -1',
+    overflow: 'hidden',
   },
-  doc3: {
-    position: 'absolute',
-    top: '8px',
-    left: '8px',
-    width: '100px',
-    height: '140px',
-    backgroundColor: '#e5e7eb',
-    borderRadius: '4px',
-    transform: 'rotate(-2deg)',
+  picture: {
+    display: 'block',
+    width: '100%',
+    height: '100%',
+    position: 'relative',
   },
-  doc2: {
-    position: 'absolute',
-    top: '4px',
-    left: '4px',
-    width: '100px',
-    height: '140px',
-    backgroundColor: '#d1d5db',
-    borderRadius: '4px',
-    transform: 'rotate(-1deg)',
-  },
-  doc1: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    width: '100px',
-    height: '140px',
-    backgroundColor: '#2d66f5',
-    borderRadius: '4px',
-    padding: '16px',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '8px',
-    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-  },
-  docIcon: {
-    fontSize: '32px',
-  },
-  docTitle: {
-    fontSize: '12px',
-    fontWeight: '600',
-    color: 'white',
-    textAlign: 'center',
-  },
-  docSaved: {
-    fontSize: '10px',
-    color: 'rgba(255, 255, 255, 0.8)',
+  image: {
+    objectFit: 'cover',
+    width: '100%',
+    height: '100%',
+    display: 'block',
   },
 }
 
+// Add responsive styles
+if (!document.getElementById('features-section-responsive-style')) {
+  const responsiveStyle = document.createElement('style')
+  responsiveStyle.id = 'features-section-responsive-style'
+  responsiveStyle.textContent = `
+    @media (min-width: 768px) {
+      [data-features-grid] {
+        grid-template-columns: repeat(2, 1fr) !important;
+      }
+    }
+    @media (min-width: 1024px) {
+      [data-features-grid] {
+        grid-template-columns: repeat(3, 1fr) !important;
+      }
+    }
+    @media (max-width: 767px) {
+      [data-features-section] {
+        padding: 24px 0 60px 0 !important;
+      }
+      [data-features-section] > div {
+        padding: 0 16px !important;
+      }
+      [data-features-title] {
+        font-size: 36px !important;
+        line-height: 44px !important;
+      }
+    }
+    [data-feature-card]:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+    }
+    [data-feature-card]:hover .link-text {
+      color: #1353F4 !important;
+    }
+    .link-text {
+      color: #2D66F5;
+      transition: color 0.2s;
+    }
+    [data-features-section] .media-container {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 4/3;
+    }
+    @media (min-width: 768px) {
+      [data-features-section] .media-container {
+        aspect-ratio: 1/1;
+      }
+    }
+  `
+  document.head.appendChild(responsiveStyle)
+}

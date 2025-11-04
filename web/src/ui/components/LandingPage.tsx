@@ -52,9 +52,11 @@ export function LandingPage() {
   return (
     <>
       <LandingHeader onTryClick={handleTryClick} />
+      <main id="main" style={styles.main}>
       <HeroSection onStartClick={handleStartClick} />
       <FeaturesSection />
       <LandingFooter />
+      </main>
       {showAuthModal && (
         <AuthModal onClose={() => setShowAuthModal(false)} onAuthSuccess={handleAuthSuccess} />
       )}
@@ -63,6 +65,9 @@ export function LandingPage() {
 }
 
 const styles: { [key: string]: React.CSSProperties } = {
+  main: {
+    paddingTop: '46px', // 42px beta banner (8px + 26px + 8px) + 64px header
+  },
   loading: {
     display: 'flex',
     alignItems: 'center',
