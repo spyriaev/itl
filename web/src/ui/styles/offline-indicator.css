@@ -1,0 +1,63 @@
+/* Offline Indicator Styles */
+.offline-indicator-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  color: #f44336;
+  cursor: pointer;
+  position: relative;
+}
+
+.offline-indicator-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* Banner below header */
+.offline-indicator-banner {
+  position: fixed;
+  top: 64px; /* Below header (assuming header is ~64px) */
+  left: 0;
+  right: 0;
+  z-index: 9999;
+  background-color: #f44336;
+  color: white;
+  padding: 12px 16px;
+  text-align: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  animation: slideDown 0.3s ease-out;
+}
+
+.offline-indicator-banner-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.offline-indicator-banner-content svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.offline-indicator-banner-text {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+@keyframes slideDown {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+

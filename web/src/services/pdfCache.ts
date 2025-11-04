@@ -117,6 +117,52 @@ export async function initCache(): Promise<void> {
 }
 
 /**
+ * Check if PDF is cached (lightweight check without loading the blob)
+ */
+export async function isPdfCached(documentId: string): Promise<boolean> {
+  try {
+    await initCache()
+
+    // Check Cache API first
+    if (cacheAPI) {
+      try {
+        const cachedResponse = await cacheAPI.match(documentId)
+        if (cachedResponse) {
+          return true
+        }
+      } catch (error) {
+        // Continue to check IndexedDB
+      }
+    }
+
+    // Check IndexedDB
+    if (db) {
+      try {
+        const transaction = db.transaction([STORE_NAME], 'readonly')
+        const store = transaction.objectStore(STORE_NAME)
+        const request = store.get(documentId)
+        
+        return new Promise((resolve) => {
+          request.onsuccess = () => {
+            resolve(!!request.result)
+          }
+          request.onerror = () => {
+            resolve(false)
+          }
+        })
+      } catch (error) {
+        return false
+      }
+    }
+
+    return false
+  } catch (error) {
+    console.error('Error checking PDF cache:', error)
+    return false
+  }
+}
+
+/**
  * Get PDF from cache (checks both storage mechanisms)
  */
 export async function getPdfFromCache(documentId: string): Promise<{ blob: Blob; url: string } | null> {

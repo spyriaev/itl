@@ -4,6 +4,7 @@ import {
   getCachedThreads, cacheThreads, getCachedMessages, cacheMessages, appendMessages,
   initQuestionsCache
 } from '../services/questionsCache'
+import { isOnline } from '../hooks/useNetworkStatus'
 
 interface ChatContextType {
   // State
@@ -120,6 +121,13 @@ export function ChatProvider({ children }: ChatProviderProps) {
   }, [threads])
 
   const createNewThread = useCallback(async (documentId: string, title?: string): Promise<ChatThread> => {
+    // Check if offline
+    if (!isOnline()) {
+      const errorMessage = 'Нет подключения к интернету'
+      setError(errorMessage)
+      throw new Error(errorMessage)
+    }
+    
     try {
       setError(null)
       const newThread = await chatService.createThread(documentId, { title })
@@ -139,6 +147,12 @@ export function ChatProvider({ children }: ChatProviderProps) {
   const sendMessage = useCallback(async (content: string, pageContext?: number, contextType?: string, chapterId?: string) => {
     if (!activeThread) {
       setError('No active thread')
+      return
+    }
+
+    // Check if offline
+    if (!isOnline()) {
+      setError('Нет подключения к интернету')
       return
     }
 
@@ -232,6 +246,12 @@ export function ChatProvider({ children }: ChatProviderProps) {
     contextType?: string,
     chapterId?: string
   ) => {
+    // Check if offline
+    if (!isOnline()) {
+      setError('Нет подключения к интернету')
+      return
+    }
+    
     try {
       setIsStreaming(true)
       setError(null)

@@ -33,7 +33,9 @@
     "unknownDate": "Fecha desconocida",
     "invalidDate": "Fecha inválida",
     "shared": "Compartido",
-    "share": "Compartir"
+    "share": "Compartir",
+    "cached": "En caché",
+    "cachedTooltip": "El archivo está en caché"
   },
   "chatPanel": {
     "assistant": "Asistente",
@@ -214,5 +216,8 @@
     "selectedText": "Texto seleccionado",
     "close": "Cerrar",
     "generatingAnswer": "Generando respuesta..."
+  },
+  "offline": {
+    "noConnection": "Sin conexión a internet"
   }
 }

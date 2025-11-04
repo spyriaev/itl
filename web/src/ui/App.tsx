@@ -7,10 +7,30 @@ import { UserProfile } from "./components/UserProfile"
 import { SharedDocumentPage } from "./components/SharedDocumentPage"
 import { ProtectedRoute } from "./components/ProtectedRoute"
 import { AuthModal } from "./components/AuthModal"
+import { useNetworkStatus } from "../hooks/useNetworkStatus"
+import { useEffect } from "react"
+import { fetchDocuments } from "../services/uploadService"
+
+// Component to handle sync on reconnect
+function SyncOnReconnect() {
+  const { isOnline } = useNetworkStatus()
+  
+  useEffect(() => {
+    if (isOnline) {
+      // Sync document list when connection is restored
+      fetchDocuments().catch(err => {
+        console.warn('Failed to sync documents on reconnect:', err)
+      })
+    }
+  }, [isOnline])
+  
+  return null
+}
 
 export function App() {
   return (
     <AuthProvider>
+      <SyncOnReconnect />
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/plans" element={<PlansPage />} />

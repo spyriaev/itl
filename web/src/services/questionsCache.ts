@@ -6,20 +6,13 @@
 
 import { PageQuestionsData, PageQuestion } from './chatService'
 import type { ChatMessage } from './chatService'
+import { updateDocumentSyncMetadata, getDocumentSyncMetadata } from './documentListCache'
 
 const DB_NAME = 'questions_cache_db'
-const DB_VERSION = 1
-const STORE_DOCUMENTS = 'documents'
+const DB_VERSION = 2  // Incremented to remove documents store
 const STORE_THREADS = 'threads'
 const STORE_MESSAGES = 'messages'
 const STORE_PAGE_QUESTIONS = 'page_questions'
-
-interface DocumentMetadata {
-  documentId: string
-  lastSync: string  // ISO timestamp
-  lastModified: string  // ISO timestamp from server
-  version: number
-}
 
 interface CachedThread {
   id: string
@@ -76,10 +69,7 @@ async function initIndexedDB(): Promise<IDBDatabase> {
       const database = (event.target as IDBOpenDBRequest).result
       
       // Create object stores if they don't exist
-      if (!database.objectStoreNames.contains(STORE_DOCUMENTS)) {
-        const docStore = database.createObjectStore(STORE_DOCUMENTS, { keyPath: 'documentId' })
-        docStore.createIndex('lastSync', 'lastSync', { unique: false })
-      }
+      // Note: documents store is removed - metadata is now in documentListCache
       
       if (!database.objectStoreNames.contains(STORE_THREADS)) {
         const threadsStore = database.createObjectStore(STORE_THREADS, { keyPath: 'id' })
@@ -121,55 +111,35 @@ export async function initQuestionsCache(): Promise<void> {
 }
 
 /**
- * Cache document metadata
+ * Cache document metadata (now uses documentListCache)
  */
 export async function cacheDocumentMetadata(
   documentId: string, 
   lastSync: string, 
   lastModified: string
 ): Promise<void> {
-  try {
-    await initQuestionsCache()
-    if (!db) return
-
-    const metadata: DocumentMetadata = {
-      documentId,
-      lastSync,
-      lastModified,
-      version: 1
-    }
-
-    const transaction = db.transaction([STORE_DOCUMENTS], 'readwrite')
-    const store = transaction.objectStore(STORE_DOCUMENTS)
-    await new Promise<void>((resolve, reject) => {
-      const request = store.put(metadata)
-      request.onsuccess = () => resolve()
-      request.onerror = () => reject(request.error)
-    })
-  } catch (error) {
-    console.error('Error caching document metadata:', error)
-  }
+  await updateDocumentSyncMetadata(documentId, lastSync, lastModified)
 }
 
 /**
- * Get document metadata
+ * Get document metadata (now uses documentListCache)
  */
-export async function getDocumentMetadata(documentId: string): Promise<DocumentMetadata | null> {
-  try {
-    await initQuestionsCache()
-    if (!db) return null
-
-    const transaction = db.transaction([STORE_DOCUMENTS], 'readonly')
-    const store = transaction.objectStore(STORE_DOCUMENTS)
-    
-    return new Promise((resolve, reject) => {
-      const request = store.get(documentId)
-      request.onsuccess = () => resolve(request.result || null)
-      request.onerror = () => reject(request.error)
-    })
-  } catch (error) {
-    console.error('Error getting document metadata:', error)
+export async function getDocumentMetadata(documentId: string): Promise<{
+  documentId: string
+  lastSync: string
+  lastModified: string
+  version: number
+} | null> {
+  const metadata = await getDocumentSyncMetadata(documentId)
+  if (!metadata || !metadata.lastSync || !metadata.lastModified) {
     return null
+  }
+  
+  return {
+    documentId,
+    lastSync: metadata.lastSync,
+    lastModified: metadata.lastModified,
+    version: metadata.version || 1
   }
 }
 
@@ -548,14 +518,7 @@ export async function invalidateCache(documentId: string): Promise<void> {
     await initQuestionsCache()
     if (!db) return
 
-    // Remove document metadata
-    const docTransaction = db.transaction([STORE_DOCUMENTS], 'readwrite')
-    const docStore = docTransaction.objectStore(STORE_DOCUMENTS)
-    await new Promise<void>((resolve, reject) => {
-      const request = docStore.delete(documentId)
-      request.onsuccess = () => resolve()
-      request.onerror = () => reject(request.error)
-    })
+    // Note: Document metadata is now in documentListCache, no need to remove it here
     
     // Remove threads
     const threadsTransaction = db.transaction([STORE_THREADS], 'readwrite')

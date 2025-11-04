@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { useTranslation } from "react-i18next"
 import { fetchDocuments, type DocumentMetadata } from "../../services/uploadService"
+import { isPdfCached } from "../../services/pdfCache"
 import { ShareDocumentButton } from "./ShareDocumentButton"
 
 interface DocumentListProps {
@@ -20,6 +21,62 @@ function PageBadge({ currentPage }: { currentPage?: number | null }) {
   return (
     <span className="document-page-badge" title={`Прочитано страниц: ${currentPage}`}>
       {currentPage}
+    </span>
+  )
+}
+
+// Cache badge component
+function CacheBadge({ documentId }: { documentId: string }) {
+  const { t } = useTranslation()
+  const [isCached, setIsCached] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    
+    isPdfCached(documentId).then((cached) => {
+      if (!cancelled) {
+        setIsCached(cached)
+      }
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [documentId])
+
+  if (isCached === null || !isCached) {
+    return null
+  }
+
+  return (
+    <span 
+      className="document-cache-badge" 
+      title={t("documentList.cachedTooltip", "Файл закеширован")}
+      style={{
+        fontSize: 11,
+        color: '#10B981',
+        backgroundColor: '#D1FAE5',
+        padding: '2px 6px',
+        borderRadius: 4,
+        flexShrink: 0,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 4
+      }}
+    >
+      <svg
+        width="12"
+        height="12"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M5 13l4 4L19 7"></path>
+      </svg>
+      {t("documentList.cached", "Кеш")}
     </span>
   )
 }
@@ -240,6 +297,7 @@ export function DocumentList({ refreshTrigger, onDocumentClick, loadingDocumentI
                         {t("documentList.shared")}
                       </span>
                     )}
+                    {doc.status === 'uploaded' && <CacheBadge documentId={doc.id} />}
                     {doc.status === 'uploaded' && doc.questionsCount !== undefined && doc.questionsCount > 0 && (
                       <span className="document-questions-badge" style={{ flexShrink: 0 }}>{doc.questionsCount}</span>
                     )}
@@ -339,6 +397,7 @@ export function DocumentList({ refreshTrigger, onDocumentClick, loadingDocumentI
                           {t("documentList.shared")}
                         </span>
                       )}
+                      {doc.status === 'uploaded' && <CacheBadge documentId={doc.id} />}
                     </div>
                   </td>
                   <td className="document-size">

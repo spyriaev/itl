@@ -33,7 +33,9 @@
     "unknownDate": "अज्ञात तिथि",
     "invalidDate": "अमान्य तिथि",
     "shared": "साझा किया गया",
-    "share": "साझा करें"
+    "share": "साझा करें",
+    "cached": "कैश",
+    "cachedTooltip": "फ़ाइल कैश की गई है"
   },
   "chatPanel": {
     "assistant": "सहायक",
@@ -214,5 +216,8 @@
     "selectedText": "चयनित पाठ",
     "close": "बंद करें",
     "generatingAnswer": "उत्तर उत्पन्न कर रहा है..."
+  },
+  "offline": {
+    "noConnection": "इंटरनेट कनेक्शन नहीं"
   }
 }

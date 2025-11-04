@@ -24,6 +24,25 @@ window.addEventListener('unhandledrejection', (event) => {
   }
 })
 
+// Register Service Worker for offline support
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker
+      .register('/sw.js')
+      .then((registration) => {
+        console.log('[SW] Service Worker registered:', registration.scope)
+        
+        // Check for updates periodically
+        setInterval(() => {
+          registration.update()
+        }, 60 * 60 * 1000) // Check every hour
+      })
+      .catch((error) => {
+        console.warn('[SW] Service Worker registration failed:', error)
+      })
+  })
+}
+
 const root = createRoot(document.getElementById('root')!)
 root.render(
   <BrowserRouter>

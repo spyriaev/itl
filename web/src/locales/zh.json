@@ -33,7 +33,9 @@
     "unknownDate": "未知日期",
     "invalidDate": "无效日期",
     "shared": "已共享",
-    "share": "分享"
+    "share": "分享",
+    "cached": "缓存",
+    "cachedTooltip": "文件已缓存"
   },
   "chatPanel": {
     "assistant": "助手",
@@ -214,5 +216,8 @@
     "selectedText": "选中的文本",
     "close": "关闭",
     "generatingAnswer": "正在生成答案..."
+  },
+  "offline": {
+    "noConnection": "无互联网连接"
   }
 }

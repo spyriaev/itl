@@ -5,6 +5,7 @@ import { useAuth } from "../../contexts/AuthContext"
 import { FileUpload } from "./FileUpload"
 import { DocumentList } from "./DocumentList"
 import { UserMenu } from "./UserMenu"
+import { OfflineIndicator, OfflineIndicatorIcon } from "./OfflineIndicator"
 import { PdfViewer } from "./PdfViewer"
 import { waitForDocumentUpload, fetchDocuments, getDocumentViewUrl, type DocumentViewInfo } from "../../services/uploadService"
 import { pdfjs } from 'react-pdf'
@@ -145,6 +146,7 @@ export function LibraryPage() {
 
   return (
     <div className="upload-page">
+      <OfflineIndicator hideInReader={viewMode === "reader"} />
       <header className="upload-header" data-landing-header>
         <Link to="/app" className="upload-header-logo" data-landing-logo>
           <div className="upload-header-logo-icon">
@@ -156,7 +158,10 @@ export function LibraryPage() {
           </div>
           <h1 className="upload-header-logo-text" data-landing-logo-text>Innesi Reader</h1>
         </Link>
-        <UserMenu />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <OfflineIndicatorIcon />
+          <UserMenu />
+        </div>
       </header>
 
       <main className="upload-main">

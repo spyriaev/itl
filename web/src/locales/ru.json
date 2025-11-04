@@ -33,7 +33,9 @@
     "unknownDate": "Неизвестная дата",
     "invalidDate": "Некорректная дата",
     "shared": "Расшарен",
-    "share": "Поделиться"
+    "share": "Поделиться",
+    "cached": "Кеш",
+    "cachedTooltip": "Файл закеширован"
   },
   "chatPanel": {
     "assistant": "Помощник",
@@ -214,5 +216,8 @@
     "selectedText": "Выделенный текст",
     "close": "Закрыть",
     "generatingAnswer": "Генерирую ответ..."
+  },
+  "offline": {
+    "noConnection": "Нет подключения к интернету"
   }
 }

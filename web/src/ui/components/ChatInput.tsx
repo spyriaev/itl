@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { DocumentStructureItem } from '../../types/document'
+import { useNetworkStatus } from '../../hooks/useNetworkStatus'
 
 interface ChatInputProps {
   value: string
@@ -31,12 +32,19 @@ export function ChatInput({
   isMobile = false
 }: ChatInputProps) {
   const { t } = useTranslation()
+  const { isOffline } = useNetworkStatus()
   const defaultPlaceholder = placeholder || t("chatInput.askQuestion")
   const [isFocused, setIsFocused] = useState(false)
   const [hasText, setHasText] = useState(false)
   const [isContextMenuOpen, setIsContextMenuOpen] = useState(false)
   const editorRef = useRef<HTMLDivElement>(null)
   const contextMenuRef = useRef<HTMLDivElement>(null)
+  
+  // Block actions when offline
+  const isDisabled = disabled || isStreaming || isOffline
+  const offlinePlaceholder = isOffline 
+    ? (t('offline.noConnection', 'Нет подключения к интернету') || 'Нет подключения к интернету')
+    : defaultPlaceholder
 
   // Sync external value with contentEditable
   React.useEffect(() => {
@@ -67,7 +75,7 @@ export function ChatInput({
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
-      if (hasText && !disabled && !isStreaming) {
+      if (hasText && !isDisabled) {
         onSend()
         if (editorRef.current) {
           editorRef.current.textContent = ''
@@ -79,7 +87,7 @@ export function ChatInput({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (hasText && !disabled && !isStreaming) {
+    if (hasText && !isDisabled) {
       onSend()
       if (editorRef.current) {
         editorRef.current.textContent = ''
@@ -264,7 +272,7 @@ export function ChatInput({
                       e.stopPropagation()
                       setIsContextMenuOpen(!isContextMenuOpen)
                     }}
-                    disabled={disabled || isStreaming}
+                    disabled={isDisabled}
                     style={{
                       ...styles.select,
                       display: 'flex',
@@ -386,7 +394,7 @@ export function ChatInput({
                 <select
                   value={getSelectedValue()}
                   onChange={handleContextChange}
-                  disabled={disabled || isStreaming}
+                  disabled={isDisabled}
                   style={styles.select}
                 >
                   <option value="none">{t("chatInput.noContext")}</option>
@@ -412,11 +420,11 @@ export function ChatInput({
                 ref={editorRef}
                 style={{
                   ...styles.editor,
-                  backgroundColor: isStreaming || disabled ? '#F9FAFB' : 'transparent',
-                  opacity: isStreaming || disabled ? 0.6 : 1,
-                  cursor: disabled || isStreaming ? 'not-allowed' : 'text'
+                  backgroundColor: isDisabled ? '#F9FAFB' : 'transparent',
+                  opacity: isDisabled ? 0.6 : 1,
+                  cursor: isDisabled ? 'not-allowed' : 'text'
                 }}
-                contentEditable={!disabled && !isStreaming}
+                contentEditable={!isDisabled}
                 role="textbox"
                 spellCheck="true"
                 onFocus={handleFocus}
@@ -426,7 +434,7 @@ export function ChatInput({
                 suppressContentEditableWarning
               />
               <div style={styles.placeholder}>
-                {isFocused || hasText ? '' : defaultPlaceholder}
+                {isFocused || hasText ? '' : offlinePlaceholder}
               </div>
             </div>
             
@@ -440,9 +448,9 @@ export function ChatInput({
                   type="submit"
                   style={{
                     ...styles.submitButton,
-                    ...((hasText && !disabled && !isStreaming) ? styles.submitButtonEnabled : {})
+                    ...((hasText && !isDisabled) ? styles.submitButtonEnabled : {})
                   }}
-                  disabled={!hasText || disabled || isStreaming}
+                  disabled={!hasText || isDisabled}
                 >
                   <svg 
                     xmlns="http://www.w3.org/2000/svg" 

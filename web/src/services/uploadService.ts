@@ -1,6 +1,8 @@
 import { supabase, uploadPdfToStorage } from '../lib/supabase'
 import { extractDocumentStructure } from './documentService'
 import { getPdfFromCache, savePdfToCache, initCache } from './pdfCache'
+import { cacheDocumentList, getCachedDocumentList, initDocumentListCache } from './documentListCache'
+import { isOnline } from '../hooks/useNetworkStatus'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
 
@@ -204,24 +206,55 @@ export async function uploadPdfFile(
 
 /**
  * Fetch list of documents from the backend
+ * Uses cache when offline, syncs with server when online
  */
 export async function fetchDocuments(limit: number = 50, offset: number = 0): Promise<DocumentMetadata[]> {
-  const token = await getAuthToken()
-  if (!token) {
-    throw new Error('Not authenticated')
+  // Initialize cache
+  await initDocumentListCache()
+  
+  // Try to load from cache first
+  const cachedDocuments = await getCachedDocumentList()
+  
+  // If offline, return cached documents
+  if (!isOnline()) {
+    if (cachedDocuments.length > 0) {
+      console.log('[fetchDocuments] Offline, using cached documents')
+      return cachedDocuments.slice(offset, offset + limit)
+    }
+    throw new Error('No cached documents available and offline')
   }
+  
+  // Online: try to fetch from server
+  try {
+    const token = await getAuthToken()
+    if (!token) {
+      throw new Error('Not authenticated')
+    }
 
-  const response = await fetch(`${API_URL}/api/documents?limit=${limit}&offset=${offset}`, {
-    headers: {
-      'Authorization': `Bearer ${token}`,
-    },
-  })
+    const response = await fetch(`${API_URL}/api/documents?limit=${limit}&offset=${offset}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    })
 
-  if (!response.ok) {
-    throw new Error('Failed to fetch documents')
+    if (!response.ok) {
+      throw new Error('Failed to fetch documents')
+    }
+
+    const documents = await response.json()
+    
+    // Cache the documents
+    await cacheDocumentList(documents)
+    
+    return documents
+  } catch (error) {
+    // If fetch fails but we have cache, use cache
+    if (cachedDocuments.length > 0) {
+      console.warn('[fetchDocuments] Failed to fetch from server, using cache:', error)
+      return cachedDocuments.slice(offset, offset + limit)
+    }
+    throw error
   }
-
-  return response.json()
 }
 
 export interface DocumentViewInfo {
