@@ -3,6 +3,10 @@ import { Document, Page, pdfjs } from 'react-pdf'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import { getDocumentViewUrl, updateViewProgress, DocumentViewInfo } from '../../services/uploadService'
 import { chatService, PageQuestionsData } from '../../services/chatService'
+import {
+  getAllCachedQuestions, cacheAllQuestions, cacheDocumentMetadata,
+  getDocumentMetadata, checkForUpdates, initQuestionsCache
+} from '../../services/questionsCache'
 import { ChatProvider, useChat } from '../../contexts/ChatContext'
 import { ChatPanel } from './ChatPanel'
 import { PageRelatedQuestions } from './PageRelatedQuestions'
@@ -347,72 +351,57 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
   }, [documentInfo?.lastViewedPage])
 
   // Track fetching state to avoid duplicate requests
-  const fetchingPagesRef = useRef<Set<number>>(new Set())
-
-  // Fetch page questions for visible pages
+  // Load all questions from cache and sync with server when document opens
   useEffect(() => {
     if (!documentId || numPages === 0) return
 
-    const fetchPageQuestions = async (pageNumbers: number[]) => {
-      const questionsMap = new Map<number, PageQuestionsData>()
-      const pagesToFetch = pageNumbers.filter(
-        pageNum => !pageQuestionsMap.has(pageNum) && !fetchingPagesRef.current.has(pageNum)
-      )
-
-      // Mark pages as being fetched
-      pagesToFetch.forEach(pageNum => fetchingPagesRef.current.add(pageNum))
-
-      // Fetch questions for specified pages only
-      for (const pageNum of pagesToFetch) {
+    const loadAndSyncQuestions = async () => {
+      try {
+        // Initialize cache
+        await initQuestionsCache()
+        
+        // Load all questions from cache immediately
+        const cachedQuestions = await getAllCachedQuestions(documentId)
+        if (cachedQuestions.size > 0) {
+          setPageQuestionsMap(cachedQuestions)
+        }
+        
+        // Check for updates on server
         try {
-          const questionsData = await chatService.getPageQuestions(documentId, pageNum)
-          if (questionsData.totalQuestions > 0) {
-            questionsMap.set(pageNum, questionsData)
+          const metadata = await chatService.getDocumentQuestionsMetadata(documentId)
+          const cachedMetadata = await getDocumentMetadata(documentId)
+          
+          const needsUpdate = !cachedMetadata || 
+            await checkForUpdates(documentId, metadata.lastModified)
+          
+          if (needsUpdate) {
+            // Fetch all questions from server
+            const allQuestions = await chatService.getAllDocumentQuestions(documentId)
+            
+            // Update cache
+            await cacheAllQuestions(documentId, allQuestions.pages, allQuestions.lastModified)
+            await cacheDocumentMetadata(documentId, new Date().toISOString(), allQuestions.lastModified)
+            
+            // Update state
+            const questionsMap = new Map<number, PageQuestionsData>()
+            for (const page of allQuestions.pages) {
+              questionsMap.set(page.pageNumber, page)
+            }
+            setPageQuestionsMap(questionsMap)
           }
         } catch (err) {
-          console.error(`Failed to fetch questions for page ${pageNum}:`, err)
-        } finally {
-          fetchingPagesRef.current.delete(pageNum)
+          // If offline or error, use cached data
+          console.warn('Failed to sync questions from server, using cache:', err)
         }
-      }
-
-      if (questionsMap.size > 0) {
-        setPageQuestionsMap(prev => new Map([...prev, ...questionsMap]))
+      } catch (err) {
+        console.error('Error loading questions:', err)
       }
     }
 
-    // Determine which pages to fetch
-    let pagesToFetch: number[] = []
+    loadAndSyncQuestions()
+  }, [documentId, numPages])
 
-    if (!continuousScroll) {
-      // Single page mode - fetch current page
-      pagesToFetch = [currentPage]
-    } else {
-      // Continuous scroll mode - fetch visible pages
-      if (pageRefs.current.length > 0 && scrollContainerRef.current) {
-        const container = scrollContainerRef.current
-        pageRefs.current.forEach((ref, index) => {
-          if (ref) {
-            const rect = ref.getBoundingClientRect()
-            const containerRect = container.getBoundingClientRect()
-
-            // Check if page is in viewport
-            if (
-              rect.bottom >= containerRect.top &&
-              rect.top <= containerRect.bottom
-            ) {
-              pagesToFetch.push(index + 1)
-            }
-          }
-        })
-      } else {
-        // Fallback: fetch first 10 pages if refs not ready
-        pagesToFetch = Array.from({ length: Math.min(10, numPages) }, (_, i) => i + 1)
-      }
-    }
-
-    fetchPageQuestions(pagesToFetch)
-  }, [documentId, numPages, currentPage, continuousScroll])
+  const fetchingPagesRef = useRef<Set<number>>(new Set())
 
   // Update page questions when a new message with page context is completed
   useEffect(() => {
@@ -430,26 +419,41 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
         const pageNum = lastUserMessage.pageContext
         lastUserMessagePageRef.current = pageNum
         
-        // Refetch questions for this page after a short delay to ensure backend has saved the message
+        // Refetch all questions and update cache after a short delay
         const timeoutId = setTimeout(async () => {
           try {
-            // Remove the page from cache to force refetch
-            setPageQuestionsMap(prev => {
-              const newMap = new Map(prev)
-              newMap.delete(pageNum)
-              return newMap
-            })
+            // Fetch all questions from server to get latest state
+            const allQuestions = await chatService.getAllDocumentQuestions(documentId)
             
-            // Clear fetching flag to allow refetch
-            fetchingPagesRef.current.delete(pageNum)
+            // Update cache
+            await cacheAllQuestions(documentId, allQuestions.pages, allQuestions.lastModified)
+            await cacheDocumentMetadata(documentId, new Date().toISOString(), allQuestions.lastModified)
             
-            // Fetch updated questions
-            const questionsData = await chatService.getPageQuestions(documentId, pageNum)
-            if (questionsData) {
-              setPageQuestionsMap(prev => new Map(prev).set(pageNum, questionsData))
+            // Update state
+            const questionsMap = new Map<number, PageQuestionsData>()
+            for (const page of allQuestions.pages) {
+              questionsMap.set(page.pageNumber, page)
             }
+            setPageQuestionsMap(questionsMap)
           } catch (err) {
-            console.error(`Failed to refresh questions for page ${pageNum}:`, err)
+            console.error(`Failed to refresh questions after new message:`, err)
+            // Fallback: try to refresh just this page
+            try {
+              const questionsData = await chatService.getPageQuestions(documentId, pageNum)
+              if (questionsData) {
+                setPageQuestionsMap(prev => new Map(prev).set(pageNum, questionsData))
+                // Update cache for this page
+                const cached = await getAllCachedQuestions(documentId)
+                cached.set(pageNum, questionsData)
+                const pagesArray = Array.from(cached.values())
+                const metadata = await getDocumentMetadata(documentId)
+                if (metadata) {
+                  await cacheAllQuestions(documentId, pagesArray, metadata.lastModified)
+                }
+              }
+            } catch (fallbackErr) {
+              console.error(`Failed to refresh questions for page ${pageNum}:`, fallbackErr)
+            }
           }
         }, 500) // Small delay to ensure backend has processed the message
         

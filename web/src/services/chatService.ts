@@ -59,6 +59,19 @@ export interface PageQuestionsData {
   questions: PageQuestion[]
 }
 
+export interface AllDocumentQuestionsResponse {
+  documentId: string
+  lastModified: string
+  pages: PageQuestionsData[]
+}
+
+export interface DocumentQuestionsMetadataResponse {
+  documentId: string
+  lastModified: string
+  totalQuestions: number
+  pagesWithQuestions: number[]
+}
+
 class ChatService {
   private async getAuthHeaders(): Promise<HeadersInit> {
     const { data: { session }, error } = await supabase.auth.getSession()
@@ -95,8 +108,61 @@ class ChatService {
     return response.json()
   }
 
-  async listThreads(documentId: string): Promise<ChatThread[]> {
-    const response = await fetch(`${API_BASE_URL}/api/documents/${documentId}/chat/threads`, {
+  async getPageQuestions(documentId: string, pageNumber: number): Promise<PageQuestionsData> {
+    const response = await fetch(
+      `${API_BASE_URL}/api/documents/${documentId}/pages/${pageNumber}/questions`,
+      {
+        method: 'GET',
+        headers: await this.getAuthHeaders(),
+      }
+    )
+
+    if (!response.ok) {
+      throw new Error(`Failed to get page questions: ${response.statusText}`)
+    }
+
+    return response.json()
+  }
+
+  async getAllDocumentQuestions(documentId: string): Promise<AllDocumentQuestionsResponse> {
+    const response = await fetch(
+      `${API_BASE_URL}/api/documents/${documentId}/questions/all`,
+      {
+        method: 'GET',
+        headers: await this.getAuthHeaders(),
+      }
+    )
+
+    if (!response.ok) {
+      throw new Error(`Failed to get all document questions: ${response.statusText}`)
+    }
+
+    return response.json()
+  }
+
+  async getDocumentQuestionsMetadata(documentId: string): Promise<DocumentQuestionsMetadataResponse> {
+    const response = await fetch(
+      `${API_BASE_URL}/api/documents/${documentId}/questions/metadata`,
+      {
+        method: 'GET',
+        headers: await this.getAuthHeaders(),
+      }
+    )
+
+    if (!response.ok) {
+      throw new Error(`Failed to get document questions metadata: ${response.statusText}`)
+    }
+
+    return response.json()
+  }
+
+  async listThreads(documentId: string, since?: string): Promise<ChatThread[]> {
+    const url = new URL(`${API_BASE_URL}/api/documents/${documentId}/chat/threads`)
+    if (since) {
+      url.searchParams.set('since', since)
+    }
+    
+    const response = await fetch(url.toString(), {
       method: 'GET',
       headers: await this.getAuthHeaders(),
     })
@@ -108,8 +174,13 @@ class ChatService {
     return response.json()
   }
 
-  async getThreadMessages(threadId: string): Promise<ThreadWithMessages> {
-    const response = await fetch(`${API_BASE_URL}/api/chat/threads/${threadId}/messages`, {
+  async getThreadMessages(threadId: string, since?: string): Promise<ThreadWithMessages> {
+    const url = new URL(`${API_BASE_URL}/api/chat/threads/${threadId}/messages`)
+    if (since) {
+      url.searchParams.set('since', since)
+    }
+    
+    const response = await fetch(url.toString(), {
       method: 'GET',
       headers: await this.getAuthHeaders(),
     })

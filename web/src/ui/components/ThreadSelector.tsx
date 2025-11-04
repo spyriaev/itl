@@ -316,7 +316,7 @@ export function ThreadSelector({ documentId, onNewThread, isMobile = false }: Th
               {t("threadSelector.noConversations")}
             </div>
           ) : (
-            threads.map((thread, index) => (
+            threads.map((thread: any, index: number) => (
               <button
                 key={thread.id}
                 onClick={(e) => {

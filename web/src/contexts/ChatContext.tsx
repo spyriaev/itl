@@ -1,5 +1,9 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react'
 import { chatService, ChatThread, ChatMessage, ThreadWithMessages } from '../services/chatService'
+import {
+  getCachedThreads, cacheThreads, getCachedMessages, cacheMessages, appendMessages,
+  initQuestionsCache
+} from '../services/questionsCache'
 
 interface ChatContextType {
   // State
@@ -36,6 +40,11 @@ export function ChatProvider({ children }: ChatProviderProps) {
   const [error, setError] = useState<string | null>(null)
   const [targetMessageId, setTargetMessageId] = useState<string | null>(null)
 
+  // Initialize cache on mount
+  useEffect(() => {
+    initQuestionsCache()
+  }, [])
+
   const clearError = useCallback(() => {
     setError(null)
   }, [])
@@ -44,8 +53,27 @@ export function ChatProvider({ children }: ChatProviderProps) {
     try {
       setIsLoading(true)
       setError(null)
-      const threadList = await chatService.listThreads(documentId)
-      setThreads(threadList)
+      
+      // Try to load from cache first
+      const cachedThreads = await getCachedThreads(documentId)
+      if (cachedThreads.length > 0) {
+        setThreads(cachedThreads)
+      }
+      
+      // Then sync with server
+      try {
+        const threadList = await chatService.listThreads(documentId)
+        setThreads(threadList)
+        // Cache the threads
+        await cacheThreads(documentId, threadList)
+      } catch (err) {
+        // If offline, use cached threads
+        if (cachedThreads.length > 0) {
+          console.warn('Failed to sync threads from server, using cache:', err)
+        } else {
+          throw err
+        }
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load threads')
     } finally {
@@ -57,15 +85,39 @@ export function ChatProvider({ children }: ChatProviderProps) {
     try {
       setIsLoading(true)
       setError(null)
-      const threadWithMessages = await chatService.getThreadMessages(threadId)
-      setActiveThread(threadWithMessages)
-      setMessages(threadWithMessages.messages)
+      
+      // Try to load from cache first
+      const cachedMessages = await getCachedMessages(threadId)
+      if (cachedMessages.length > 0) {
+        // Find the thread in the threads list
+        const thread = threads.find(t => t.id === threadId)
+        if (thread) {
+          setActiveThread(thread)
+          setMessages(cachedMessages)
+        }
+      }
+      
+      // Then sync with server
+      try {
+        const threadWithMessages = await chatService.getThreadMessages(threadId)
+        setActiveThread(threadWithMessages)
+        setMessages(threadWithMessages.messages)
+        // Cache the messages
+        await cacheMessages(threadId, threadWithMessages.messages)
+      } catch (err) {
+        // If offline, use cached messages
+        if (cachedMessages.length > 0) {
+          console.warn('Failed to sync messages from server, using cache:', err)
+        } else {
+          throw err
+        }
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load thread')
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [threads])
 
   const createNewThread = useCallback(async (documentId: string, title?: string): Promise<ChatThread> => {
     try {
@@ -74,13 +126,15 @@ export function ChatProvider({ children }: ChatProviderProps) {
       setThreads(prev => [newThread, ...prev])
       setActiveThread(newThread)
       setMessages([])
+      // Cache the new thread
+      await cacheThreads(documentId, [newThread, ...threads])
       return newThread
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to create thread'
       setError(errorMessage)
       throw new Error(errorMessage)
     }
-  }, [])
+  }, [threads])
 
   const sendMessage = useCallback(async (content: string, pageContext?: number, contextType?: string, chapterId?: string) => {
     if (!activeThread) {
@@ -131,11 +185,20 @@ export function ChatProvider({ children }: ChatProviderProps) {
         },
         (messageId) => {
           // Replace temp message with real message - preserve contextType and chapterId
-          setMessages(prev => prev.map(msg => 
-            msg.id === assistantMessageId 
-              ? { ...msg, id: messageId, contextType: msg.contextType, chapterId: msg.chapterId, pageContext: msg.pageContext }
-              : msg
-          ))
+          setMessages(prev => {
+            const updated = prev.map(msg => 
+              msg.id === assistantMessageId 
+                ? { ...msg, id: messageId, contextType: msg.contextType, chapterId: msg.chapterId, pageContext: msg.pageContext }
+                : msg
+            )
+            // Update cache with new messages
+            if (activeThread) {
+              cacheMessages(activeThread.id, updated).catch(err => 
+                console.error('Failed to cache messages:', err)
+              )
+            }
+            return updated
+          })
           setIsStreaming(false)
         },
         (error) => {
@@ -197,51 +260,96 @@ export function ChatProvider({ children }: ChatProviderProps) {
       
       setMessages([userMessage, assistantMessage])
 
-      // Create thread and send first message
-      const newThread = await chatService.startNewConversation(
-        documentId,
-        firstMessage,
-        pageContext,
-        contextType,
-        chapterId,
-        (chunk) => {
-          // Handle streaming for new conversation
-          setMessages(prev => prev.map(msg => 
-            msg.id === assistantMessageId 
-              ? { ...msg, content: msg.content + chunk }
-              : msg
-          ))
-        },
-        (messageId) => {
-          // Replace temp message with real message - preserve contextType and chapterId
-          setMessages(prev => prev.map(msg => 
-            msg.id === assistantMessageId 
-              ? { ...msg, id: messageId, contextType: msg.contextType, chapterId: msg.chapterId, pageContext: msg.pageContext }
-              : msg
-          ))
-          setIsStreaming(false)
-        },
-        (error) => {
-          // Check if it's a limit exceeded error
-          try {
-            const errorData = JSON.parse(error)
-            if (errorData.error_type === 'limit_exceeded') {
-              setError(errorData.message || error)
-            } else {
+      // Create thread first (synchronously)
+      let newThread: ChatThread
+      const threadIdRef = { current: null as string | null }
+      
+      try {
+        // Create thread first
+        newThread = await chatService.createThread(documentId, {
+          title: firstMessage.length > 50 ? firstMessage.substring(0, 50) + '...' : firstMessage
+        })
+        
+        // Store threadId in ref immediately
+        threadIdRef.current = newThread.id
+        
+        // Send first message
+        await chatService.sendMessage(
+          newThread.id,
+          { 
+            content: firstMessage, 
+            pageContext,
+            contextType,
+            chapterId
+          },
+          (chunk) => {
+            // Handle streaming for new conversation
+            setMessages(prev => prev.map(msg => 
+              msg.id === assistantMessageId 
+                ? { ...msg, content: msg.content + chunk }
+                : msg
+            ))
+          },
+          (messageId) => {
+            // Replace temp message with real message - preserve contextType and chapterId
+            setMessages(prev => {
+              const updated = prev.map(msg => 
+                msg.id === assistantMessageId 
+                  ? { ...msg, id: messageId, contextType: msg.contextType, chapterId: msg.chapterId, pageContext: msg.pageContext }
+                  : msg
+              )
+              // Update cache with new messages
+              if (threadIdRef.current) {
+                cacheMessages(threadIdRef.current, updated).catch(err => 
+                  console.error('Failed to cache messages:', err)
+                )
+              }
+              return updated
+            })
+            setIsStreaming(false)
+          },
+          (error) => {
+            // Check if it's a limit exceeded error
+            try {
+              const errorData = JSON.parse(error)
+              if (errorData.error_type === 'limit_exceeded') {
+                setError(errorData.message || error)
+              } else {
+                setError(error)
+              }
+            } catch {
+              // Not a JSON error, use as is
               setError(error)
             }
-          } catch {
-            // Not a JSON error, use as is
-            setError(error)
+            setIsStreaming(false)
+            // Remove the failed assistant message
+            setMessages(prev => prev.filter(msg => msg.id !== assistantMessageId))
           }
+        )
+      } catch (err: any) {
+        console.log('startNewConversation caught error:', err)
+        console.log('Error limitError:', err?.limitError)
+        
+        // Check if it's a limit exceeded error
+        if (err?.limitError) {
+          setError(err.limitError.message || err.message)
           setIsStreaming(false)
-          // Remove the failed assistant message
-          setMessages(prev => prev.filter(msg => msg.id !== assistantMessageId))
+          // Re-throw to let PdfViewer handle it
+          throw err
         }
-      )
+        
+        throw err
+      }
 
       setActiveThread(newThread)
-      setThreads(prev => [newThread, ...prev])
+      setThreads(prev => {
+        const updatedThreads = [newThread, ...prev]
+        // Cache the new thread
+        cacheThreads(documentId, updatedThreads).catch(err => 
+          console.error('Failed to cache threads:', err)
+        )
+        return updatedThreads
+      })
     } catch (err: any) {
       console.log('startNewConversation catch in ChatContext:', err)
       console.log('Error limitError:', err?.limitError)
@@ -263,21 +371,47 @@ export function ChatProvider({ children }: ChatProviderProps) {
     try {
       setIsLoading(true)
       setError(null)
-      const threadWithMessages = await chatService.getThreadMessages(threadId)
-      setActiveThread(threadWithMessages)
-      setMessages(threadWithMessages.messages)
-      setTargetMessageId(messageId)
       
-      // Clear target message after a delay to allow scroll animation
-      setTimeout(() => {
-        setTargetMessageId(null)
-      }, 3000)
+      // Try to load from cache first
+      const cachedMessages = await getCachedMessages(threadId)
+      if (cachedMessages.length > 0) {
+        const thread = threads.find(t => t.id === threadId)
+        if (thread) {
+          setActiveThread(thread)
+          setMessages(cachedMessages)
+          setTargetMessageId(messageId)
+          setTimeout(() => setTargetMessageId(null), 3000)
+        }
+      }
+      
+      // Then sync with server
+      try {
+        const threadWithMessages = await chatService.getThreadMessages(threadId)
+        setActiveThread(threadWithMessages)
+        setMessages(threadWithMessages.messages)
+        setTargetMessageId(messageId)
+        
+        // Cache the messages
+        await cacheMessages(threadId, threadWithMessages.messages)
+        
+        // Clear target message after a delay to allow scroll animation
+        setTimeout(() => {
+          setTargetMessageId(null)
+        }, 3000)
+      } catch (err) {
+        // If offline, use cached messages
+        if (cachedMessages.length > 0) {
+          console.warn('Failed to sync messages from server, using cache:', err)
+        } else {
+          throw err
+        }
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to navigate to message')
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [threads])
 
   const contextValue: ChatContextType = {
     activeThread,

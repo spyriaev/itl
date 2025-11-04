@@ -8,7 +8,8 @@ from models import (
     Document, CreateDocumentRequest, DocumentResponse,
     ChatThread, ChatMessage, CreateThreadRequest, ThreadResponse,
     CreateMessageRequest, MessageResponse, ThreadWithMessagesResponse,
-    PageQuestionResponse, PageQuestionsResponse, DocumentStructure,
+    PageQuestionResponse, PageQuestionsResponse, AllDocumentQuestionsResponse,
+    DocumentQuestionsMetadataResponse, DocumentStructure,
     DocumentStructureItem, DocumentStructureResponse,
     UserPlan, PlanLimits, UserUsage, UserPlanResponse, PlanLimitsResponse, UserUsageResponse,
     DocumentShare, DocumentShareAccess, ShareDocumentResponse, ShareStatusResponse
@@ -427,6 +428,246 @@ def get_page_questions(db: Session, document_id: str, page_number: int, user_id:
             totalQuestions=0,
             questions=[]
         )
+
+def get_all_document_questions(db: Session, document_id: str, user_id: str) -> AllDocumentQuestionsResponse:
+    """Get all questions for a document, grouped by page"""
+    try:
+        doc_uuid = uuid.UUID(document_id)
+        user_uuid = uuid.UUID(user_id)
+        
+        # Check if user has access through sharing
+        has_shared_access = check_user_has_document_access(db, document_id, user_id)
+        
+        # Check if user owns the document
+        document = db.query(Document)\
+            .filter(Document.id == doc_uuid)\
+            .first()
+        
+        is_owner = document and document.owner_id == user_uuid
+        
+        # Get all user messages (questions) for this document
+        if has_shared_access or is_owner:
+            # Get all questions from all users
+            questions_query = db.query(ChatMessage, ChatThread)\
+                .join(ChatThread, ChatMessage.thread_id == ChatThread.id)\
+                .filter(ChatThread.document_id == doc_uuid)\
+                .filter(ChatMessage.role == 'user')\
+                .filter(ChatMessage.page_context.isnot(None))\
+                .order_by(ChatMessage.page_context, desc(ChatMessage.created_at))
+        else:
+            # Get only user's own questions
+            questions_query = db.query(ChatMessage, ChatThread)\
+                .join(ChatThread, ChatMessage.thread_id == ChatThread.id)\
+                .filter(ChatThread.document_id == doc_uuid)\
+                .filter(ChatThread.user_id == user_uuid)\
+                .filter(ChatMessage.role == 'user')\
+                .filter(ChatMessage.page_context.isnot(None))\
+                .order_by(ChatMessage.page_context, desc(ChatMessage.created_at))
+        
+        messages_with_threads = questions_query.all()
+        
+        # Group questions by page
+        questions_by_page: Dict[int, List[PageQuestionResponse]] = {}
+        last_modified = None
+        
+        for msg, thread in messages_with_threads:
+            page_num = msg.page_context
+            
+            # Track last modified timestamp
+            if last_modified is None or msg.created_at > last_modified:
+                last_modified = msg.created_at
+            
+            # Find the first assistant message after this user message
+            answer_msg = db.query(ChatMessage)\
+                .filter(ChatMessage.thread_id == msg.thread_id)\
+                .filter(ChatMessage.role == 'assistant')\
+                .filter(ChatMessage.created_at > msg.created_at)\
+                .order_by(ChatMessage.created_at)\
+                .first()
+            
+            # Update last_modified if answer is newer
+            if answer_msg and (last_modified is None or answer_msg.created_at > last_modified):
+                last_modified = answer_msg.created_at
+            
+            answer_content = answer_msg.content if answer_msg else None
+            question_user_id = str(thread.user_id)
+            is_own = question_user_id == user_id
+            can_open = is_own
+            
+            question = PageQuestionResponse(
+                id=str(msg.id),
+                threadId=str(thread.id),
+                threadTitle=thread.title,
+                content=msg.content,
+                answer=answer_content,
+                createdAt=msg.created_at.isoformat(),
+                userId=question_user_id,
+                isOwn=is_own,
+                canOpenThread=can_open
+            )
+            
+            if page_num not in questions_by_page:
+                questions_by_page[page_num] = []
+            questions_by_page[page_num].append(question)
+        
+        # Convert to PageQuestionsResponse list
+        pages: List[PageQuestionsResponse] = []
+        for page_num in sorted(questions_by_page.keys()):
+            questions = questions_by_page[page_num]
+            pages.append(PageQuestionsResponse(
+                pageNumber=page_num,
+                totalQuestions=len(questions),
+                questions=questions
+            ))
+        
+        # If no questions, return empty response with current time as lastModified
+        if last_modified is None:
+            last_modified = datetime.utcnow()
+        
+        return AllDocumentQuestionsResponse(
+            documentId=document_id,
+            lastModified=last_modified.isoformat(),
+            pages=pages
+        )
+    except ValueError:
+        # If UUIDs are invalid, return empty response
+        return AllDocumentQuestionsResponse(
+            documentId=document_id,
+            lastModified=datetime.utcnow().isoformat(),
+            pages=[]
+        )
+
+def get_document_questions_metadata(db: Session, document_id: str, user_id: str) -> DocumentQuestionsMetadataResponse:
+    """Get metadata about questions for a document (lastModified, total count, pages with questions)"""
+    try:
+        doc_uuid = uuid.UUID(document_id)
+        user_uuid = uuid.UUID(user_id)
+        
+        # Check if user has access through sharing
+        has_shared_access = check_user_has_document_access(db, document_id, user_id)
+        
+        # Check if user owns the document
+        document = db.query(Document)\
+            .filter(Document.id == doc_uuid)\
+            .first()
+        
+        is_owner = document and document.owner_id == user_uuid
+        
+        # Get all user messages (questions) for this document
+        if has_shared_access or is_owner:
+            # Get all questions from all users
+            questions_query = db.query(ChatMessage)\
+                .join(ChatThread, ChatMessage.thread_id == ChatThread.id)\
+                .filter(ChatThread.document_id == doc_uuid)\
+                .filter(ChatMessage.role == 'user')\
+                .filter(ChatMessage.page_context.isnot(None))
+            
+            # Get all messages (including answers) for lastModified
+            all_messages_query = db.query(ChatMessage)\
+                .join(ChatThread, ChatMessage.thread_id == ChatThread.id)\
+                .filter(ChatThread.document_id == doc_uuid)
+        else:
+            # Get only user's own questions
+            questions_query = db.query(ChatMessage)\
+                .join(ChatThread, ChatMessage.thread_id == ChatThread.id)\
+                .filter(ChatThread.document_id == doc_uuid)\
+                .filter(ChatThread.user_id == user_uuid)\
+                .filter(ChatMessage.role == 'user')\
+                .filter(ChatMessage.page_context.isnot(None))
+            
+            # Get all messages (including answers) for lastModified
+            all_messages_query = db.query(ChatMessage)\
+                .join(ChatThread, ChatMessage.thread_id == ChatThread.id)\
+                .filter(ChatThread.document_id == doc_uuid)\
+                .filter(ChatThread.user_id == user_uuid)
+        
+        questions = questions_query.all()
+        all_messages = all_messages_query.all()
+        
+        # Get last modified timestamp
+        last_modified = None
+        if all_messages:
+            last_modified = max(msg.created_at for msg in all_messages)
+        
+        # Get unique page numbers with questions
+        pages_with_questions = sorted(set(q.page_context for q in questions if q.page_context is not None))
+        
+        # If no questions, return empty response with current time as lastModified
+        if last_modified is None:
+            last_modified = datetime.utcnow()
+        
+        return DocumentQuestionsMetadataResponse(
+            documentId=document_id,
+            lastModified=last_modified.isoformat(),
+            totalQuestions=len(questions),
+            pagesWithQuestions=pages_with_questions
+        )
+    except ValueError:
+        # If UUIDs are invalid, return empty response
+        return DocumentQuestionsMetadataResponse(
+            documentId=document_id,
+            lastModified=datetime.utcnow().isoformat(),
+            totalQuestions=0,
+            pagesWithQuestions=[]
+        )
+
+def list_chat_threads_since(db: Session, document_id: str, user_id: str, since: Optional[datetime] = None) -> List[ThreadResponse]:
+    """List chat threads for a document, optionally filtered by updated_at timestamp"""
+    query = db.query(ChatThread)\
+        .filter(ChatThread.document_id == uuid.UUID(document_id))\
+        .filter(ChatThread.user_id == uuid.UUID(user_id))
+    
+    if since:
+        query = query.filter(ChatThread.updated_at > since)
+    
+    threads = query.order_by(desc(ChatThread.updated_at)).all()
+    
+    return [
+        ThreadResponse(
+            id=str(thread.id),
+            title=thread.title,
+            createdAt=thread.created_at.isoformat(),
+            updatedAt=thread.updated_at.isoformat()
+        )
+        for thread in threads
+    ]
+
+def get_thread_messages_since(db: Session, thread_id: str, user_id: str, since: Optional[datetime] = None) -> Optional[ThreadWithMessagesResponse]:
+    """Get a chat thread with its messages, optionally filtered by created_at timestamp"""
+    thread = db.query(ChatThread)\
+        .filter(ChatThread.id == uuid.UUID(thread_id))\
+        .filter(ChatThread.user_id == uuid.UUID(user_id))\
+        .first()
+    
+    if not thread:
+        return None
+    
+    query = db.query(ChatMessage)\
+        .filter(ChatMessage.thread_id == thread.id)
+    
+    if since:
+        query = query.filter(ChatMessage.created_at > since)
+    
+    messages = query.order_by(ChatMessage.created_at).all()
+    
+    return ThreadWithMessagesResponse(
+        id=str(thread.id),
+        title=thread.title,
+        createdAt=thread.created_at.isoformat(),
+        updatedAt=thread.updated_at.isoformat(),
+        messages=[
+            MessageResponse(
+                id=str(msg.id),
+                role=msg.role,
+                content=msg.content,
+                pageContext=msg.page_context,
+                contextType=msg.context_type or "page",
+                chapterId=str(msg.chapter_id) if msg.chapter_id else None,
+                createdAt=msg.created_at.isoformat()
+            )
+            for msg in messages
+        ]
+    )
 
 # Document structure related functions
 def save_document_structure(db: Session, document_id: str, structure_items: List[Dict[str, Any]]) -> None:

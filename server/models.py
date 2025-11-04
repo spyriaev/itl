@@ -253,6 +253,25 @@ class PageQuestionsResponse(BaseModel):
         from_attributes = True
         populate_by_name = True
 
+class AllDocumentQuestionsResponse(BaseModel):
+    documentId: str
+    lastModified: str  # ISO timestamp of the most recent question/answer
+    pages: List[PageQuestionsResponse]  # Questions grouped by page
+    
+    class Config:
+        from_attributes = True
+        populate_by_name = True
+
+class DocumentQuestionsMetadataResponse(BaseModel):
+    documentId: str
+    lastModified: str  # ISO timestamp of the most recent question/answer
+    totalQuestions: int
+    pagesWithQuestions: List[int]  # List of page numbers that have questions
+    
+    class Config:
+        from_attributes = True
+        populate_by_name = True
+
 # Document structure related models
 class DocumentStructureItem(BaseModel):
     id: str

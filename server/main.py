@@ -17,6 +17,7 @@ from models import (
     CreateDocumentRequest, DocumentResponse, Base, UpdateProgressRequest,
     CreateThreadRequest, ThreadResponse, CreateMessageRequest, MessageResponse,
     ThreadWithMessagesResponse, Document, ChatThread, PageQuestionsResponse,
+    AllDocumentQuestionsResponse, DocumentQuestionsMetadataResponse,
     DocumentStructureResponse, ExtractStructureRequest,
     UserPlanResponse, UserUsageResponse, SetUserPlanRequest,
     ShareDocumentRequest, ShareDocumentResponse, ShareStatusResponse
@@ -25,6 +26,8 @@ from repository import (
     create_document, list_documents, get_document_by_id, update_document_progress,
     create_chat_thread, list_chat_threads, get_chat_thread_with_messages,
     create_chat_message, update_thread_title, get_page_questions,
+    get_all_document_questions, get_document_questions_metadata,
+    list_chat_threads_since, get_thread_messages_since,
     save_document_structure, get_document_structure, get_chapter_by_page,
     get_user_plan, set_user_plan, get_user_usage, increment_user_usage,
     check_storage_limit, check_file_count_limit, check_single_file_limit,
@@ -598,10 +601,11 @@ async def create_chat_thread_endpoint(
 @app.get("/api/documents/{document_id}/chat/threads", response_model=List[ThreadResponse])
 async def list_chat_threads_endpoint(
     document_id: str,
+    since: Optional[str] = None,
     user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db)
 ):
-    """List chat threads for a document. Works for owned and shared documents."""
+    """List chat threads for a document. Works for owned and shared documents. Optionally filter by updated_at timestamp."""
     # Check database connectivity
     if not test_database_connection():
         raise HTTPException(
@@ -616,7 +620,18 @@ async def list_chat_threads_endpoint(
             detail="Document not found"
         )
     
-    return list_chat_threads(db, document_id, user_id)
+    # Parse since timestamp if provided
+    since_datetime = None
+    if since:
+        try:
+            since_datetime = datetime.fromisoformat(since.replace('Z', '+00:00'))
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid timestamp format. Use ISO 8601 format."
+            )
+    
+    return list_chat_threads_since(db, document_id, user_id, since_datetime)
 
 @app.get("/api/documents/{document_id}/pages/{page_number}/questions", response_model=PageQuestionsResponse)
 async def get_page_questions_endpoint(
@@ -642,13 +657,13 @@ async def get_page_questions_endpoint(
     
     return get_page_questions(db, document_id, page_number, user_id, limit=None)
 
-@app.get("/api/chat/threads/{thread_id}/messages", response_model=ThreadWithMessagesResponse)
-async def get_chat_thread_messages(
-    thread_id: str,
+@app.get("/api/documents/{document_id}/questions/all", response_model=AllDocumentQuestionsResponse)
+async def get_all_document_questions_endpoint(
+    document_id: str,
     user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db)
 ):
-    """Get chat thread with its messages"""
+    """Get all questions for a document, grouped by page"""
     # Check database connectivity
     if not test_database_connection():
         raise HTTPException(
@@ -656,7 +671,65 @@ async def get_chat_thread_messages(
             detail="Database not available"
         )
     
-    thread_with_messages = get_chat_thread_with_messages(db, thread_id, user_id)
+    # Verify document exists and user has access (ownership or shared)
+    if not check_user_has_document_access(db, document_id, user_id):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found"
+        )
+    
+    return get_all_document_questions(db, document_id, user_id)
+
+@app.get("/api/documents/{document_id}/questions/metadata", response_model=DocumentQuestionsMetadataResponse)
+async def get_document_questions_metadata_endpoint(
+    document_id: str,
+    user_id: str = Depends(get_current_user_id),
+    db: Session = Depends(get_db)
+):
+    """Get metadata about questions for a document (lastModified, total count, pages with questions)"""
+    # Check database connectivity
+    if not test_database_connection():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database not available"
+        )
+    
+    # Verify document exists and user has access (ownership or shared)
+    if not check_user_has_document_access(db, document_id, user_id):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found"
+        )
+    
+    return get_document_questions_metadata(db, document_id, user_id)
+
+@app.get("/api/chat/threads/{thread_id}/messages", response_model=ThreadWithMessagesResponse)
+async def get_chat_thread_messages_endpoint(
+    thread_id: str,
+    since: Optional[str] = None,
+    user_id: str = Depends(get_current_user_id),
+    db: Session = Depends(get_db)
+):
+    """Get chat thread with its messages. Optionally filter by created_at timestamp."""
+    # Check database connectivity
+    if not test_database_connection():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database not available"
+        )
+    
+    # Parse since timestamp if provided
+    since_datetime = None
+    if since:
+        try:
+            since_datetime = datetime.fromisoformat(since.replace('Z', '+00:00'))
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid timestamp format. Use ISO 8601 format."
+            )
+    
+    thread_with_messages = get_thread_messages_since(db, thread_id, user_id, since_datetime)
     if not thread_with_messages:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
