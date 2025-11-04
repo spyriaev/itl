@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from sqlalchemy.orm import Session
 from typing import List, Optional
+from dataclasses import dataclass
 import os
 import logging
 import json
@@ -33,6 +34,39 @@ from repository import (
     check_user_has_document_access
 )
 from pdf_utils import extract_pdf_outline
+
+# Custom exception for limit exceeded errors
+@dataclass
+class LimitExceededError(Exception):
+    """Custom exception for limit exceeded errors"""
+    limit_type: str  # 'question', 'token', 'file', 'storage', 'single_file'
+    limit_value: int  # The limit value
+    current_usage: Optional[int] = None  # Current usage if available
+    limit_period: str = "month"  # 'month' or 'day'
+    
+    def to_dict(self) -> dict:
+        """Convert to dictionary for JSON response"""
+        return {
+            "error_type": "limit_exceeded",
+            "limit_type": self.limit_type,
+            "limit_value": self.limit_value,
+            "current_usage": self.current_usage,
+            "limit_period": self.limit_period,
+            "message": self.get_message()
+        }
+    
+    def get_message(self) -> str:
+        """Get human-readable error message"""
+        type_names = {
+            "question": "questions",
+            "token": "tokens",
+            "file": "files",
+            "storage": "storage",
+            "single_file": "file size"
+        }
+        type_name = type_names.get(self.limit_type, self.limit_type)
+        period = f"per {self.limit_period}"
+        return f"{self.limit_type.title()} limit exceeded. Maximum: {self.limit_value} {type_name} {period}"
 
 # Import AI service (real or mock based on environment variable)
 if os.getenv("USE_MOCK_AI", "").lower() in ["true", "1", "yes"]:
@@ -98,11 +132,19 @@ async def log_requests(request: Request, call_next):
     return response
 
 # Global exception handlers
+@app.exception_handler(LimitExceededError)
+async def limit_exceeded_handler(request, exc: LimitExceededError):
+    """Handle limit exceeded errors with structured response"""
+    return JSONResponse(
+        status_code=status.HTTP_403_FORBIDDEN,
+        content=exc.to_dict()
+    )
+
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request, exc):
     return JSONResponse(
         status_code=exc.status_code,
-        content={"error": exc.detail}
+        content={"error": exc.detail, "error_type": "general"}
     )
 
 @app.exception_handler(Exception)
@@ -667,11 +709,19 @@ async def send_chat_message(
     chapter_id = request.chapterId
     
     # Check questions limit before proceeding
-    allowed, error_msg = check_questions_limit(db, user_id)
-    if not allowed:
+    usage_data = get_user_usage(db, user_id)
+    if not usage_data:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=error_msg
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unable to determine usage limits"
+        )
+    
+    if usage_data.questionsCount >= usage_data.limits.maxQuestionsPerMonth:
+        raise LimitExceededError(
+            limit_type="question",
+            limit_value=usage_data.limits.maxQuestionsPerMonth,
+            current_usage=usage_data.questionsCount,
+            limit_period="month"
         )
     
     # Determine if we should use context at all

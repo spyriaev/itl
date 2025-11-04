@@ -139,7 +139,18 @@ export function ChatProvider({ children }: ChatProviderProps) {
           setIsStreaming(false)
         },
         (error) => {
-          setError(error)
+          // Check if it's a limit exceeded error
+          try {
+            const errorData = JSON.parse(error)
+            if (errorData.error_type === 'limit_exceeded') {
+              setError(errorData.message || error)
+            } else {
+              setError(error)
+            }
+          } catch {
+            // Not a JSON error, use as is
+            setError(error)
+          }
           setIsStreaming(false)
           // Remove the failed assistant message
           setMessages(prev => prev.filter(msg => msg.id !== assistantMessageId))
@@ -211,7 +222,18 @@ export function ChatProvider({ children }: ChatProviderProps) {
           setIsStreaming(false)
         },
         (error) => {
-          setError(error)
+          // Check if it's a limit exceeded error
+          try {
+            const errorData = JSON.parse(error)
+            if (errorData.error_type === 'limit_exceeded') {
+              setError(errorData.message || error)
+            } else {
+              setError(error)
+            }
+          } catch {
+            // Not a JSON error, use as is
+            setError(error)
+          }
           setIsStreaming(false)
           // Remove the failed assistant message
           setMessages(prev => prev.filter(msg => msg.id !== assistantMessageId))
@@ -220,7 +242,18 @@ export function ChatProvider({ children }: ChatProviderProps) {
 
       setActiveThread(newThread)
       setThreads(prev => [newThread, ...prev])
-    } catch (err) {
+    } catch (err: any) {
+      console.log('startNewConversation catch in ChatContext:', err)
+      console.log('Error limitError:', err?.limitError)
+      
+      // If error has limitError, preserve it by rethrowing
+      if (err?.limitError) {
+        setError(err.limitError.message || err.message)
+        setIsStreaming(false)
+        // Re-throw to let PdfViewer handle it
+        throw err
+      }
+      
       setError(err instanceof Error ? err.message : 'Failed to start conversation')
       setIsStreaming(false)
     }

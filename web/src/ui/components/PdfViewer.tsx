@@ -77,7 +77,7 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
 
   // Text selection state
   const [selectionMenu, setSelectionMenu] = useState<{ position: { top: number; left: number }, selectedText: string, pageNumber: number } | null>(null)
-  const [floatingAnswer, setFloatingAnswer] = useState<{ selectedText: string, question: string, answer: string, isStreaming: boolean, position?: { top: number; left: number }, questionTimestamp: number } | null>(null)
+  const [floatingAnswer, setFloatingAnswer] = useState<{ selectedText: string, question: string, answer: string, isStreaming: boolean, position?: { top: number; left: number }, questionTimestamp: number, limitError?: { error_type: string, limit_type: string, limit_value: number, current_usage?: number, limit_period: string, message: string } } | null>(null)
   const [selectedTextRange, setSelectedTextRange] = useState<Range | null>(null)
   const [initialChatInputValue, setInitialChatInputValue] = useState<string>('')
   const selectionRangeRef = useRef<Range | null>(null)
@@ -768,33 +768,98 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
 
       // The answer will be updated through the streaming callback
       // We'll track it in a separate effect
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to send message:', err)
-      setFloatingAnswer(prev => prev ? {
-        ...prev,
-        answer: 'Error sending message. Please try again.',
-        isStreaming: false
-      } : null)
+      console.log('Error object:', err)
+      console.log('Error limitError property:', err?.limitError)
+      
+      // Try to parse limit exceeded error
+      let errorMessage = err instanceof Error ? err.message : 'Failed to send message. Please try again.'
+      let limitErrorData: any = null
+      
+      // Priority 1: Check if limitError is attached to error object
+      if (err?.limitError) {
+        limitErrorData = err.limitError
+        errorMessage = limitErrorData.message || errorMessage
+        console.log('✅ Found limitError on error object:', limitErrorData)
+      } 
+      // Priority 2: Try to parse message as JSON
+      else if (err?.message) {
+        const message = err.message
+        console.log('Error message to parse:', message)
+        
+        try {
+          let parsed: any = null
+          if (message.startsWith('{')) {
+            parsed = JSON.parse(message)
+          } else if (message.startsWith('"')) {
+            parsed = JSON.parse(JSON.parse(message))
+          }
+          
+          if (parsed && parsed.error_type === 'limit_exceeded') {
+            limitErrorData = parsed
+            errorMessage = parsed.message || errorMessage
+            console.log('✅ Parsed limit error from message:', limitErrorData)
+          }
+        } catch (parseErr) {
+          console.log('Failed to parse error message:', parseErr)
+        }
+      }
+      
+      console.log('Final limitErrorData:', limitErrorData)
+      console.log('Final errorMessage:', errorMessage)
+      
+      setFloatingAnswer(prev => {
+        if (!prev) return null
+        
+        const newState = {
+          ...prev,
+          answer: errorMessage,
+          isStreaming: false,
+          limitError: limitErrorData && limitErrorData.error_type === 'limit_exceeded' ? limitErrorData : undefined
+        }
+        
+        console.log('Setting FloatingAnswer with limitError:', newState.limitError)
+        return newState
+      })
     }
   }, [selectionMenu, activeThread, sendMessage, startNewConversation, documentId])
 
   // Track streaming answer updates
   useEffect(() => {
-    if (floatingAnswer?.isStreaming && messages.length > 0 && questionPageNumberRef.current !== null) {
+    if (floatingAnswer?.isStreaming && questionPageNumberRef.current !== null) {
       // Find assistant messages for the current page
       const pageMessages = messages.filter(msg => 
         msg.role === 'assistant' && 
         msg.pageContext === questionPageNumberRef.current
       )
       
-      if (pageMessages.length === 0) {
-        return
-      }
-
-      // Try to find message by timestamp first
+      // Find the user message that matches our question
+      const userMessages = messages.filter(msg => 
+        msg.role === 'user' && 
+        msg.pageContext === questionPageNumberRef.current &&
+        msg.content === floatingAnswer.question
+      )
+      
       let lastAssistantMessage = null
       
-      if (questionTimestampRef.current) {
+      // If we found a matching user message, find the assistant message that comes after it
+      if (userMessages.length > 0) {
+        const matchingUserMessage = userMessages[userMessages.length - 1]
+        const userMessageIndex = messages.indexOf(matchingUserMessage)
+        
+        // Find the first assistant message after this user message
+        for (let i = userMessageIndex + 1; i < messages.length; i++) {
+          if (messages[i].role === 'assistant' && 
+              messages[i].pageContext === questionPageNumberRef.current) {
+            lastAssistantMessage = messages[i]
+            break
+          }
+        }
+      }
+      
+      // Fallback: Try to find message by timestamp
+      if (!lastAssistantMessage && questionTimestampRef.current && pageMessages.length > 0) {
         const relevantMessages = pageMessages.filter(msg => {
           try {
             const msgTimestamp = new Date(msg.createdAt).getTime()
@@ -805,31 +870,60 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
         })
         
         if (relevantMessages.length > 0) {
-          lastAssistantMessage = relevantMessages[relevantMessages.length - 1]
+          // Sort by timestamp and get the most recent one
+          relevantMessages.sort((a, b) => {
+            try {
+              const aTime = new Date(a.createdAt).getTime()
+              const bTime = new Date(b.createdAt).getTime()
+              return bTime - aTime
+            } catch {
+              return 0
+            }
+          })
+          lastAssistantMessage = relevantMessages[0]
         }
       }
       
-      // Fallback: use the last assistant message for this page
-      if (!lastAssistantMessage) {
-        lastAssistantMessage = pageMessages[pageMessages.length - 1]
+      // Final fallback: use the last assistant message for this page (by creation time)
+      if (!lastAssistantMessage && pageMessages.length > 0) {
+        const sortedMessages = [...pageMessages].sort((a, b) => {
+          try {
+            const aTime = new Date(a.createdAt).getTime()
+            const bTime = new Date(b.createdAt).getTime()
+            return bTime - aTime
+          } catch {
+            return 0
+          }
+        })
+        lastAssistantMessage = sortedMessages[0]
       }
 
-      if (lastAssistantMessage && lastAssistantMessage.content.length > 0) {
+      // Update answer even if it's empty (streaming in progress)
+      if (lastAssistantMessage) {
         setFloatingAnswer(prev => {
           if (!prev) return null
-          // Update answer if it's different or longer (streaming update)
-          if (prev.answer !== lastAssistantMessage.content) {
+          const newContent = lastAssistantMessage.content || ''
+          // Always update if content changed (streaming update)
+          // This ensures we capture all streaming updates
+          if (prev.answer !== newContent) {
             return {
               ...prev,
-              answer: lastAssistantMessage.content,
-              isStreaming: isStreaming
+              answer: newContent,
+              isStreaming: chatIsStreaming
+            }
+          }
+          // Also update isStreaming status even if content hasn't changed
+          if (prev.isStreaming !== chatIsStreaming) {
+            return {
+              ...prev,
+              isStreaming: chatIsStreaming
             }
           }
           return prev
         })
       }
     }
-  }, [messages, floatingAnswer, isStreaming])
+  }, [messages, floatingAnswer, chatIsStreaming])
 
   // Close menu when floating answer appears
   useEffect(() => {
@@ -2472,6 +2566,7 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
             questionThreadIdRef.current = null
           }}
           position={floatingAnswer.position}
+          limitError={floatingAnswer.limitError}
         />
       )}
 

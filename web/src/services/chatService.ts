@@ -61,8 +61,11 @@ export interface PageQuestionsData {
 
 class ChatService {
   private async getAuthHeaders(): Promise<HeadersInit> {
-    const { data: { session } } = await supabase.auth.getSession()
-    const token = session?.access_token
+    const { data: { session }, error } = await supabase.auth.getSession()
+    if (error || !session?.access_token) {
+      throw new Error('Authentication required. Please log in again.')
+    }
+    const token = session.access_token
     return {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json',
@@ -77,7 +80,16 @@ class ChatService {
     })
 
     if (!response.ok) {
-      throw new Error(`Failed to create thread: ${response.statusText}`)
+      let errorMessage = `Failed to create thread: ${response.statusText}`
+      try {
+        const errorData = await response.json()
+        if (errorData.detail) {
+          errorMessage = errorData.detail
+        }
+      } catch {
+        // If response is not JSON, use status text
+      }
+      throw new Error(errorMessage)
     }
 
     return response.json()
@@ -123,7 +135,68 @@ class ChatService {
     })
 
     if (!response.ok) {
-      throw new Error(`Failed to send message: ${response.statusText}`)
+      // Try to get error message from response body
+      let errorMessage = `Failed to send message: ${response.statusText}`
+      let errorData: any = null
+      let limitError: any = null
+      
+      try {
+        errorData = await response.json()
+        console.log('Error response data:', errorData)
+        
+        // Check if it's a limit exceeded error
+        if (errorData.error_type === 'limit_exceeded') {
+          // Return structured error for limit exceeded
+          limitError = {
+            error_type: 'limit_exceeded',
+            limit_type: errorData.limit_type,
+            limit_value: errorData.limit_value,
+            current_usage: errorData.current_usage,
+            limit_period: errorData.limit_period,
+            message: errorData.message || errorMessage
+          }
+          
+          console.log('Limit exceeded error detected:', limitError)
+          
+          // Call error callback with structured error
+          if (onError) {
+            onError(JSON.stringify(limitError))
+          }
+          
+          // Throw error with the limitError object attached
+          const error = new Error(limitError.message)
+          ;(error as any).limitError = limitError
+          throw error
+        }
+        
+        // Handle other error types
+        if (errorData.detail) {
+          errorMessage = errorData.detail
+        } else if (errorData.error) {
+          errorMessage = errorData.error
+        } else if (errorData.message) {
+          errorMessage = errorData.message
+        }
+      } catch (parseError) {
+        // If parseError is our limit error, rethrow it
+        if (parseError instanceof Error && (parseError as any).limitError) {
+          throw parseError
+        }
+        // If response is not JSON, use status text
+        console.log('Failed to parse error response:', parseError)
+      }
+      
+      // Call error callback if provided (for non-limit errors)
+      if (onError && !limitError) {
+        onError(errorMessage)
+      }
+      
+      // Throw error - if it's not already thrown above
+      const error = new Error(errorMessage)
+      if (limitError) {
+        (error as any).limitError = limitError
+      }
+      throw error
     }
 
     if (!response.body) {
@@ -186,26 +259,51 @@ class ChatService {
     onComplete?: (messageId: string) => void,
     onError?: (error: string) => void
   ): Promise<ChatThread> {
-    // Create thread
-    const thread = await this.createThread(documentId, {
-      title: firstMessage.length > 50 ? firstMessage.substring(0, 50) + '...' : firstMessage
-    })
+    try {
+      // Create thread
+      const thread = await this.createThread(documentId, {
+        title: firstMessage.length > 50 ? firstMessage.substring(0, 50) + '...' : firstMessage
+      })
 
-    // Send first message
-    await this.sendMessage(
-      thread.id,
-      { 
-        content: firstMessage, 
-        pageContext,
-        contextType,
-        chapterId
-      },
-      onChunk,
-      onComplete,
-      onError
-    )
+      // Send first message
+      await this.sendMessage(
+        thread.id,
+        { 
+          content: firstMessage, 
+          pageContext,
+          contextType,
+          chapterId
+        },
+        onChunk,
+        onComplete,
+        onError
+      )
 
-    return thread
+      return thread
+    } catch (error: any) {
+      console.log('startNewConversation caught error:', error)
+      console.log('Error limitError:', error?.limitError)
+      
+      // If error callback is provided, call it, but also rethrow the error
+      if (onError && error instanceof Error) {
+        // Check if error has limitError attached
+        if (error.limitError) {
+          console.log('Passing limitError to callback:', error.limitError)
+          onError(JSON.stringify(error.limitError))
+        } else {
+          onError(error.message)
+        }
+      }
+      
+      // Make sure limitError is preserved when rethrowing
+      if (error.limitError) {
+        const rethrowError = new Error(error.message || 'Failed to start conversation')
+        ;(rethrowError as any).limitError = error.limitError
+        throw rethrowError
+      }
+      
+      throw error
+    }
   }
 
   async getPageQuestions(documentId: string, pageNumber: number): Promise<PageQuestionsData> {
