@@ -13,36 +13,7 @@ export function FeaturesSection() {
           <h2 style={styles.title} data-features-title>{t("landing.featuresTitle")}</h2>
         </div>
         <div style={styles.grid} data-features-grid>
-          {/* Feature 1 */}
-          <div style={styles.cardWrapper}>
-            <a href="#" style={styles.card} data-feature-card>
-              <div style={styles.cardContent}>
-                <div>
-                  <h3 style={styles.cardTitle}>{t("landing.feature1Title")}</h3>
-                  <p style={styles.cardDescription}>{t("landing.feature1Desc")}</p>
-                </div>
-                <div style={styles.cardLink}>
-                  <span style={styles.linkText} className="link-text">Explore features ↗</span>
-                </div>
-              </div>
-              <figure style={styles.figure}>
-                <div style={styles.mediaContainer} className="media-container">
-                  <div style={styles.mediaInner}>
-                    <picture style={styles.picture}>
-                      <img 
-                        src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=640&q=80" 
-                        alt="Feature illustration" 
-                        style={styles.image}
-                        loading="lazy"
-                      />
-                    </picture>
-                  </div>
-                </div>
-              </figure>
-            </a>
-          </div>
-
-          {/* Feature 2 */}
+          {/* Feature 2 - Contextual Reading */}
           <div style={styles.cardWrapper}>
             <a href="#" style={styles.card} data-feature-card>
               <div style={styles.cardContent}>
@@ -71,7 +42,7 @@ export function FeaturesSection() {
             </a>
           </div>
 
-          {/* Feature 3 */}
+          {/* Feature 3 - Offline Mode */}
           <div style={styles.cardWrapper}>
             <a href="#" style={styles.card} data-feature-card>
               <div style={styles.cardContent}>
@@ -89,6 +60,35 @@ export function FeaturesSection() {
                     <picture style={styles.picture}>
                       <img 
                         src="https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=640&q=80" 
+                        alt="Feature illustration" 
+                        style={styles.image}
+                        loading="lazy"
+                      />
+                    </picture>
+                  </div>
+                </div>
+              </figure>
+            </a>
+          </div>
+
+          {/* Feature 4 - Collaboration */}
+          <div style={styles.cardWrapper}>
+            <a href="#" style={styles.card} data-feature-card>
+              <div style={styles.cardContent}>
+                <div>
+                  <h3 style={styles.cardTitle}>{t("landing.feature4Title")}</h3>
+                  <p style={styles.cardDescription}>{t("landing.feature4Desc")}</p>
+                </div>
+                <div style={styles.cardLink}>
+                  <span style={styles.linkText} className="link-text">{t("landing.feature4Cta")}</span>
+                </div>
+              </div>
+              <figure style={styles.figure}>
+                <div style={styles.mediaContainer} className="media-container">
+                  <div style={styles.mediaInner}>
+                    <picture style={styles.picture}>
+                      <img 
+                        src="https://images.unsplash.com/photo-1551434678-e076c223a692?w=640&q=80" 
                         alt="Feature illustration" 
                         style={styles.image}
                         loading="lazy"
