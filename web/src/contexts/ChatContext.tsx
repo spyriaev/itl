@@ -65,8 +65,9 @@ export function ChatProvider({ children }: ChatProviderProps) {
       try {
         const threadList = await chatService.listThreads(documentId)
         setThreads(threadList)
-        // Cache the threads
-        await cacheThreads(documentId, threadList)
+        // Cache the threads (convert ChatThread[] to CachedThread[] by adding documentId)
+        const threadsToCache = threadList.map(thread => ({ ...thread, documentId }))
+        await cacheThreads(documentId, threadsToCache)
       } catch (err) {
         // If offline, use cached threads
         if (cachedThreads.length > 0) {
@@ -131,11 +132,13 @@ export function ChatProvider({ children }: ChatProviderProps) {
     try {
       setError(null)
       const newThread = await chatService.createThread(documentId, { title })
-      setThreads(prev => [newThread, ...prev])
+      const updatedThreads = [newThread, ...threads]
+      setThreads(updatedThreads)
       setActiveThread(newThread)
       setMessages([])
-      // Cache the new thread
-      await cacheThreads(documentId, [newThread, ...threads])
+      // Cache the new thread (convert ChatThread[] to CachedThread[] by adding documentId)
+      const cachedThreads = updatedThreads.map(thread => ({ ...thread, documentId }))
+      await cacheThreads(documentId, cachedThreads)
       return newThread
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to create thread'
@@ -364,8 +367,9 @@ export function ChatProvider({ children }: ChatProviderProps) {
       setActiveThread(newThread)
       setThreads(prev => {
         const updatedThreads = [newThread, ...prev]
-        // Cache the new thread
-        cacheThreads(documentId, updatedThreads).catch(err => 
+        // Cache the new thread (convert ChatThread[] to CachedThread[] by adding documentId)
+        const cachedThreads = updatedThreads.map(thread => ({ ...thread, documentId }))
+        cacheThreads(documentId, cachedThreads).catch(err => 
           console.error('Failed to cache threads:', err)
         )
         return updatedThreads

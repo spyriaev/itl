@@ -39,35 +39,6 @@ export function FloatingAnswer({
     }
   }, [answer, isStreaming])
 
-  // Check if answer is an error message (limit exceeded, etc.)
-  // Priority: use limitError prop if available, otherwise check answer text
-  const isError = !isStreaming && (limitError || (answer && (
-    answer.includes('limit exceeded') ||
-    answer.includes('Limit exceeded') ||
-    answer.includes('Maximum:') ||
-    answer.includes('Failed to') ||
-    answer.includes('Error') ||
-    answer.includes('Authentication required')
-  )))
-  
-  // Use limitError data if available, otherwise parse from answer
-  const errorInfo = limitError && limitError.error_type === 'limit_exceeded' ? {
-    limit: limitError.limit_value,
-    type: limitError.limit_type,
-    current_usage: limitError.current_usage,
-    period: limitError.limit_period,
-    fullText: limitError.message
-  } : (isError && !limitError ? parseLimitError(answer) : null)
-  
-  // Debug logging
-  React.useEffect(() => {
-    if (limitError) {
-      console.log('FloatingAnswer received limitError:', limitError)
-      console.log('isError:', isError)
-      console.log('errorInfo:', errorInfo)
-    }
-  }, [limitError, isError, errorInfo])
-
   // Parse limit error to extract details
   const parseLimitError = (errorText: string) => {
     // Try to match "Maximum: 25 questions per month"
@@ -102,6 +73,40 @@ export function FloatingAnswer({
     }
   }
 
+  // Check if answer is an error message (limit exceeded, etc.)
+  // Priority: use limitError prop if available, otherwise check answer text
+  const isError = !isStreaming && (limitError || (answer && (
+    answer.includes('limit exceeded') ||
+    answer.includes('Limit exceeded') ||
+    answer.includes('Maximum:') ||
+    answer.includes('Failed to') ||
+    answer.includes('Error') ||
+    answer.includes('Authentication required')
+  )))
+  
+  // Use limitError data if available, otherwise parse from answer
+  const errorInfo: {
+    limit: number | null
+    type: string | null
+    current_usage?: number
+    period?: string
+    fullText: string
+  } | null = limitError && limitError.error_type === 'limit_exceeded' ? {
+    limit: limitError.limit_value,
+    type: limitError.limit_type,
+    current_usage: limitError.current_usage,
+    period: limitError.limit_period,
+    fullText: limitError.message
+  } : (isError && !limitError ? parseLimitError(answer) : null)
+  
+  // Debug logging
+  React.useEffect(() => {
+    if (limitError) {
+      console.log('FloatingAnswer received limitError:', limitError)
+      console.log('isError:', isError)
+      console.log('errorInfo:', errorInfo)
+    }
+  }, [limitError, isError, errorInfo])
 
   // Calculate position - center by default, or use provided position
   const containerStyle: React.CSSProperties = position
@@ -375,7 +380,7 @@ export function FloatingAnswer({
                           : ''
                         }
                       </div>
-                      {errorInfo.current_usage !== undefined && (
+                      {errorInfo && errorInfo.current_usage !== undefined && errorInfo.limit !== null && (
                         <div style={{ fontSize: 12, color: '#991B1B', marginTop: 4 }}>
                           {t('textSelection.currentUsage', { defaultValue: 'Current usage' })}: <strong>{errorInfo.current_usage}</strong> / {errorInfo.limit}
                         </div>
