@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Development files
+*.log
+.env.local
+.env.dev
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+*.md
+README.md
+
+# Scripts
+*.sh
+run-dev.sh
+install-deps.sh
+generate_gigachat_key.py
+
+# Other
+.DS_Store
+*.bak
+*.tmp
+
