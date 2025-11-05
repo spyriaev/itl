@@ -3,7 +3,7 @@ from sqlalchemy.orm import sessionmaker
 import os
 from typing import Generator
 from supabase import create_client, Client
-
+import traceback
 # Database configuration
 username = os.getenv("DATABASE_USERNAME", "postgres")
 password = os.getenv("DATABASE_PASSWORD", "postgres")
@@ -52,4 +52,6 @@ def test_database_connection() -> bool:
         db.close()
         return True
     except Exception:
+        print(f"Error: {e}")
+        traceback.print_exc()
         return False

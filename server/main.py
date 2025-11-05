@@ -162,7 +162,7 @@ async def general_exception_handler(request, exc):
 async def health_check():
     """Health check endpoint with database status"""
     try:
-        db_status = True
+        db_status = test_database_connection()
         status_text = "ok" if db_status else "degraded"
         return {
             "status": status_text,
