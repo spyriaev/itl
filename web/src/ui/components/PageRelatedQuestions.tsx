@@ -81,7 +81,7 @@ export function PageRelatedQuestions({
             color: '#9CA3AF',
             fontWeight: 500,
           }}>
-            Innesi Reader
+            Innesi AI Reader
           </span>
         </div>
         <div style={{
