@@ -51,7 +51,7 @@ def test_database_connection() -> bool:
         db.execute(text("SELECT 1"))
         db.close()
         return True
-    except Exception:
-        print(f"Error: {e}")
+    except Exception as e:
+        print(f"Error testing database connection: {e}")
         traceback.print_exc()
         return False
