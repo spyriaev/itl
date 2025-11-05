@@ -1,4 +1,5 @@
 import React from 'react'
+import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import '../styles/buttons.css'
 import '../styles/typography.css'
@@ -16,7 +17,7 @@ export function LandingHeader({ onTryClick }: LandingHeaderProps) {
         {t("landing.betaAccess")}
       </div>
       <header style={styles.header} data-landing-header>
-        <div style={styles.logoContainer} data-landing-logo>
+        <Link to="/" style={styles.logoContainer} data-landing-logo>
           <div style={styles.logoIcon}>
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
               <path d="M5.75 21.25H15.45C17.1302 21.25 17.9702 21.25 18.612 20.923C19.1765 20.6354 19.6354 20.1765 19.923 19.612C20.25 18.9702 20.25 18.1302 20.25 16.45V10.9882C20.25 10.2545 20.25 9.88757 20.1671 9.5423C20.0936 9.2362 19.9724 8.94356 19.8079 8.67515C19.6224 8.3724 19.363 8.11297 18.8441 7.59411L15.4059 4.15589C14.887 3.63703 14.6276 3.37761 14.3249 3.19208C14.0564 3.02759 13.7638 2.90638 13.4577 2.83289C13.1124 2.75 12.7455 2.75 12.0118 2.75H9.875H9.25C8.78558 2.75 8.55337 2.75 8.35842 2.77567C7.01222 2.9529 5.9529 4.01222 5.77567 5.35842C5.75 5.55337 5.75 5.78558 5.75 6.25" stroke="#2d66f5" strokeWidth="1.5" strokeLinecap="round" />
@@ -25,11 +26,11 @@ export function LandingHeader({ onTryClick }: LandingHeaderProps) {
             </svg>
           </div>
           <h1 style={styles.logoText} data-landing-logo-text>Innesi AI Reader</h1>
-        </div>
+        </Link>
         <nav style={styles.nav} data-landing-nav>
           <a href="#" style={styles.navLink} data-landing-nav-link>{t("landing.contact")}</a>
           <div style={styles.navItem}>
-            <a href="#" style={styles.navLink} data-landing-nav-link>{t("landing.plans")}</a>
+            <Link to="/plans" style={styles.navLink} data-landing-nav-link>{t("landing.plans")}</Link>
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={styles.dropdownIcon}>
               <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
@@ -66,6 +67,8 @@ const styles: { [key: string]: React.CSSProperties } = {
     display: 'flex',
     alignItems: 'center',
     gap: '12px',
+    textDecoration: 'none',
+    cursor: 'pointer',
   },
   logoIcon: {
     display: 'flex',

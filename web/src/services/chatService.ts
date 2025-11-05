@@ -358,39 +358,23 @@ class ChatService {
       // If error callback is provided, call it, but also rethrow the error
       if (onError && error instanceof Error) {
         // Check if error has limitError attached
-        if (error.limitError) {
-          console.log('Passing limitError to callback:', error.limitError)
-          onError(JSON.stringify(error.limitError))
+        if ((error as any).limitError) {
+          console.log('Passing limitError to callback:', (error as any).limitError)
+          onError(JSON.stringify((error as any).limitError))
         } else {
           onError(error.message)
         }
       }
       
       // Make sure limitError is preserved when rethrowing
-      if (error.limitError) {
+      if ((error as any).limitError) {
         const rethrowError = new Error(error.message || 'Failed to start conversation')
-        ;(rethrowError as any).limitError = error.limitError
+        ;(rethrowError as any).limitError = (error as any).limitError
         throw rethrowError
       }
       
       throw error
     }
-  }
-
-  async getPageQuestions(documentId: string, pageNumber: number): Promise<PageQuestionsData> {
-    const response = await fetch(
-      `${API_BASE_URL}/api/documents/${documentId}/pages/${pageNumber}/questions`,
-      {
-        method: 'GET',
-        headers: await this.getAuthHeaders(),
-      }
-    )
-
-    if (!response.ok) {
-      throw new Error(`Failed to get page questions: ${response.statusText}`)
-    }
-
-    return response.json()
   }
 }
 

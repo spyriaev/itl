@@ -19,6 +19,7 @@ export function LanguageSelector() {
   const { i18n } = useTranslation()
   const [isOpen, setIsOpen] = useState(false)
   const [openUpward, setOpenUpward] = useState(false)
+  const [alignLeft, setAlignLeft] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
 
   const currentLanguage = languages.find(lang => lang.code === i18n.language) || languages[0]
@@ -28,16 +29,25 @@ export function LanguageSelector() {
     setIsOpen(false)
   }
 
-  // Determine if dropdown should open upward
+  // Determine if dropdown should open upward and adjust horizontal position
   useEffect(() => {
     if (isOpen && containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect()
       const spaceBelow = window.innerHeight - rect.bottom
       const spaceAbove = rect.top
       const dropdownHeight = 280 // Approximate height of dropdown with 5 languages
+      const dropdownWidth = 180 // Width of dropdown
       
       // Open upward if not enough space below but enough space above
       setOpenUpward(spaceBelow < dropdownHeight && spaceAbove > spaceBelow)
+      
+      // On mobile or if there's not enough space on the right, align to left
+      const isMobile = window.innerWidth <= 768
+      const spaceRight = window.innerWidth - rect.right
+      const spaceLeft = rect.left
+      
+      // Align left if mobile or if not enough space on right but enough on left
+      setAlignLeft(isMobile || (spaceRight < dropdownWidth && spaceLeft > spaceRight))
     }
   }, [isOpen])
 
@@ -100,23 +110,20 @@ export function LanguageSelector() {
             onClick={() => setIsOpen(false)}
           />
           <div
-            style={openUpward ? {
+            style={{
               position: 'absolute',
-              bottom: '100%',
-              marginBottom: 8,
-              right: 0,
-              backgroundColor: 'white',
-              border: '1px solid #dee1e6',
-              borderRadius: 8,
-              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-              zIndex: 999,
-              minWidth: 180,
-              overflow: 'hidden',
-            } : {
-              position: 'absolute',
-              top: '100%',
-              marginTop: 8,
-              right: 0,
+              ...(openUpward
+                ? {
+                    bottom: '100%',
+                    marginBottom: 8,
+                  }
+                : {
+                    top: '100%',
+                    marginTop: 8,
+                  }),
+              ...(alignLeft
+                ? { left: 0, right: 'auto' }
+                : { right: 0, left: 'auto' }),
               backgroundColor: 'white',
               border: '1px solid #dee1e6',
               borderRadius: 8,

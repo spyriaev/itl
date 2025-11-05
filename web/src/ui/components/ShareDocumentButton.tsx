@@ -107,7 +107,7 @@ export function ShareDocumentButton({ documentId, onShareCreated, onShareRevoked
 
   return (
     <>
-      <button
+      <div
         onClick={(e) => {
           e.preventDefault()
           e.stopPropagation()
@@ -120,6 +120,15 @@ export function ShareDocumentButton({ documentId, onShareCreated, onShareRevoked
         onMouseUp={(e) => {
           e.preventDefault()
           e.stopPropagation()
+        }}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            e.stopPropagation()
+            handleOpenModal()
+          }
         }}
         style={{
           background: 'transparent',
@@ -143,7 +152,6 @@ export function ShareDocumentButton({ documentId, onShareCreated, onShareRevoked
           e.currentTarget.style.color = '#6B7280'
         }}
         title={t("shareDocument.share")}
-        type="button"
       >
         <svg
           width="16"
@@ -161,7 +169,7 @@ export function ShareDocumentButton({ documentId, onShareCreated, onShareRevoked
           <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
           <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
         </svg>
-      </button>
+      </div>
 
       {isModalOpen && (
         <div style={styles.overlay} onClick={handleCloseModal}>

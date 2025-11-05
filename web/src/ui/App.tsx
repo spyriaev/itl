@@ -1,5 +1,5 @@
 import { Routes, Route, Navigate } from "react-router-dom"
-import { AuthProvider } from "../contexts/AuthContext"
+import { AuthProvider, useAuth } from "../contexts/AuthContext"
 import { LandingPage } from "./components/LandingPage"
 import { PlansPage } from "./components/PlansPage"
 import { LibraryPage } from "./components/LibraryPage"
@@ -14,15 +14,20 @@ import { fetchDocuments } from "../services/uploadService"
 // Component to handle sync on reconnect
 function SyncOnReconnect() {
   const { isOnline } = useNetworkStatus()
+  const { user, loading } = useAuth()
   
   useEffect(() => {
-    if (isOnline) {
+    // Only sync if online, authenticated, and not loading
+    if (isOnline && user && !loading) {
       // Sync document list when connection is restored
       fetchDocuments().catch(err => {
-        console.warn('Failed to sync documents on reconnect:', err)
+        // Only log if it's not an authentication error (which is expected when not authenticated)
+        if (!err.message?.includes('Not authenticated')) {
+          console.warn('Failed to sync documents on reconnect:', err)
+        }
       })
     }
-  }, [isOnline])
+  }, [isOnline, user, loading])
   
   return null
 }

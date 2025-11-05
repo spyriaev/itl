@@ -228,6 +228,10 @@ export async function fetchDocuments(limit: number = 50, offset: number = 0): Pr
   try {
     const token = await getAuthToken()
     if (!token) {
+      // If not authenticated but we have cache, use cache silently
+      if (cachedDocuments.length > 0) {
+        return cachedDocuments.slice(offset, offset + limit)
+      }
       throw new Error('Not authenticated')
     }
 
@@ -250,7 +254,11 @@ export async function fetchDocuments(limit: number = 50, offset: number = 0): Pr
   } catch (error) {
     // If fetch fails but we have cache, use cache
     if (cachedDocuments.length > 0) {
-      console.warn('[fetchDocuments] Failed to fetch from server, using cache:', error)
+      // Only log warning if it's not an authentication error (which is expected when not authenticated)
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      if (!errorMessage.includes('Not authenticated')) {
+        console.warn('[fetchDocuments] Failed to fetch from server, using cache:', error)
+      }
       return cachedDocuments.slice(offset, offset + limit)
     }
     throw error

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react'
+import React, { useState, useRef, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Document, Page, pdfjs } from 'react-pdf'
 import { PageRelatedQuestions } from './PageRelatedQuestions'
@@ -67,6 +67,14 @@ export function HeroSection({ onStartClick }: HeroSectionProps) {
     console.error('PDF load error:', error)
     setPageError('Failed to load PDF')
   }
+
+  // Memoize PDF options to prevent unnecessary reloads
+  const pdfOptions = useMemo(() => ({
+    disableFontFace: false,
+    enableXfa: false,
+    maxImageSize: 5242880,
+    standardFontDataUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/standard_fonts/`,
+  }), [])
 
   return (
     <section style={styles.section} data-hero-section>
@@ -137,12 +145,7 @@ export function HeroSection({ onStartClick }: HeroSectionProps) {
                                   Loading PDF...
                                 </div>
                               }
-                              options={{
-                                disableFontFace: false,
-                                enableXfa: false,
-                                maxImageSize: 5242880,
-                                standardFontDataUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/standard_fonts/`,
-                              }}
+                              options={pdfOptions}
                             >
                               <div style={styles.pdfPageWrapper}>
                                 <div style={styles.pdfPageInner}>

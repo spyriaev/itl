@@ -559,7 +559,7 @@ const styles: { [key: string]: React.CSSProperties } = {
   },
   submitButtonEnabled: {
     backgroundColor: '#3b82f6',
-    borderColor: '#3b82f6',
+    border: '1px solid #3b82f6',
     color: 'white',
     cursor: 'pointer'
   },
