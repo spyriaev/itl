@@ -10,7 +10,7 @@ password = os.getenv("DATABASE_PASSWORD", "postgres")
 dbname = os.getenv("DATABASE_NAME", "postgres")
 port = os.getenv("DATABASE_PORT", "54322")
 host = os.getenv("DATABASE_HOST", "127.0.0.1")
-DATABASE_URL = (f"postgresql+psycopg2://{username}:{password}@{host}:{port}/{dbname}")
+DATABASE_URL = (f"postgresql+psycopg2://{username}:{password}@{host}:{port}/{dbname}?sslmode=require")
 
 # Supabase configuration
 SUPABASE_URL = os.getenv("SUPABASE_URL")
