@@ -14,16 +14,29 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Deploy to Heroku
-        uses: akhileshns/heroku-deploy@v3.13.15
+      - name: Setup Heroku CLI
+        uses: akhileshns/setup-heroku@v2.0.0
         with:
           heroku_api_key: ${{ secrets.HEROKU_API_KEY }}
-          heroku_app_name: ${{ secrets.HEROKU_APP_NAME }}
           heroku_email: ${{ secrets.HEROKU_EMAIL }}
-          appdir: "server"
-          usedocker: false
-          healthcheck: "https://${{ secrets.HEROKU_APP_NAME }}.herokuapp.com/health"
-          check_health: true
-          rollback_on_healthcheck_failed: true
-          dontautocreate: true
 
+      - name: Deploy to Heroku
+        working-directory: ./server
+        env:
+          HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
+        run: |
+          # Create a temporary git repository for deployment
+          git init
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add .
+          git commit -m "Deploy from GitHub Actions [skip ci]" || exit 0
+          
+          # Deploy using Heroku CLI
+          heroku git:remote --app ${{ secrets.HEROKU_APP_NAME }}
+          git push heroku HEAD:main --force
+
+      - name: Check health
+        run: |
+          sleep 15
+          curl -f https://${{ secrets.HEROKU_APP_NAME }}.herokuapp.com/health || exit 1
