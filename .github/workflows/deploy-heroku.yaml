@@ -1,42 +1,21 @@
-name: Deploy to Heroku
+name: Deploy
 
 on:
   push:
     branches:
-      - main
-  workflow_dispatch:
+      - master
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
-    
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Heroku CLI
-        uses: akhileshns/setup-heroku@v2.0.0
+      - uses: actions/checkout@v2
+      - name: Install Heroku CLI # <- IMPORTANT!!! Make sure the cli is installed before using the action
+        run: |
+          curl https://cli-assets.heroku.com/install.sh | sh 
+      - uses: akhileshns/heroku-deploy@v3.14.15 # This is the action
         with:
-          heroku_api_key: ${{ secrets.HEROKU_API_KEY }}
-          heroku_email: ${{ secrets.HEROKU_EMAIL }}
-
-      - name: Deploy to Heroku
-        working-directory: ./server
-        env:
-          HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
-        run: |
-          # Create a temporary git repository for deployment
-          git init
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
-          git add .
-          git commit -m "Deploy from GitHub Actions [skip ci]" || exit 0
-          
-          # Deploy using Heroku CLI
-          heroku git:remote --app ${{ secrets.HEROKU_APP_NAME }}
-          git push heroku HEAD:main --force
-
-      - name: Check health
-        run: |
-          sleep 15
-          curl -f https://${{ secrets.HEROKU_APP_NAME }}.herokuapp.com/health || exit 1
+          heroku_api_key: ${{secrets.HEROKU_API_KEY}}
+          heroku_app_name: "itl" #Must be unique in Heroku
+          heroku_email: "s.pyriaev@gmail.com"
+          appdir: "server"
