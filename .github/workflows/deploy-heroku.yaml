@@ -21,8 +21,9 @@ jobs:
           heroku_app_name: ${{ secrets.HEROKU_APP_NAME }}
           heroku_email: ${{ secrets.HEROKU_EMAIL }}
           appdir: "server"
+          usedocker: false
           healthcheck: "https://${{ secrets.HEROKU_APP_NAME }}.herokuapp.com/health"
           check_health: true
           rollback_on_healthcheck_failed: true
-          stack: "heroku-22"
+          dontautocreate: true
 
