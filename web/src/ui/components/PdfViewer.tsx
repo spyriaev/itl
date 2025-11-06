@@ -1127,7 +1127,7 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
       textLayers.forEach((layer) => {
         const htmlLayer = layer as HTMLElement
         // Apply styles to prevent default menu on mobile
-        htmlLayer.style.webkitTouchCallout = 'none'
+        htmlLayer.style.setProperty('-webkit-touch-callout', 'none')
         htmlLayer.style.webkitUserSelect = 'text'
         htmlLayer.style.userSelect = 'text'
         
@@ -1135,7 +1135,7 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
         const spans = htmlLayer.querySelectorAll('span')
         spans.forEach((span) => {
           const htmlSpan = span as HTMLElement
-          htmlSpan.style.webkitTouchCallout = 'none'
+          htmlSpan.style.setProperty('-webkit-touch-callout', 'none')
         })
       })
     }
