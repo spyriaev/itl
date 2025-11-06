@@ -137,6 +137,12 @@ export function AuthModal({ onClose, onAuthSuccess }: AuthModalProps) {
               required
               disabled={loading}
               placeholder={t("authModal.emailPlaceholder")}
+              onBlur={(e) => {
+                // Reset zoom on iOS after input loses focus
+                if (window.visualViewport && window.visualViewport.scale !== 1) {
+                  window.scrollTo(0, 0)
+                }
+              }}
             />
           </div>
 
@@ -151,6 +157,12 @@ export function AuthModal({ onClose, onAuthSuccess }: AuthModalProps) {
               disabled={loading}
               placeholder={t("authModal.passwordPlaceholder")}
               minLength={6}
+              onBlur={(e) => {
+                // Reset zoom on iOS after input loses focus
+                if (window.visualViewport && window.visualViewport.scale !== 1) {
+                  window.scrollTo(0, 0)
+                }
+              }}
             />
           </div>
 
@@ -293,7 +305,7 @@ const styles: { [key: string]: React.CSSProperties } = {
     padding: '10px 12px',
     border: '1px solid #d1d5db',
     borderRadius: '4px',
-    fontSize: '14px',
+    fontSize: '16px', // 16px minimum to prevent iOS zoom on focus
     lineHeight: '22px',
     fontFamily: "'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif",
     fontWeight: '400',
@@ -366,7 +378,9 @@ dividerStyle.textContent = `
     [data-auth-modal] h2 {
       font-size: 20px !important;
     }
-    [data-auth-modal] input,
+    [data-auth-modal] input {
+      font-size: 16px !important; /* 16px minimum to prevent iOS zoom */
+    }
     [data-auth-modal] button {
       font-size: 14px !important;
     }
@@ -378,6 +392,9 @@ dividerStyle.textContent = `
     }
     [data-auth-modal] h2 {
       font-size: 18px !important;
+    }
+    [data-auth-modal] input {
+      font-size: 16px !important; /* 16px minimum to prevent iOS zoom */
     }
   }
 `

@@ -144,6 +144,38 @@ export function LibraryPage() {
     setIsPdfReady(true)
   }
 
+  // Reset zoom on iOS when component mounts or view mode changes
+  useEffect(() => {
+    // Reset zoom on iOS after navigation
+    const resetZoom = () => {
+      // Check if we're on iOS
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+      
+      if (isIOS) {
+        // Force reset zoom by scrolling to top
+        window.scrollTo(0, 0)
+        // Reset viewport scale if available
+        if (window.visualViewport && window.visualViewport.scale !== 1) {
+          // Try to reset by setting body zoom
+          if (document.body) {
+            document.body.style.zoom = '1'
+          }
+        }
+      }
+    }
+
+    // Reset immediately and after a short delay to handle navigation
+    resetZoom()
+    const timeoutId = setTimeout(resetZoom, 100)
+    const timeoutId2 = setTimeout(resetZoom, 300)
+
+    return () => {
+      clearTimeout(timeoutId)
+      clearTimeout(timeoutId2)
+    }
+  }, [viewMode])
+
   return (
     <div className="upload-page">
       <OfflineIndicator hideInReader={viewMode === "reader"} />
