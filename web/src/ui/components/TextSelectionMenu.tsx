@@ -13,7 +13,7 @@ export function TextSelectionMenu({ position, selectedText, onOptionClick, onClo
   const menuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         onClose()
       }
@@ -21,12 +21,14 @@ export function TextSelectionMenu({ position, selectedText, onOptionClick, onClo
 
     // Add listener with small delay to avoid immediate closure
     const timeoutId = setTimeout(() => {
-      document.addEventListener('click', handleClickOutside)
+      document.addEventListener('click', handleClickOutside as EventListener)
+      document.addEventListener('touchend', handleClickOutside as EventListener, { passive: true })
     }, 0)
 
     return () => {
       clearTimeout(timeoutId)
-      document.removeEventListener('click', handleClickOutside)
+      document.removeEventListener('click', handleClickOutside as EventListener)
+      document.removeEventListener('touchend', handleClickOutside as EventListener)
     }
   }, [onClose])
 
@@ -95,6 +97,12 @@ export function TextSelectionMenu({ position, selectedText, onOptionClick, onClo
             e.currentTarget.style.backgroundColor = '#F9FAFB'
           }}
           onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = 'transparent'
+          }}
+          onTouchStart={(e) => {
+            e.currentTarget.style.backgroundColor = '#F9FAFB'
+          }}
+          onTouchEnd={(e) => {
             e.currentTarget.style.backgroundColor = 'transparent'
           }}
         >

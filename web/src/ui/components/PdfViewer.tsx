@@ -531,7 +531,7 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
   }, [isChatVisible, navigateToMessage, activeThread, chatIsStreaming])
 
   // Handle text selection
-  const handleTextSelection = useCallback((e: MouseEvent) => {
+  const handleTextSelection = useCallback((e?: MouseEvent | TouchEvent | Event) => {
     const selection = window.getSelection()
     if (!selection || selection.rangeCount === 0) {
       setSelectionMenu(null)
@@ -997,7 +997,7 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
     }
   }, [selectedTextRange, floatingAnswer?.isStreaming])
 
-  // Add mouseup event listener for text selection
+  // Add mouseup event listener for text selection (desktop)
   useEffect(() => {
     const handleMouseUp = (e: MouseEvent) => {
       // Small delay to ensure selection is complete
@@ -1011,6 +1011,155 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
       document.removeEventListener('mouseup', handleMouseUp)
     }
   }, [handleTextSelection])
+
+  // Add touchend event listener for text selection (mobile/tablet)
+  // Note: This is separate from the context menu prevention handler
+  useEffect(() => {
+    const handleTouchEndForSelection = (e: TouchEvent) => {
+      // Only process if not a long press (handled by context menu prevention)
+      const target = e.target as HTMLElement
+      if (target.closest('.react-pdf__Page__textContent')) {
+        // Small delay to ensure selection is complete
+        setTimeout(() => {
+          handleTextSelection(e as any)
+        }, 100) // Longer delay for mobile to ensure selection is complete
+      }
+    }
+
+    document.addEventListener('touchend', handleTouchEndForSelection, { passive: true })
+    return () => {
+      document.removeEventListener('touchend', handleTouchEndForSelection)
+    }
+  }, [handleTextSelection])
+
+  // Add selectionchange event listener for mobile devices
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout | null = null
+    
+    const handleSelectionChange = () => {
+      // Check if we're on a mobile device
+      const isMobileDevice = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || 
+                            (window.innerWidth < 1024 && 'ontouchstart' in window)
+      
+      if (isMobileDevice) {
+        // Clear previous timeout to debounce
+        if (timeoutId) {
+          clearTimeout(timeoutId)
+        }
+        
+        // Small delay to ensure selection is complete
+        timeoutId = setTimeout(() => {
+          handleTextSelection(new Event('selectionchange') as any)
+          timeoutId = null
+        }, 200) // Increased delay for better reliability
+      }
+    }
+
+    document.addEventListener('selectionchange', handleSelectionChange)
+    return () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId)
+      }
+      document.removeEventListener('selectionchange', handleSelectionChange)
+    }
+  }, [handleTextSelection])
+
+  // Prevent default context menu on mobile devices for text layers
+  useEffect(() => {
+    const handleContextMenu = (e: Event) => {
+      const target = e.target as HTMLElement
+      // Check if the event is on a text layer
+      if (target.closest('.react-pdf__Page__textContent')) {
+        // Check if we're on a mobile device
+        const isMobileDevice = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || 
+                              (window.innerWidth < 1024 && 'ontouchstart' in window)
+        
+        if (isMobileDevice) {
+          e.preventDefault()
+          e.stopPropagation()
+        }
+      }
+    }
+
+    // Also handle touchstart with long press to prevent default menu
+    let touchStartTime = 0
+    let touchStartTarget: HTMLElement | null = null
+    
+    const handleTouchStart = (e: TouchEvent) => {
+      const target = e.target as HTMLElement
+      if (target.closest('.react-pdf__Page__textContent')) {
+        touchStartTime = Date.now()
+        touchStartTarget = target
+      }
+    }
+    
+    const handleTouchEnd = (e: TouchEvent) => {
+      const target = e.target as HTMLElement
+      const isMobileDevice = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || 
+                            (window.innerWidth < 1024 && 'ontouchstart' in window)
+      
+      if (isMobileDevice && touchStartTarget && target.closest('.react-pdf__Page__textContent')) {
+        const touchDuration = Date.now() - touchStartTime
+        // If it was a long press (more than 500ms), prevent default menu
+        if (touchDuration > 500) {
+          e.preventDefault()
+        }
+      }
+      touchStartTime = 0
+      touchStartTarget = null
+    }
+
+    document.addEventListener('contextmenu', handleContextMenu, true)
+    document.addEventListener('touchstart', handleTouchStart, { passive: true })
+    document.addEventListener('touchend', handleTouchEnd, { passive: false })
+    
+    return () => {
+      document.removeEventListener('contextmenu', handleContextMenu, true)
+      document.removeEventListener('touchstart', handleTouchStart)
+      document.removeEventListener('touchend', handleTouchEnd)
+    }
+  }, [])
+
+  // Apply styles to text layers after they're rendered (for mobile support)
+  useEffect(() => {
+    const applyTextLayerStyles = () => {
+      const textLayers = document.querySelectorAll('.react-pdf__Page__textContent')
+      textLayers.forEach((layer) => {
+        const htmlLayer = layer as HTMLElement
+        // Apply styles to prevent default menu on mobile
+        htmlLayer.style.webkitTouchCallout = 'none'
+        htmlLayer.style.webkitUserSelect = 'text'
+        htmlLayer.style.userSelect = 'text'
+        
+        // Also apply to child spans
+        const spans = htmlLayer.querySelectorAll('span')
+        spans.forEach((span) => {
+          const htmlSpan = span as HTMLElement
+          htmlSpan.style.webkitTouchCallout = 'none'
+        })
+      })
+    }
+
+    // Apply styles immediately
+    applyTextLayerStyles()
+
+    // Also apply styles when new pages are rendered
+    const observer = new MutationObserver(() => {
+      applyTextLayerStyles()
+    })
+
+    // Observe the scroll container for new text layers
+    if (scrollContainerRef.current) {
+      observer.observe(scrollContainerRef.current, {
+        childList: true,
+        subtree: true
+      })
+    }
+
+    return () => {
+      observer.disconnect()
+    }
+  }, [numPages, visiblePageRange])
 
   // Функция для прокрутки к определенной странице
   const scrollToPage = useCallback((pageNumber: number) => {
@@ -2701,6 +2850,26 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
             -webkit-transform: translateZ(0);
             transform: translateZ(0);
             will-change: transform;
+          }
+        }
+
+        /* Prevent default text selection menu on mobile devices */
+        .react-pdf__Page__textContent {
+          -webkit-touch-callout: none;
+          -webkit-user-select: text;
+          -moz-user-select: text;
+          -ms-user-select: text;
+          user-select: text;
+        }
+
+        /* Prevent default context menu on mobile for text layers */
+        @media (max-width: 1024px) {
+          .react-pdf__Page__textContent {
+            -webkit-touch-callout: none;
+          }
+          
+          .react-pdf__Page__textContent span {
+            -webkit-touch-callout: none;
           }
         }
       `}</style>
