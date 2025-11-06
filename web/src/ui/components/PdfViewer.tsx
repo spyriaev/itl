@@ -1396,6 +1396,86 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
     }
   }, [updateVisiblePage, continuousScroll])
 
+  // Fix for iOS Safari: prevent horizontal shift after zoom
+  useEffect(() => {
+    const container = scrollContainerRef.current
+    if (!container) return
+
+    // Detect iOS
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+                  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+
+    if (!isIOS) return
+
+    let lastScrollLeft = 0
+    let isScrolling = false
+    let scrollTimeout: NodeJS.Timeout | null = null
+
+    const handleScroll = () => {
+      if (!isScrolling) {
+        isScrolling = true
+        requestAnimationFrame(() => {
+          const currentScrollLeft = container.scrollLeft
+          
+          // Check if content is actually wider than container
+          const contentWidth = container.scrollWidth
+          const containerWidth = container.clientWidth
+          const shouldFit = contentWidth <= containerWidth + 100 // 100px tolerance for padding
+          
+          // Only reset if content should fit and scrollLeft changed unexpectedly
+          if (shouldFit && Math.abs(currentScrollLeft) > 5) {
+            // Clear any pending timeout
+            if (scrollTimeout) {
+              clearTimeout(scrollTimeout)
+            }
+            
+            // Reset horizontal scroll after a short delay to allow natural scrolling
+            scrollTimeout = setTimeout(() => {
+              if (container.scrollLeft !== 0 && shouldFit) {
+                container.scrollLeft = 0
+                lastScrollLeft = 0
+              }
+            }, 100)
+          } else {
+            lastScrollLeft = currentScrollLeft
+          }
+          
+          isScrolling = false
+        })
+      }
+    }
+
+    // Handle scroll end to reset position if needed
+    const handleScrollEnd = () => {
+      if (scrollTimeout) {
+        clearTimeout(scrollTimeout)
+        scrollTimeout = null
+      }
+      
+      const contentWidth = container.scrollWidth
+      const containerWidth = container.clientWidth
+      const shouldFit = contentWidth <= containerWidth + 100
+      
+      if (shouldFit && Math.abs(container.scrollLeft) > 5) {
+        container.scrollLeft = 0
+        lastScrollLeft = 0
+      }
+    }
+
+    container.addEventListener('scroll', handleScroll, { passive: true })
+    container.addEventListener('touchend', handleScrollEnd, { passive: true })
+    container.addEventListener('touchcancel', handleScrollEnd, { passive: true })
+
+    return () => {
+      container.removeEventListener('scroll', handleScroll)
+      container.removeEventListener('touchend', handleScrollEnd)
+      container.removeEventListener('touchcancel', handleScrollEnd)
+      if (scrollTimeout) {
+        clearTimeout(scrollTimeout)
+      }
+    }
+  }, [])
+
   // Cleanup timeout on component unmount
   useEffect(() => {
     return () => {
@@ -2092,6 +2172,7 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
         {/* PDF Content */}
         <div
           ref={scrollContainerRef}
+          data-pdf-scroll-container
           style={{
             flex: 1,
             display: 'flex',
@@ -2099,9 +2180,13 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
             justifyContent: 'center',
             padding: 24,
             overflow: 'auto',
-            overflowX: 'hidden',
+            overflowX: 'auto',
+            WebkitOverflowScrolling: 'touch',
+            overscrollBehaviorX: 'contain',
+            overscrollBehaviorY: 'auto',
             marginRight: isChatVisible ? (isMobile ? 0 : 400) : 0,
             transition: 'margin-right 0.3s ease-out',
+            position: 'relative',
           }}>
           {continuousScroll ? (
             /* Continuous Scroll Mode - Virtualized rendering for memory efficiency */
@@ -2601,6 +2686,22 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
           border-radius: 2px;
           padding: 0 2px;
           margin: 0 -2px;
+        }
+
+        /* Fix for iOS Safari: prevent horizontal shift after zoom */
+        @supports (-webkit-touch-callout: none) {
+          /* iOS Safari specific styles */
+          [data-pdf-scroll-container] {
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior-x: contain;
+            overscroll-behavior-y: auto;
+          }
+          
+          .react-pdf__Page {
+            -webkit-transform: translateZ(0);
+            transform: translateZ(0);
+            will-change: transform;
+          }
         }
       `}</style>
     </div>
