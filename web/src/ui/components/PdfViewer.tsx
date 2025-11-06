@@ -673,47 +673,64 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
       }
     }
 
-    // Get selection position for menu - position at the end of selection
-    // Create a range that only contains the end of the selection
-    const endRange = range.cloneRange()
-    endRange.collapse(false) // Collapse to end point
-    const endPoint = endRange.getBoundingClientRect()
+    // Menu dimensions (actual size)
+    const menuWidth = 240
+    const menuHeight = 180 // Approximate height: header (~60px) + 3 options (~40px each)
+    const padding = 8 // Padding from edges
+    const spacing = 12 // Spacing between button and menu
     
-    // Also get full selection rect for fallback
-    const fullRect = range.getBoundingClientRect()
+    // Get viewport dimensions
+    const viewportWidth = window.innerWidth
+    const viewportHeight = window.innerHeight
     
-    // Use end point if available, otherwise use right edge of full selection
-    const endX = endPoint.width > 0 ? endPoint.right : fullRect.right
-    const endY = endPoint.height > 0 ? endPoint.bottom : fullRect.bottom
+    // Calculate assistant button position
+    const assistantButtonSize = 52
+    let buttonRight: number
+    let buttonBottom: number
     
-    // Calculate menu position at the end of selection
-    // Since menu uses position: fixed, we use viewport coordinates directly
-    let menuLeft = endX
-    let menuTop = endY + 8
-    
-    // Ensure menu doesn't go off screen (adjust if needed)
-    const menuWidth = 200 // Approximate menu width
-    const menuHeight = 150 // Approximate menu height
-    
-    // Adjust horizontal position if menu would go off right edge
-    if (menuLeft + menuWidth > window.innerWidth) {
-      menuLeft = fullRect.left - menuWidth
+    if (typeof assistantButtonPosition.right === 'number') {
+      buttonRight = assistantButtonPosition.right
+    } else {
+      // Parse percentage or default
+      buttonRight = 24
     }
     
-    // Adjust vertical position if menu would go off bottom edge
-    if (menuTop + menuHeight > window.innerHeight) {
-      menuTop = fullRect.top - menuHeight - 8
+    if (typeof assistantButtonPosition.bottom === 'number') {
+      buttonBottom = assistantButtonPosition.bottom
+    } else {
+      // Parse percentage or default
+      buttonBottom = 24
     }
     
-    // Ensure menu doesn't go off left edge
-    if (menuLeft < 0) {
-      menuLeft = 8
+    // Calculate button's actual position (from left and top)
+    const buttonLeft = viewportWidth - buttonRight - assistantButtonSize
+    const buttonTop = viewportHeight - buttonBottom - assistantButtonSize
+    
+    // Position menu next to assistant button (to the left of it)
+    let menuLeft = buttonLeft - menuWidth - spacing
+    let menuTop = buttonTop + (assistantButtonSize / 2) - (menuHeight / 2) // Center vertically with button
+    
+    // Adjust if menu would go off left edge
+    if (menuLeft < padding) {
+      // Try positioning to the right of button
+      menuLeft = buttonLeft + assistantButtonSize + spacing
+      // If still off screen, align to left edge
+      if (menuLeft + menuWidth > viewportWidth - padding) {
+        menuLeft = padding
+      }
     }
     
-    // Ensure menu doesn't go off top edge
-    if (menuTop < 0) {
-      menuTop = endY + 8
+    // Adjust vertical position if menu would go off screen
+    if (menuTop < padding) {
+      menuTop = padding
+    } else if (menuTop + menuHeight > viewportHeight - padding) {
+      // Menu would go off bottom, align to bottom
+      menuTop = viewportHeight - menuHeight - padding
     }
+    
+    // Final check: ensure menu is fully visible
+    menuLeft = Math.max(padding, Math.min(menuLeft, viewportWidth - menuWidth - padding))
+    menuTop = Math.max(padding, Math.min(menuTop, viewportHeight - menuHeight - padding))
     
     const menuPosition = {
       top: menuTop,
