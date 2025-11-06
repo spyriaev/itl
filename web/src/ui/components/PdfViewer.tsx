@@ -736,6 +736,12 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
 
     const { selectedText, pageNumber } = selectionMenu
 
+    // Clear text selection immediately
+    const selection = window.getSelection()
+    if (selection) {
+      selection.removeAllRanges()
+    }
+
     // Close menu immediately when option is clicked
     setSelectionMenu(null)
     setSelectedTextRange(null)
@@ -997,87 +1003,193 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
     }
   }, [selectedTextRange, floatingAnswer?.isStreaming])
 
+  // Track selection state to detect when selection is stable
+  const selectionStableTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const isSelectingRef = useRef<boolean>(false)
+
   // Add mouseup event listener for text selection (desktop)
   useEffect(() => {
     const handleMouseUp = (e: MouseEvent) => {
-      // Small delay to ensure selection is complete
-      setTimeout(() => {
-        handleTextSelection(e)
-      }, 10)
+      // Mark that selection is complete
+      isSelectingRef.current = false
+      
+      // Wait for selection to stabilize before showing menu
+      if (selectionStableTimeoutRef.current) {
+        clearTimeout(selectionStableTimeoutRef.current)
+      }
+      
+      // Capture current selection immediately
+      const selection = window.getSelection()
+      const initialText = selection?.toString().trim() || ''
+      
+      if (initialText.length === 0) {
+        return
+      }
+      
+      selectionStableTimeoutRef.current = setTimeout(() => {
+        // Verify selection hasn't changed
+        const finalSelection = window.getSelection()
+        const finalText = finalSelection?.toString().trim() || ''
+        
+        // Only show menu if selection is stable (same text) and user is not selecting
+        if (finalText === initialText && finalText.length > 0 && !isSelectingRef.current) {
+          handleTextSelection(e)
+        }
+        selectionStableTimeoutRef.current = null
+      }, 150) // Wait 150ms after mouseup to ensure selection is complete (reduced for faster menu appearance)
     }
 
+    const handleMouseDown = () => {
+      isSelectingRef.current = true
+      // Clear any pending menu when starting new selection
+      if (selectionStableTimeoutRef.current) {
+        clearTimeout(selectionStableTimeoutRef.current)
+        selectionStableTimeoutRef.current = null
+      }
+      setSelectionMenu(null)
+    }
+
+    document.addEventListener('mousedown', handleMouseDown)
     document.addEventListener('mouseup', handleMouseUp)
     return () => {
+      document.removeEventListener('mousedown', handleMouseDown)
       document.removeEventListener('mouseup', handleMouseUp)
+      if (selectionStableTimeoutRef.current) {
+        clearTimeout(selectionStableTimeoutRef.current)
+      }
     }
   }, [handleTextSelection])
 
   // Add touchend event listener for text selection (mobile/tablet)
   // Note: This is separate from the context menu prevention handler
   useEffect(() => {
+    let touchEndTimeout: NodeJS.Timeout | null = null
+    
     const handleTouchEndForSelection = (e: TouchEvent) => {
       // Only process if not a long press (handled by context menu prevention)
       const target = e.target as HTMLElement
       if (target.closest('.react-pdf__Page__textContent')) {
-        // Small delay to ensure selection is complete
-        setTimeout(() => {
-          handleTextSelection(e as any)
-        }, 100) // Longer delay for mobile to ensure selection is complete
+        isSelectingRef.current = false
+        
+        // Clear any existing timeout
+        if (touchEndTimeout) {
+          clearTimeout(touchEndTimeout)
+        }
+        
+        // Capture current selection immediately
+        const selection = window.getSelection()
+        const initialText = selection?.toString().trim() || ''
+        
+        if (initialText.length === 0) {
+          return
+        }
+        
+        // Wait longer for mobile to ensure selection is complete and stable
+        touchEndTimeout = setTimeout(() => {
+          // Check if selection is stable (hasn't changed)
+          const finalSelection = window.getSelection()
+          const finalText = finalSelection?.toString().trim() || ''
+          
+          // Only show menu if selection is stable (same text) and user is not selecting
+          if (finalText === initialText && finalText.length > 0 && !isSelectingRef.current) {
+            handleTextSelection(e as any)
+          }
+          touchEndTimeout = null
+        }, 250) // Wait 250ms after touchend for mobile (reduced for faster menu appearance)
       }
     }
 
+    const handleTouchStart = () => {
+      isSelectingRef.current = true
+      // Clear any pending menu when starting new selection
+      if (touchEndTimeout) {
+        clearTimeout(touchEndTimeout)
+        touchEndTimeout = null
+      }
+      setSelectionMenu(null)
+    }
+
+    document.addEventListener('touchstart', handleTouchStart, { passive: true })
     document.addEventListener('touchend', handleTouchEndForSelection, { passive: true })
     return () => {
+      document.removeEventListener('touchstart', handleTouchStart)
       document.removeEventListener('touchend', handleTouchEndForSelection)
+      if (touchEndTimeout) {
+        clearTimeout(touchEndTimeout)
+      }
     }
   }, [handleTextSelection])
 
-  // Add selectionchange event listener for mobile devices
+  // Track selection changes to detect when selection stabilizes (fallback for mobile)
   useEffect(() => {
-    let timeoutId: NodeJS.Timeout | null = null
+    let stabilityCheckTimeout: NodeJS.Timeout | null = null
     
     const handleSelectionChange = () => {
-      // Check if we're on a mobile device
-      const isMobileDevice = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || 
-                            (window.innerWidth < 1024 && 'ontouchstart' in window)
-      
-      if (isMobileDevice) {
-        // Clear previous timeout to debounce
-        if (timeoutId) {
-          clearTimeout(timeoutId)
+      // If user is actively selecting, don't show menu yet
+      if (isSelectingRef.current) {
+        // Clear any pending menu
+        if (stabilityCheckTimeout) {
+          clearTimeout(stabilityCheckTimeout)
         }
-        
-        // Small delay to ensure selection is complete
-        timeoutId = setTimeout(() => {
-          handleTextSelection(new Event('selectionchange') as any)
-          timeoutId = null
-        }, 200) // Increased delay for better reliability
+        return
       }
+      
+      const selection = window.getSelection()
+      const currentText = selection?.toString().trim() || ''
+      
+      if (currentText.length === 0) {
+        return
+      }
+      
+      // Only show menu if selection is stable (hasn't changed for a while)
+      // Clear previous timeout
+      if (stabilityCheckTimeout) {
+        clearTimeout(stabilityCheckTimeout)
+      }
+      
+      // Wait for selection to stabilize
+      stabilityCheckTimeout = setTimeout(() => {
+        const finalSelection = window.getSelection()
+        const finalText = finalSelection?.toString().trim() || ''
+        
+        // Only show menu if selection hasn't changed and is not empty
+        if (finalText === currentText && finalText.length > 0 && !isSelectingRef.current) {
+          // Check if we're on a mobile device
+          const isMobileDevice = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || 
+                                (window.innerWidth < 1024 && 'ontouchstart' in window)
+          
+          // Only use selectionchange for mobile as fallback
+          if (isMobileDevice) {
+            handleTextSelection(new Event('selectionchange') as any)
+          }
+        }
+        stabilityCheckTimeout = null
+      }, 200) // Wait 200ms for selection to stabilize (reduced for faster menu appearance)
     }
 
     document.addEventListener('selectionchange', handleSelectionChange)
     return () => {
-      if (timeoutId) {
-        clearTimeout(timeoutId)
-      }
       document.removeEventListener('selectionchange', handleSelectionChange)
+      if (stabilityCheckTimeout) {
+        clearTimeout(stabilityCheckTimeout)
+      }
     }
   }, [handleTextSelection])
 
-  // Prevent default context menu on mobile devices for text layers
+  // Prevent default context menu for text layers (all devices)
   useEffect(() => {
     const handleContextMenu = (e: Event) => {
       const target = e.target as HTMLElement
+      // Don't prevent if clicking on our custom menu
+      if (target.closest('[data-text-selection-menu]')) {
+        return
+      }
       // Check if the event is on a text layer
       if (target.closest('.react-pdf__Page__textContent')) {
-        // Check if we're on a mobile device
-        const isMobileDevice = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || 
-                              (window.innerWidth < 1024 && 'ontouchstart' in window)
-        
-        if (isMobileDevice) {
-          e.preventDefault()
-          e.stopPropagation()
-        }
+        // Prevent default context menu on all devices
+        e.preventDefault()
+        e.stopPropagation()
+        return false
       }
     }
 
@@ -1100,23 +1212,42 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
       
       if (isMobileDevice && touchStartTarget && target.closest('.react-pdf__Page__textContent')) {
         const touchDuration = Date.now() - touchStartTime
-        // If it was a long press (more than 500ms), prevent default menu
-        if (touchDuration > 500) {
+        // Prevent default menu for any touch on text layer
+        if (touchDuration > 300) {
           e.preventDefault()
+          e.stopPropagation()
         }
       }
       touchStartTime = 0
       touchStartTarget = null
     }
+    
+    // Also prevent context menu on mouse right-click for desktop
+    const handleMouseDown = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      // Don't prevent if clicking on our custom menu
+      if (target.closest('[data-text-selection-menu]')) {
+        return
+      }
+      if (target.closest('.react-pdf__Page__textContent')) {
+        // Prevent right-click context menu
+        if (e.button === 2) {
+          e.preventDefault()
+          e.stopPropagation()
+        }
+      }
+    }
 
     document.addEventListener('contextmenu', handleContextMenu, true)
     document.addEventListener('touchstart', handleTouchStart, { passive: true })
     document.addEventListener('touchend', handleTouchEnd, { passive: false })
+    document.addEventListener('mousedown', handleMouseDown, true)
     
     return () => {
       document.removeEventListener('contextmenu', handleContextMenu, true)
       document.removeEventListener('touchstart', handleTouchStart)
       document.removeEventListener('touchend', handleTouchEnd)
+      document.removeEventListener('mousedown', handleMouseDown, true)
     }
   }, [])
 
@@ -1126,12 +1257,19 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
       const textLayers = document.querySelectorAll('.react-pdf__Page__textContent')
       textLayers.forEach((layer) => {
         const htmlLayer = layer as HTMLElement
-        // Apply styles to prevent default menu on mobile
+        // Apply styles to prevent default menu on all devices
         htmlLayer.style.setProperty('-webkit-touch-callout', 'none')
         htmlLayer.style.webkitUserSelect = 'text'
         htmlLayer.style.userSelect = 'text'
         
-        // Also apply to child spans
+        // Also apply to all child elements
+        const allChildren = htmlLayer.querySelectorAll('*')
+        allChildren.forEach((child) => {
+          const htmlChild = child as HTMLElement
+          htmlChild.style.setProperty('-webkit-touch-callout', 'none')
+        })
+        
+        // Also apply to child spans specifically
         const spans = htmlLayer.querySelectorAll('span')
         spans.forEach((span) => {
           const htmlSpan = span as HTMLElement
@@ -2853,24 +2991,28 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
           }
         }
 
-        /* Prevent default text selection menu on mobile devices */
+        /* Prevent default text selection menu on all devices */
         .react-pdf__Page__textContent {
-          -webkit-touch-callout: none;
+          -webkit-touch-callout: none !important;
           -webkit-user-select: text;
           -moz-user-select: text;
           -ms-user-select: text;
           user-select: text;
         }
 
-        /* Prevent default context menu on mobile for text layers */
-        @media (max-width: 1024px) {
-          .react-pdf__Page__textContent {
-            -webkit-touch-callout: none;
-          }
-          
-          .react-pdf__Page__textContent span {
-            -webkit-touch-callout: none;
-          }
+        /* Prevent default context menu for text layers */
+        .react-pdf__Page__textContent,
+        .react-pdf__Page__textContent * {
+          -webkit-touch-callout: none !important;
+        }
+        
+        .react-pdf__Page__textContent span {
+          -webkit-touch-callout: none !important;
+        }
+        
+        /* Prevent context menu on all devices */
+        .react-pdf__Page__textContent {
+          pointer-events: auto;
         }
       `}</style>
     </div>
