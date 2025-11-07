@@ -76,6 +76,7 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
   const [pageQuestionsMap, setPageQuestionsMap] = useState<Map<number, PageQuestionsData>>(new Map())
   const [pageHeights, setPageHeights] = useState<Map<number, number>>(new Map())
   const [pageWidths, setPageWidths] = useState<Map<number, number>>(new Map())
+  const [initialPageWidth, setInitialPageWidth] = useState<number | null>(null)
   const [visiblePageRange, setVisiblePageRange] = useState<{ start: number, end: number }>({ start: 1, end: 10 })
   const [assistantButtonPosition, setAssistantButtonPosition] = useState<{ right: number | string, bottom: number | string }>({ right: 24, bottom: 24 })
 
@@ -219,29 +220,40 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
 
         // Get available container width
         const container = scrollContainerRef.current
+        let availableWidth: number
+        
         if (container) {
           const containerRect = container.getBoundingClientRect()
-          const availableWidth = containerRect.width - 48 // Account for padding (24px on each side)
-
-          // Calculate optimal scale
-          let optimalScale = availableWidth / pageWidth
-
-          // Clamp scale to reasonable limits
-          optimalScale = Math.max(0.1, Math.min(optimalScale, 3.0))
-
-          // Set initial scale before rendering
-          setScale(optimalScale)
-
-          // Clean up the PDF (we only used it for scale calculation)
-          await pdf.destroy()
+          availableWidth = containerRect.width - 48 // Account for padding (24px on each side)
+        } else {
+          // Fallback: use window width minus margins for chat and padding
+          const windowWidth = window.innerWidth
+          const chatWidth = isChatVisible && !isMobile ? 400 : 0
+          availableWidth = windowWidth - chatWidth - 48 // Account for padding (24px on each side)
         }
+
+        // Calculate optimal scale
+        let optimalScale = availableWidth / pageWidth
+
+        // Clamp scale to reasonable limits
+        optimalScale = Math.max(0.1, Math.min(optimalScale, 3.0))
+
+        // Calculate initial page width based on scale
+        const scaledPageWidth = pageWidth * optimalScale
+        setInitialPageWidth(scaledPageWidth)
+
+        // Set initial scale before rendering
+        setScale(optimalScale)
+
+        // Clean up the PDF (we only used it for scale calculation)
+        await pdf.destroy()
       } catch (error) {
         console.error('Error calculating scale:', error)
       }
     }
 
     calculateScale()
-  }, [documentInfo?.url])
+  }, [documentInfo?.url, isChatVisible, isMobile])
 
   // Handle window resize
   useEffect(() => {
@@ -1552,30 +1564,34 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
 
     // На десктопе - позиционируем справа от страницы
     const updateButtonPosition = () => {
-      if (!scrollContainerRef.current || !pageRefs.current.length) {
-        // Если страницы еще не загружены, используем дефолтную позицию
+      if (!scrollContainerRef.current || !pageRefs.current.length || numPages === 0) {
+        // Если страницы еще не загружены, используем дефолтную позицию справа внизу
         setAssistantButtonPosition({ right: 24, bottom: 24 })
         return
       }
 
       // Находим первую видимую страницу или используем контейнер для определения правого края
       let pageRight: number | null = null
+      let pageWidth: number = 0
 
       // Сначала пытаемся найти видимую страницу
       for (let i = 0; i < pageRefs.current.length; i++) {
         const pageRef = pageRefs.current[i]
         if (pageRef) {
           const pageRect = pageRef.getBoundingClientRect()
-          if (pageRect.width > 0 && pageRect.height > 0) {
+          // Проверяем, что страница имеет разумную ширину (больше 200px), чтобы избежать позиционирования относительно узких placeholder'ов
+          if (pageRect.width > 200 && pageRect.height > 0) {
             // Находим самый правый край всех видимых страниц
             if (pageRight === null || pageRect.right > pageRight) {
               pageRight = pageRect.right
+              pageWidth = pageRect.width
             }
           }
         }
       }
 
-      if (pageRight !== null) {
+      // Если страница найдена и имеет достаточную ширину, позиционируем кнопку справа от неё
+      if (pageRight !== null && pageWidth > 200) {
         const windowWidth = window.innerWidth
 
         // Кнопка должна быть справа от страницы с отступом 32px (чтобы точно была за пределами)
@@ -1590,7 +1606,7 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
 
         setAssistantButtonPosition({ right: finalRight, bottom: 24 })
       } else {
-        // Если страница не найдена, используем дефолтную позицию
+        // Если страница не найдена или слишком узкая, используем дефолтную позицию справа внизу
         setAssistantButtonPosition({ right: 24, bottom: 24 })
       }
     }
@@ -1617,7 +1633,7 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
         scrollContainerRef.current.removeEventListener('scroll', handleScroll)
       }
     }
-  }, [scale, continuousScroll, currentPage, visiblePageRange, isMobile, isTablet])
+  }, [scale, continuousScroll, currentPage, visiblePageRange, isMobile, isTablet, numPages])
 
   // Отдельный эффект для обновления позиции при открытии/закрытии чата
   useEffect(() => {
@@ -2423,7 +2439,7 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
       left: 0,
       right: 0,
       bottom: 0,
-      backgroundColor: 'rgba(0, 0, 0, 0.8)',
+      backgroundColor: '#f5f5f5',
       zIndex: 1000,
       display: 'flex',
       flexDirection: 'column',
@@ -2517,6 +2533,10 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
                     const shouldRenderTextLayer = isZoomingRef.current
                       ? Math.abs(pageNumber - currentPage) <= Math.max(4, WINDOW_RENDER_DISTANCE)
                       : Math.abs(pageNumber - currentPage) <= WINDOW_RENDER_DISTANCE
+                    const knownWidth = pageWidths.get(pageNumber)
+                    // Use initialPageWidth if available, otherwise fallback to scale * 612 (standard PDF width)
+                    const estimatedWidth = knownWidth || initialPageWidth || (scale * 612)
+                    const containerWidth = knownWidth ? `${knownWidth + 32}px` : `${estimatedWidth + 32}px` // 32px for padding (16px * 2)
                     return (
                       <div
                         key={pageNumber}
@@ -2528,6 +2548,9 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
                           padding: 16,
                           marginBottom: 8,
                           minHeight: isInRange ? 'auto' : `${knownHeight}px`,
+                          width: containerWidth,
+                          minWidth: `${estimatedWidth + 32}px`,
+                          maxWidth: 'min(100%, calc(100vw - 80px))',
                           display: 'flex',
                           flexDirection: 'column',
                           alignItems: 'center',
@@ -2540,6 +2563,10 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
                               ref={(el) => {
                                 pdfPageRefs.current[index] = el
                               }}
+                              style={{
+                                width: `${estimatedWidth}px`,
+                                minWidth: `${estimatedWidth}px`,
+                              }}
                             >
                               <Page
                                 key={`page-${pageNumber}-scale-${scale}`}
@@ -2549,18 +2576,14 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
                                 renderAnnotationLayer={true}
                                 loading={
                                   <div style={{
-                                    width: '100%',
+                                    width: `${estimatedWidth}px`,
+                                    minWidth: `${estimatedWidth}px`,
                                     height: `${knownHeight}px`,
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    color: '#9CA3AF',
-                                    background: 'linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 37%, #f3f4f6 63%)',
-                                    backgroundSize: '400% 100%',
-                                    animation: 'pulse 1.2s ease-in-out infinite',
+                                    backgroundColor: 'white',
                                     borderRadius: 8,
+                                    boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
                                   }}>
-                                    Loading page {pageNumber}...
+                                    {/* Empty placeholder to prevent layout shift */}
                                   </div>
                                 }
                                 onLoadSuccess={(page) => {
@@ -2623,26 +2646,29 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
                                 }}
                               />
                             </div>
-                            {/* Page number indicator */}
-                            <div style={{
-                              textAlign: 'center',
-                              marginTop: 8,
-                              fontSize: 12,
-                              color: '#6B7280',
-                              fontWeight: 500,
-                            }}>
-                              Page {pageNumber} of {numPages}
-                            </div>
+                            {/* Page number indicator - only show after page is loaded */}
+                            {pageWidths.get(pageNumber) && (
+                              <div style={{
+                                textAlign: 'center',
+                                marginTop: 8,
+                                fontSize: 12,
+                                color: '#6B7280',
+                                fontWeight: 500,
+                              }}>
+                                Page {pageNumber} of {numPages}
+                              </div>
+                            )}
 
-                            {/* Related questions for this page */}
-                            <div style={{
-                              width: pageWidths.get(pageNumber) ? `${pageWidths.get(pageNumber)}px` : '100%',
-                              maxWidth: 'min(100%, calc(100vw - 80px))',
-                              overflow: 'hidden',
-                              boxSizing: 'border-box',
-                              margin: '0 auto',
-                            }}>
-                              <PageRelatedQuestions
+                            {/* Related questions for this page - only show after page is loaded */}
+                            {pageWidths.get(pageNumber) && (
+                              <div style={{
+                                width: `${pageWidths.get(pageNumber)}px`,
+                                maxWidth: 'min(100%, calc(100vw - 80px))',
+                                overflow: 'hidden',
+                                boxSizing: 'border-box',
+                                margin: '0 auto',
+                              }}>
+                                <PageRelatedQuestions
                                 questionsData={pageQuestionsMap.get(pageNumber) || null}
                                 onQuestionClick={handleQuestionClick}
                                 isStreaming={(() => {
@@ -2687,7 +2713,8 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
                                     : undefined
                                 }
                               />
-                            </div>
+                              </div>
+                            )}
                           </>
                         ) : (
                           <div style={{
@@ -2703,15 +2730,21 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
                     )
                   })
                 ) : (
+                  // Show minimal loading state that doesn't cause flickering
+                  // Use a placeholder with estimated height to prevent layout shift
                   <div style={{
-                    backgroundColor: 'white',
-                    padding: 32,
-                    borderRadius: 12,
-                    textAlign: 'center',
-                    boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
+                    width: '100%',
+                    minHeight: '100vh',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
                   }}>
-                    <div style={{ fontSize: 32, marginBottom: 16 }}>⏳</div>
-                    <p style={{ margin: 0, fontSize: 16, color: '#374151' }}>Loading PDF pages...</p>
+                    <div style={{
+                      opacity: 0,
+                      pointerEvents: 'none',
+                    }}>
+                      {/* Hidden placeholder to prevent layout shift */}
+                    </div>
                   </div>
                 )}
               </Document>
