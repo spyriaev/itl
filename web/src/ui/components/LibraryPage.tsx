@@ -7,7 +7,7 @@ import { DocumentList } from "./DocumentList"
 import { UserMenu } from "./UserMenu"
 import { OfflineIndicator, OfflineIndicatorIcon } from "./OfflineIndicator"
 import { PdfViewer } from "./PdfViewer"
-import { waitForDocumentUpload, fetchDocuments, getDocumentViewUrl, type DocumentViewInfo } from "../../services/uploadService"
+import { waitForDocumentUpload, fetchDocuments, getDocumentViewUrl, type DocumentViewInfo, type DocumentMetadata } from "../../services/uploadService"
 import { pdfjs } from 'react-pdf'
 import "../styles/upload-page.css"
 import "../styles/typography.css"
@@ -16,7 +16,9 @@ type ViewMode = "library" | "reader"
 
 export function LibraryPage() {
   const { t } = useTranslation()
-  const [refreshTrigger, setRefreshTrigger] = useState(0)
+  const [documents, setDocuments] = useState<DocumentMetadata[]>([])
+  const [documentsLoading, setDocumentsLoading] = useState(true)
+  const [documentsInitialized, setDocumentsInitialized] = useState(false)
   const [viewMode, setViewMode] = useState<ViewMode>("library")
   const [currentDocumentId, setCurrentDocumentId] = useState<string | null>(null)
   const [preloadedDocumentInfo, setPreloadedDocumentInfo] = useState<DocumentViewInfo | null>(null)
@@ -29,8 +31,48 @@ export function LibraryPage() {
     pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`
   }, [])
 
-  const handleUploadComplete = () => {
-    setRefreshTrigger((prev) => prev + 1)
+  // Load documents only once on mount
+  useEffect(() => {
+    if (!documentsInitialized) {
+      const loadDocuments = async () => {
+        try {
+          setDocumentsLoading(true)
+          const docs = await fetchDocuments()
+          setDocuments(docs)
+          setDocumentsInitialized(true)
+        } catch (err) {
+          console.error('Failed to load documents:', err)
+        } finally {
+          setDocumentsLoading(false)
+        }
+      }
+      loadDocuments()
+    }
+  }, [documentsInitialized])
+
+  const handleUploadComplete = async () => {
+    // Reload documents after upload
+    try {
+      setDocumentsLoading(true)
+      const docs = await fetchDocuments()
+      setDocuments(docs)
+    } catch (err) {
+      console.error('Failed to reload documents after upload:', err)
+    } finally {
+      setDocumentsLoading(false)
+    }
+  }
+
+  const handleRefreshDocuments = async () => {
+    try {
+      setDocumentsLoading(true)
+      const docs = await fetchDocuments()
+      setDocuments(docs)
+    } catch (err) {
+      console.error('Failed to refresh documents:', err)
+    } finally {
+      setDocumentsLoading(false)
+    }
   }
 
   const handleDocumentClick = async (documentId: string) => {
@@ -120,8 +162,7 @@ export function LibraryPage() {
         setLoadingDocumentId(null)
       } finally {
         setWaitingForUpload(null)
-        // Refresh the list to show updated status
-        setRefreshTrigger((prev) => prev + 1)
+        // Don't refresh the list - it will be updated when needed (e.g., after upload)
       }
     } catch (error) {
       console.error('[handleDocumentClick] Error during document click:', error)
@@ -137,7 +178,7 @@ export function LibraryPage() {
     setPreloadedDocumentInfo(null)
     setViewMode("library")
     setIsPdfReady(false)
-    setRefreshTrigger((prev) => prev + 1)
+    // Don't reload documents when returning from PDF viewer
   }
 
   const handlePdfRenderComplete = () => {
@@ -255,7 +296,13 @@ export function LibraryPage() {
             <div className="upload-area">
               <FileUpload onUploadComplete={handleUploadComplete} />
 
-              <DocumentList refreshTrigger={refreshTrigger} onDocumentClick={handleDocumentClick} loadingDocumentId={loadingDocumentId} />
+              <DocumentList 
+                documents={documents}
+                loading={documentsLoading}
+                onDocumentClick={handleDocumentClick} 
+                loadingDocumentId={loadingDocumentId}
+                onRefresh={handleRefreshDocuments}
+              />
             </div>
           </>
         ) : (

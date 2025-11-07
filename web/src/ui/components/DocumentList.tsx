@@ -2,14 +2,16 @@
 
 import { useState, useEffect } from "react"
 import { useTranslation } from "react-i18next"
-import { fetchDocuments, type DocumentMetadata } from "../../services/uploadService"
+import { type DocumentMetadata } from "../../services/uploadService"
 import { isPdfCached } from "../../services/pdfCache"
 import { ShareDocumentButton } from "./ShareDocumentButton"
 
 interface DocumentListProps {
-  refreshTrigger?: number
+  documents: DocumentMetadata[]
+  loading: boolean
   onDocumentClick: (documentId: string) => void
   loadingDocumentId?: string | null
+  onRefresh?: () => void
 }
 
 // Page badge component
@@ -81,29 +83,10 @@ function CacheBadge({ documentId }: { documentId: string }) {
   )
 }
 
-export function DocumentList({ refreshTrigger, onDocumentClick, loadingDocumentId }: DocumentListProps) {
+export function DocumentList({ documents, loading, onDocumentClick, loadingDocumentId, onRefresh }: DocumentListProps) {
   const { t } = useTranslation()
-  const [documents, setDocuments] = useState<DocumentMetadata[]>([])
-  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isMobile, setIsMobile] = useState(false)
-
-  const loadDocuments = async () => {
-    try {
-      setLoading(true)
-      setError(null)
-      const docs = await fetchDocuments()
-      setDocuments(docs)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t("documentList.error"))
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    loadDocuments()
-  }, [refreshTrigger])
 
   useEffect(() => {
     const mql = window.matchMedia('(max-width: 480px)')
@@ -167,9 +150,11 @@ export function DocumentList({ refreshTrigger, onDocumentClick, loadingDocumentI
         <p className="document-list-error-text">
           <strong>{t("documentList.error")}</strong> {error}
         </p>
-        <button onClick={loadDocuments} className="document-list-error-button">
-          {t("documentList.retry")}
-        </button>
+        {onRefresh && (
+          <button onClick={onRefresh} className="document-list-error-button">
+            {t("documentList.retry")}
+          </button>
+        )}
       </div>
     )
   }
@@ -226,19 +211,21 @@ export function DocumentList({ refreshTrigger, onDocumentClick, loadingDocumentI
     <div style={{ marginTop: 24 }}>
       {/* Refresh Button */}
       <div className="refresh-button-container">
-        <button onClick={loadDocuments} className="refresh-button">
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2" />
-          </svg>
-          {t("documentList.refresh")}
-        </button>
+        {onRefresh && (
+          <button onClick={onRefresh} className="refresh-button">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2" />
+            </svg>
+            {t("documentList.refresh")}
+          </button>
+        )}
       </div>
 
       {/* List */}
@@ -316,8 +303,8 @@ export function DocumentList({ refreshTrigger, onDocumentClick, loadingDocumentI
                     >
                       <ShareDocumentButton 
                         documentId={doc.id}
-                        onShareCreated={loadDocuments}
-                        onShareRevoked={loadDocuments}
+                        onShareCreated={onRefresh}
+                        onShareRevoked={onRefresh}
                       />
                     </div>
                   )}
@@ -420,8 +407,8 @@ export function DocumentList({ refreshTrigger, onDocumentClick, loadingDocumentI
                     {!doc.isShared && doc.status === "uploaded" && (
                       <ShareDocumentButton 
                         documentId={doc.id}
-                        onShareCreated={loadDocuments}
-                        onShareRevoked={loadDocuments}
+                        onShareCreated={onRefresh}
+                        onShareRevoked={onRefresh}
                       />
                     )}
                   </td>
