@@ -1,7 +1,7 @@
 import { supabase, uploadPdfToStorage } from '../lib/supabase'
 import { extractDocumentStructure } from './documentService'
 import { getPdfFromCache, savePdfToCache, initCache } from './pdfCache'
-import { cacheDocumentList, getCachedDocumentList, initDocumentListCache } from './documentListCache'
+import { cacheDocumentList, getCachedDocumentList, initDocumentListCache, getCachedDocumentById } from './documentListCache'
 import { isOnline } from '../hooks/useNetworkStatus'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
@@ -274,47 +274,62 @@ export interface DocumentViewInfo {
 /**
  * Get signed URL for viewing a document
  * Checks cache first, then loads from server if not cached
+ * When internet is available and file is cached, returns cached file immediately
  */
 export async function getDocumentViewUrl(documentId: string): Promise<DocumentViewInfo> {
   // Initialize cache
   await initCache()
 
-  // Check cache first
+  // Check cache first - this is the key: check cache regardless of internet status
   const cached = await getPdfFromCache(documentId)
   if (cached) {
     console.log(`[getDocumentViewUrl] Using cached PDF for document ${documentId}`)
     
-    // Get metadata from server to get lastViewedPage and title
-    const token = await getAuthToken()
-    if (!token) {
-      throw new Error('Not authenticated')
-    }
-
+    // Try to get metadata from cached document list (fast, synchronous)
+    let cachedMetadata: DocumentMetadata | null = null
     try {
-      const response = await fetch(`${API_URL}/api/documents/${documentId}/view`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      })
-
-      if (response.ok) {
-        const metadata = await response.json()
-        // Return cached blob URL with metadata from server
-        return {
-          url: cached.url,
-          lastViewedPage: metadata.lastViewedPage,
-          title: metadata.title
-        }
-      }
+      cachedMetadata = await getCachedDocumentById(documentId)
     } catch (error) {
-      console.warn('[getDocumentViewUrl] Failed to fetch metadata, using cached URL only:', error)
-      // Fallback: return cached URL with default values
-      return {
-        url: cached.url,
-        lastViewedPage: 1,
-        title: ''
+      // Ignore errors, use defaults
+    }
+    
+    // Return cached file immediately with metadata from cache if available
+    const result: DocumentViewInfo = {
+      url: cached.url,
+      lastViewedPage: cachedMetadata?.lastViewedPage || 1,
+      title: cachedMetadata?.title || ''
+    }
+    
+    // Fetch fresh metadata in background if internet is available, but don't block
+    if (isOnline()) {
+      const token = await getAuthToken()
+      if (token) {
+        // Fetch metadata asynchronously without blocking return
+        fetch(`${API_URL}/api/documents/${documentId}/view`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        })
+          .then(response => {
+            if (response.ok) {
+              return response.json()
+            }
+            return null
+          })
+          .then(metadata => {
+            if (metadata) {
+              console.log(`[getDocumentViewUrl] Metadata fetched in background for document ${documentId}`)
+              // Metadata fetched successfully, but we already returned cached file
+              // The metadata will be used on next call
+            }
+          })
+          .catch(error => {
+            console.warn('[getDocumentViewUrl] Failed to fetch metadata in background:', error)
+          })
       }
     }
+    
+    return result
   }
 
   // Not in cache, fetch from server
