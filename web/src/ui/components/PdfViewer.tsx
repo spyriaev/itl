@@ -740,6 +740,18 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
       menuTop = viewportHeight - menuHeight - padding
     }
     
+    // If chat is visible, transfer selected text to chat input instead of showing menu
+    if (isChatVisible) {
+      setInitialChatInputValue(selectedText)
+      // Clear selection menu
+      setSelectionMenu(null)
+      setSelectedTextRange(null)
+      selectionRangeRef.current = null
+      // Clear the selection
+      selection.removeAllRanges()
+      return
+    }
+
     // Final check: ensure menu is fully visible
     menuLeft = Math.max(padding, Math.min(menuLeft, viewportWidth - menuWidth - padding))
     menuTop = Math.max(padding, Math.min(menuTop, viewportHeight - menuHeight - padding))
@@ -757,7 +769,7 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
       selectedText,
       pageNumber
     })
-  }, [currentPage])
+  }, [currentPage, isChatVisible])
 
   // Handle text selection menu option click
   const handleSelectionOptionClick = useCallback(async (option: string, question: string) => {
