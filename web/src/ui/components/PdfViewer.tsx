@@ -2991,6 +2991,15 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
             questionPageNumberRef.current = null
             questionThreadIdRef.current = null
           }}
+          onOpenChat={() => {
+            setIsChatVisible(true)
+            setFloatingAnswer(null)
+            setSelectedTextRange(null)
+            selectionRangeRef.current = null
+            questionTimestampRef.current = null
+            questionPageNumberRef.current = null
+            questionThreadIdRef.current = null
+          }}
           position={floatingAnswer.position}
           limitError={floatingAnswer.limitError}
         />

@@ -16,6 +16,7 @@ interface FloatingAnswerProps {
   answer: string
   isStreaming: boolean
   onClose: () => void
+  onOpenChat?: () => void
   position?: { top: number; left: number }
   limitError?: LimitErrorData
 }
@@ -26,16 +27,33 @@ export function FloatingAnswer({
   answer,
   isStreaming,
   onClose,
+  onOpenChat,
   position,
   limitError
 }: FloatingAnswerProps) {
   const { t } = useTranslation()
   const contentRef = useRef<HTMLDivElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  // Auto-scroll to answer when it appears
+  useEffect(() => {
+    if (contentRef.current && containerRef.current && answer && !isStreaming) {
+      // Scroll to the answer section
+      const container = containerRef.current
+      const answerElement = contentRef.current
+      const answerTop = answerElement.offsetTop - container.offsetTop
+      
+      container.scrollTo({
+        top: answerTop - 20, // 20px offset from top
+        behavior: 'smooth'
+      })
+    }
+  }, [answer, isStreaming])
 
   // Auto-scroll to bottom as content streams in
   useEffect(() => {
-    if (contentRef.current && isStreaming) {
-      contentRef.current.scrollTop = contentRef.current.scrollHeight
+    if (containerRef.current && isStreaming && answer) {
+      containerRef.current.scrollTop = containerRef.current.scrollHeight
     }
   }, [answer, isStreaming])
 
@@ -143,6 +161,7 @@ export function FloatingAnswer({
       
       {/* Answer Card */}
       <div
+        ref={containerRef}
         style={{
           ...containerStyle,
           backgroundColor: 'white',
@@ -155,9 +174,13 @@ export function FloatingAnswer({
           display: 'flex',
           flexDirection: 'column',
           animation: 'slideUpFadeIn 0.3s ease-out',
-          overflow: 'hidden',
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          scrollbarWidth: 'thin',
+          scrollbarColor: '#D1D5DB #F9FAFB',
         }}
         onClick={(e) => e.stopPropagation()}
+        className="floating-answer-content"
       >
         {/* Header */}
         <div
@@ -168,11 +191,11 @@ export function FloatingAnswer({
             paddingTop: '48px',
             borderBottom: '1px solid #E5E7EB',
             position: 'relative',
-            flexShrink: 0,
           }}
         >
           {/* Logo - top left */}
           <div
+            className={isStreaming ? 'logo-thinking' : ''}
             style={{
               position: 'absolute',
               top: 16,
@@ -190,12 +213,13 @@ export function FloatingAnswer({
               }}
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
-                <path d="M5.75 21.25H15.45C17.1302 21.25 17.9702 21.25 18.612 20.923C19.1765 20.6354 19.6354 20.1765 19.923 19.612C20.25 18.9702 20.25 18.1302 20.25 16.45V10.9882C20.25 10.2545 20.25 9.88757 20.1671 9.5423C20.0936 9.2362 19.9724 8.94356 19.8079 8.67515C19.6224 8.3724 19.363 8.11297 18.8441 7.59411L15.4059 4.15589C14.887 3.63703 14.6276 3.37761 14.3249 3.19208C14.0564 3.02759 13.7638 2.90638 13.4577 2.83289C13.1124 2.75 12.7455 2.75 12.0118 2.75H9.875H9.25C8.78558 2.75 8.55337 2.75 8.35842 2.77567C7.01222 2.9529 5.9529 4.01222 5.77567 5.35842C5.75 5.55337 5.75 5.78558 5.75 6.25" stroke="#9CA3AF" strokeWidth="1.5" strokeLinecap="round" />
-                <path d="M13.75 2.75V4.45C13.75 6.13016 13.75 6.97024 14.077 7.61197C14.3646 8.17646 14.8235 8.6354 15.388 8.92302C16.0298 9.25 16.8698 9.25 18.55 9.25H20.25" stroke="#9CA3AF" strokeWidth="1.5" />
-                <path d="M9.33687 15.1876L8.67209 17.2136C8.53833 17.6213 7.96167 17.6213 7.82791 17.2136L7.16313 15.1876C7.03098 14.7849 6.71511 14.469 6.31236 14.3369L4.28637 13.6721C3.87872 13.5383 3.87872 12.9617 4.28637 12.8279L6.31236 12.1631C6.71511 12.031 7.03098 11.7151 7.16313 11.3124L7.82791 9.28637C7.96167 8.87872 8.53833 8.87872 8.67209 9.28637L9.33687 11.3124C9.46902 11.7151 9.78489 12.031 10.1876 12.1631L12.2136 12.8279C12.6213 12.9617 12.6213 13.5383 12.2136 13.6721L10.1876 14.3369C9.78489 14.469 9.46902 14.7849 9.33687 15.1876Z" fill="#9CA3AF" />
+                <path d="M5.75 21.25H15.45C17.1302 21.25 17.9702 21.25 18.612 20.923C19.1765 20.6354 19.6354 20.1765 19.923 19.612C20.25 18.9702 20.25 18.1302 20.25 16.45V10.9882C20.25 10.2545 20.25 9.88757 20.1671 9.5423C20.0936 9.2362 19.9724 8.94356 19.8079 8.67515C19.6224 8.3724 19.363 8.11297 18.8441 7.59411L15.4059 4.15589C14.887 3.63703 14.6276 3.37761 14.3249 3.19208C14.0564 3.02759 13.7638 2.90638 13.4577 2.83289C13.1124 2.75 12.7455 2.75 12.0118 2.75H9.875H9.25C8.78558 2.75 8.55337 2.75 8.35842 2.77567C7.01222 2.9529 5.9529 4.01222 5.77567 5.35842C5.75 5.55337 5.75 5.78558 5.75 6.25" stroke={isStreaming ? "#2563EB" : "#9CA3AF"} strokeWidth="1.5" strokeLinecap="round" />
+                <path d="M13.75 2.75V4.45C13.75 6.13016 13.75 6.97024 14.077 7.61197C14.3646 8.17646 14.8235 8.6354 15.388 8.92302C16.0298 9.25 16.8698 9.25 18.55 9.25H20.25" stroke={isStreaming ? "#2563EB" : "#9CA3AF"} strokeWidth="1.5" />
+                <path d="M9.33687 15.1876L8.67209 17.2136C8.53833 17.6213 7.96167 17.6213 7.82791 17.2136L7.16313 15.1876C7.03098 14.7849 6.71511 14.469 6.31236 14.3369L4.28637 13.6721C3.87872 13.5383 3.87872 12.9617 4.28637 12.8279L6.31236 12.1631C6.71511 12.031 7.03098 11.7151 7.16313 11.3124L7.82791 9.28637C7.96167 8.87872 8.53833 8.87872 8.67209 9.28637L9.33687 11.3124C9.46902 11.7151 9.78489 12.031 10.1876 12.1631L12.2136 12.8279C12.6213 12.9617 12.6213 13.5383 12.2136 13.6721L10.1876 14.3369C9.78489 14.469 9.46902 14.7849 9.33687 15.1876Z" fill={isStreaming ? "#2563EB" : "#9CA3AF"} />
               </svg>
             </div>
             <span
+              className={isStreaming ? 'logo-text-thinking' : ''}
               style={{
                 fontSize: 11,
                 color: '#9CA3AF',
@@ -274,61 +298,24 @@ export function FloatingAnswer({
         {/* Content - Answer */}
         <div
           ref={contentRef}
-          className="floating-answer-content"
           style={{
             padding: '20px',
-            overflowY: 'auto',
-            overflowX: 'hidden',
-            flex: 1,
-            minHeight: 0,
             fontSize: 14,
             lineHeight: 1.5,
             color: '#374151',
             backgroundColor: isError ? '#FEF2F2' : '#FAFAFA',
-            scrollbarWidth: 'thin',
-            scrollbarColor: '#D1D5DB #F9FAFB',
           }}
         >
           {isStreaming && !answer ? (
             <div
               style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                color: '#6B7280',
-                fontStyle: 'italic',
+                padding: '12px 16px',
+                fontSize: 14,
+                textAlign: 'left',
               }}
+              className="thinking-text"
             >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 16 16"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-                style={{
-                  animation: 'spin 1s linear infinite',
-                }}
-              >
-                <circle
-                  cx="8"
-                  cy="8"
-                  r="7"
-                  stroke="#2563EB"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeDasharray="31.416"
-                  strokeDashoffset="31.416"
-                  fill="none"
-                >
-                  <animate
-                    attributeName="stroke-dashoffset"
-                    values="31.416;0"
-                    dur="1.5s"
-                    repeatCount="indefinite"
-                  />
-                </circle>
-              </svg>
-              {t('textSelection.generatingAnswer')}
+              {t("chatPanel.aiThinking")}
             </div>
           ) : isError ? (
             <div
@@ -435,27 +422,73 @@ export function FloatingAnswer({
               </div>
             </div>
           ) : (
-            <div
-              style={{
-                whiteSpace: 'pre-wrap',
-                wordBreak: 'break-word',
-              }}
-            >
-              {answer || ''}
-              {isStreaming && (
-                <span
-                  style={{
-                    display: 'inline-block',
-                    width: 8,
-                    height: 16,
-                    backgroundColor: '#2563EB',
-                    marginLeft: 2,
-                    animation: 'blink 1s infinite',
-                    verticalAlign: 'baseline',
-                  }}
-                />
-              )}
-            </div>
+            <>
+              <div
+                style={{
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-word',
+                }}
+              >
+                {answer || ''}
+                {isStreaming && (
+                  <span
+                    style={{
+                      display: 'inline-block',
+                      width: 8,
+                      height: 16,
+                      backgroundColor: '#2563EB',
+                      marginLeft: 2,
+                      animation: 'blink 1s infinite',
+                      verticalAlign: 'baseline',
+                    }}
+                  />
+                )}
+                {!isStreaming && answer && onOpenChat && (
+                  <>
+                    {' '}
+                    <span
+                      onClick={onOpenChat}
+                      style={{
+                        color: '#2563EB',
+                        cursor: 'pointer',
+                        textDecoration: 'none',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        marginLeft: 4,
+                        fontSize: 14,
+                        fontWeight: 500,
+                        transition: 'color 0.2s',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.color = '#1D4ED8'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.color = '#2563EB'
+                      }}
+                    >
+                      Перейти в чат
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 16 16"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                        style={{ flexShrink: 0 }}
+                      >
+                        <path
+                          d="M6 12L10 8L6 4"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </span>
+                  </>
+                )}
+              </div>
+            </>
           )}
         </div>
       </div>
@@ -517,6 +550,61 @@ export function FloatingAnswer({
 
         .floating-answer-content::-webkit-scrollbar-thumb:hover {
           background: #9CA3AF;
+        }
+
+        .thinking-text {
+          background: linear-gradient(
+            90deg,
+            #6B7280 0%,
+            #6B7280 35%,
+            #9CA3AF 40%,
+            #FFFFFF 50%,
+            #9CA3AF 60%,
+            #6B7280 65%,
+            #6B7280 100%
+          );
+          background-size: 250% 100%;
+          background-clip: text;
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          animation: shimmer 3s linear infinite;
+        }
+        
+        @keyframes shimmer {
+          0% {
+            background-position: 150% center;
+          }
+          100% {
+            background-position: -150% center;
+          }
+        }
+
+
+        .logo-text-thinking {
+          background: linear-gradient(
+            90deg,
+            #2563EB 0%,
+            #2563EB 35%,
+            #3B82F6 40%,
+            #60A5FA 50%,
+            #3B82F6 60%,
+            #2563EB 65%,
+            #2563EB 100%
+          );
+          background-size: 250% 100%;
+          background-clip: text;
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          animation: shimmerBlue 3s linear infinite;
+        }
+
+        @keyframes shimmerBlue {
+          0% {
+            background-position: 150% center;
+          }
+          100% {
+            background-position: -150% center;
+          }
         }
       `}</style>
     </>
