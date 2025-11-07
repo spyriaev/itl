@@ -151,10 +151,11 @@ export function FloatingAnswer({
           zIndex: 5001,
           width: '90%',
           maxWidth: 600,
-          maxHeight: '80vh',
+          maxHeight: 'calc(100vh - 80px)',
           display: 'flex',
           flexDirection: 'column',
           animation: 'slideUpFadeIn 0.3s ease-out',
+          overflow: 'hidden',
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -163,17 +164,54 @@ export function FloatingAnswer({
           style={{
             padding: '16px 20px',
             paddingRight: '48px',
+            paddingLeft: '48px',
             paddingTop: '48px',
             borderBottom: '1px solid #E5E7EB',
             position: 'relative',
+            flexShrink: 0,
           }}
         >
+          {/* Logo - top left */}
+          <div
+            style={{
+              position: 'absolute',
+              top: 16,
+              left: 20,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                flexShrink: 0,
+              }}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
+                <path d="M5.75 21.25H15.45C17.1302 21.25 17.9702 21.25 18.612 20.923C19.1765 20.6354 19.6354 20.1765 19.923 19.612C20.25 18.9702 20.25 18.1302 20.25 16.45V10.9882C20.25 10.2545 20.25 9.88757 20.1671 9.5423C20.0936 9.2362 19.9724 8.94356 19.8079 8.67515C19.6224 8.3724 19.363 8.11297 18.8441 7.59411L15.4059 4.15589C14.887 3.63703 14.6276 3.37761 14.3249 3.19208C14.0564 3.02759 13.7638 2.90638 13.4577 2.83289C13.1124 2.75 12.7455 2.75 12.0118 2.75H9.875H9.25C8.78558 2.75 8.55337 2.75 8.35842 2.77567C7.01222 2.9529 5.9529 4.01222 5.77567 5.35842C5.75 5.55337 5.75 5.78558 5.75 6.25" stroke="#9CA3AF" strokeWidth="1.5" strokeLinecap="round" />
+                <path d="M13.75 2.75V4.45C13.75 6.13016 13.75 6.97024 14.077 7.61197C14.3646 8.17646 14.8235 8.6354 15.388 8.92302C16.0298 9.25 16.8698 9.25 18.55 9.25H20.25" stroke="#9CA3AF" strokeWidth="1.5" />
+                <path d="M9.33687 15.1876L8.67209 17.2136C8.53833 17.6213 7.96167 17.6213 7.82791 17.2136L7.16313 15.1876C7.03098 14.7849 6.71511 14.469 6.31236 14.3369L4.28637 13.6721C3.87872 13.5383 3.87872 12.9617 4.28637 12.8279L6.31236 12.1631C6.71511 12.031 7.03098 11.7151 7.16313 11.3124L7.82791 9.28637C7.96167 8.87872 8.53833 8.87872 8.67209 9.28637L9.33687 11.3124C9.46902 11.7151 9.78489 12.031 10.1876 12.1631L12.2136 12.8279C12.6213 12.9617 12.6213 13.5383 12.2136 13.6721L10.1876 14.3369C9.78489 14.469 9.46902 14.7849 9.33687 15.1876Z" fill="#9CA3AF" />
+              </svg>
+            </div>
+            <span
+              style={{
+                fontSize: 11,
+                color: '#9CA3AF',
+                fontWeight: 500,
+              }}
+            >
+              Innesi AI Reader
+            </span>
+          </div>
+          
           {/* Close button - top right */}
           <button
             onClick={onClose}
             style={{
               position: 'absolute',
-              top: 8,
+              top: 16,
               right: 8,
               width: 32,
               height: 32,
@@ -217,15 +255,16 @@ export function FloatingAnswer({
           {/* Question */}
           <div
             style={{
-              fontSize: 15,
+              fontSize: 14,
               color: '#111827',
               fontWeight: 600,
               backgroundColor: '#EFF6FF',
               padding: '14px 18px',
               borderRadius: 8,
               borderLeft: '4px solid #2563EB',
-              lineHeight: 1.6,
+              lineHeight: 1.5,
               marginBottom: 0,
+              wordBreak: 'break-word',
             }}
           >
             {question}
@@ -235,14 +274,19 @@ export function FloatingAnswer({
         {/* Content - Answer */}
         <div
           ref={contentRef}
+          className="floating-answer-content"
           style={{
             padding: '20px',
             overflowY: 'auto',
+            overflowX: 'hidden',
             flex: 1,
-            fontSize: 15,
-            lineHeight: 1.7,
+            minHeight: 0,
+            fontSize: 14,
+            lineHeight: 1.5,
             color: '#374151',
             backgroundColor: isError ? '#FEF2F2' : '#FAFAFA',
+            scrollbarWidth: 'thin',
+            scrollbarColor: '#D1D5DB #F9FAFB',
           }}
         >
           {isStreaming && !answer ? (
@@ -453,6 +497,26 @@ export function FloatingAnswer({
           51%, 100% {
             opacity: 0;
           }
+        }
+
+        /* Custom scrollbar styling for webkit browsers */
+        .floating-answer-content::-webkit-scrollbar {
+          width: 8px;
+        }
+
+        .floating-answer-content::-webkit-scrollbar-track {
+          background: #F9FAFB;
+          border-radius: 4px;
+        }
+
+        .floating-answer-content::-webkit-scrollbar-thumb {
+          background: #D1D5DB;
+          border-radius: 4px;
+          transition: background 0.2s;
+        }
+
+        .floating-answer-content::-webkit-scrollbar-thumb:hover {
+          background: #9CA3AF;
         }
       `}</style>
     </>
