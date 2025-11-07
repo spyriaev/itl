@@ -135,6 +135,20 @@
     "feature4Title": "文档协作",
     "feature4Desc": "与您的笔记共享文档，共同处理文档。与同事、朋友或家人无缝协作。",
     "feature4Cta": "立即试用 →",
+    "demo": {
+      "windowTitle": "Innesi AI Reader",
+      "pdfLoading": "正在加载 PDF...",
+      "pdfError": "加载 PDF 失败",
+      "userMessage": "解释本文档的关键发现",
+      "assistantMessage": "根据文档，关键发现包括：\n\n• 使用上下文AI显著提高了理解准确性\n• 通过视觉和文本理解增强了文档分析\n• 彻底改变了与数字内容的交互方式",
+      "documentTitle": "Attention Is All You Need",
+      "pages": "第 1-15 页",
+      "question1": "什么是注意力机制？",
+      "question1Answer": "注意力机制允许模型在处理每个位置时专注于输入序列的不同部分。",
+      "question2": "Transformer 是如何工作的？",
+      "question2Answer": "Transformer 使用自注意力机制并行处理序列，与顺序处理的 RNN 不同。",
+      "ariaLabel": "此元素包含一个交互式演示，显示带有聊天面板的 PDF 查看器界面。"
+    },
     "footer": {
       "aboutUs": "关于我们",
       "ourProducts": "我们的产品",

@@ -135,6 +135,20 @@
     "feature4Title": "Colabora en Documentos",
     "feature4Desc": "Comparte documentos con tus notas y trabaja juntos en documentos. Colabora con colegas, amigos o familiares sin problemas.",
     "feature4Cta": "Pruébalo ahora →",
+    "demo": {
+      "windowTitle": "Innesi AI Reader",
+      "pdfLoading": "Cargando PDF...",
+      "pdfError": "Error al cargar PDF",
+      "userMessage": "Explica los hallazgos clave de este documento",
+      "assistantMessage": "Según el documento, los hallazgos clave incluyen:\n\n• Mejoras significativas en la precisión de comprensión con IA contextual\n• Análisis mejorado de documentos a través de comprensión visual y textual\n• Interacción revolucionaria con contenido digital",
+      "documentTitle": "Attention Is All You Need",
+      "pages": "Páginas 1-15",
+      "question1": "¿Qué es el mecanismo de atención?",
+      "question1Answer": "El mecanismo de atención permite al modelo enfocarse en diferentes partes de la secuencia de entrada al procesar cada posición.",
+      "question2": "¿Cómo funciona el transformador?",
+      "question2Answer": "Los transformadores usan mecanismos de auto-atención para procesar secuencias en paralelo, a diferencia de las RNN que procesan secuencialmente.",
+      "ariaLabel": "Este elemento contiene una demostración interactiva que muestra la interfaz del visor de PDF con panel de chat."
+    },
     "footer": {
       "aboutUs": "Acerca de nosotros",
       "ourProducts": "Nuestros productos",

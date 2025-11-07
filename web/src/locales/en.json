@@ -135,6 +135,20 @@
     "feature4Title": "Collaborate on Documents",
     "feature4Desc": "Share documents with your notes and work together on documents. Collaborate with colleagues, friends, or family seamlessly.",
     "feature4Cta": "Try it now →",
+    "demo": {
+      "windowTitle": "Innesi AI Reader",
+      "pdfLoading": "Loading PDF...",
+      "pdfError": "Failed to load PDF",
+      "userMessage": "Explain the key findings in this document",
+      "assistantMessage": "Based on the document, the key findings include:\n\n• Significant improvements in comprehension accuracy with contextual AI\n• Enhanced document analysis through visual and textual understanding\n• Revolutionized interaction with digital content",
+      "documentTitle": "Attention Is All You Need",
+      "pages": "Pages 1-15",
+      "question1": "What is attention mechanism?",
+      "question1Answer": "The attention mechanism allows the model to focus on different parts of the input sequence when processing each position.",
+      "question2": "How does transformer work?",
+      "question2Answer": "Transformers use self-attention mechanisms to process sequences in parallel, unlike RNNs which process sequentially.",
+      "ariaLabel": "This element contains an interactive demo showing PDF viewer interface with chat panel."
+    },
     "footer": {
       "aboutUs": "About us",
       "ourProducts": "Our products",

@@ -16,7 +16,7 @@ interface HeroSectionProps {
 }
 
 export function HeroSection({ onStartClick }: HeroSectionProps) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const [numPages, setNumPages] = useState<number | null>(null)
   const [pageError, setPageError] = useState<string | null>(null)
   const [scale, setScale] = useState<number>(0.75)
@@ -65,7 +65,7 @@ export function HeroSection({ onStartClick }: HeroSectionProps) {
 
   const onDocumentLoadError = (error: Error) => {
     console.error('PDF load error:', error)
-    setPageError('Failed to load PDF')
+    setPageError(t("landing.demo.pdfError"))
   }
 
   // Memoize PDF options to prevent unnecessary reloads
@@ -75,6 +75,11 @@ export function HeroSection({ onStartClick }: HeroSectionProps) {
     maxImageSize: 5242880,
     standardFontDataUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/standard_fonts/`,
   }), [])
+
+  // Memoize assistant message lines for rendering
+  const assistantMessageLines = useMemo(() => {
+    return t("landing.demo.assistantMessage").split('\n')
+  }, [t, i18n.language])
 
   return (
     <section style={styles.section} data-hero-section>
@@ -95,7 +100,7 @@ export function HeroSection({ onStartClick }: HeroSectionProps) {
           <div className="demo-container" style={styles.demoContainer}>
                           <div className="demo-content" style={styles.demoContent}>
               <div style={styles.srOnly} aria-live="polite">
-                This element contains an interactive demo showing PDF viewer interface with chat panel.
+                {t("landing.demo.ariaLabel")}
               </div>
                               <div className="demo-visual" style={styles.demoVisual}>
                 <div className="window-container" style={styles.windowContainer}>
@@ -106,7 +111,7 @@ export function HeroSection({ onStartClick }: HeroSectionProps) {
                       <span style={styles.controlDot}></span>
                       <span style={styles.controlDot}></span>
                     </div>
-                    <div style={styles.windowTitle}>Document Viewer</div>
+                    <div style={styles.windowTitle}>{t("landing.demo.windowTitle")}</div>
                     <div style={styles.windowActions}></div>
                   </div>
                   
@@ -142,7 +147,7 @@ export function HeroSection({ onStartClick }: HeroSectionProps) {
                               onLoadError={onDocumentLoadError}
                               loading={
                                 <div style={styles.pdfLoading}>
-                                  Loading PDF...
+                                  {t("landing.demo.pdfLoading")}
                                 </div>
                               }
                               options={pdfOptions}
@@ -171,9 +176,9 @@ export function HeroSection({ onStartClick }: HeroSectionProps) {
                                 {
                                   id: 'demo-1',
                                   threadId: 'demo-thread-1',
-                                  threadTitle: 'What is attention mechanism?',
-                                  content: 'What is attention mechanism?',
-                                  answer: 'The attention mechanism allows the model to focus on different parts of the input sequence when processing each position.',
+                                  threadTitle: t("landing.demo.question1"),
+                                  content: t("landing.demo.question1"),
+                                  answer: t("landing.demo.question1Answer"),
                                   createdAt: new Date().toISOString(),
                                   userId: 'demo-user',
                                   isOwn: true,
@@ -182,9 +187,9 @@ export function HeroSection({ onStartClick }: HeroSectionProps) {
                                 {
                                   id: 'demo-2',
                                   threadId: 'demo-thread-2',
-                                  threadTitle: 'How does transformer work?',
-                                  content: 'How does transformer work?',
-                                  answer: 'Transformers use self-attention mechanisms to process sequences in parallel, unlike RNNs which process sequentially.',
+                                  threadTitle: t("landing.demo.question2"),
+                                  content: t("landing.demo.question2"),
+                                  answer: t("landing.demo.question2Answer"),
                                   createdAt: new Date().toISOString(),
                                   userId: 'demo-user',
                                   isOwn: true,
@@ -208,7 +213,7 @@ export function HeroSection({ onStartClick }: HeroSectionProps) {
                       {/* Header */}
                       <div style={styles.chatHeader}>
                         <h3 style={styles.chatTitle}>
-                          Assistant
+                          {t("chatPanel.assistant")}
                         </h3>
                       </div>
 
@@ -216,18 +221,17 @@ export function HeroSection({ onStartClick }: HeroSectionProps) {
                       <div style={styles.chatMessages}>
                         <div style={styles.chatMessage}>
                           <div style={styles.userMessage}>
-                            Explain the key findings in this document
+                            {t("landing.demo.userMessage")}
                           </div>
                         </div>
                         <div style={styles.chatMessage}>
                           <div style={styles.assistantMessage}>
-                            Based on the document, the key findings include:
-                            <br /><br />
-                            • Significant improvements in comprehension accuracy with contextual AI
-                            <br />
-                            • Enhanced document analysis through visual and textual understanding
-                            <br />
-                            • Revolutionized interaction with digital content
+                            {assistantMessageLines.map((line, idx) => (
+                              <React.Fragment key={idx}>
+                                {line}
+                                {idx < assistantMessageLines.length - 1 && <br />}
+                              </React.Fragment>
+                            ))}
                           </div>
                         </div>
                       </div>
@@ -321,17 +325,17 @@ export function HeroSection({ onStartClick }: HeroSectionProps) {
                                 disabled={true}
                                 style={styles.contextSelect}
                               >
-                                <option value="none">No context</option>
-                                <option value="page">Current Page</option>
-                                <option value="chapter">Current Chapter</option>
+                                <option value="none">{t("chatInput.noContext")}</option>
+                                <option value="page">{t("chatInput.currentPage")}</option>
+                                <option value="chapter">{t("chatInput.currentChapter")}</option>
                               </select>
                             </div>
                             <div style={styles.contextDisplay}>
                               <span style={{ fontWeight: 500, color: '#111827' }}>
-                                Attention Is All You Need
+                                {t("landing.demo.documentTitle")}
                               </span>
                               <span style={{ fontSize: '10px', color: '#6B7280' }}>
-                                Pages 1-15
+                                {t("landing.demo.pages")}
                               </span>
                             </div>
                           </div>
@@ -347,7 +351,7 @@ export function HeroSection({ onStartClick }: HeroSectionProps) {
                               >
                               </div>
                               <div style={styles.inputPlaceholder}>
-                                Ask about this document...
+                                {t("chatInput.askQuestion")}
                               </div>
                             </div>
                             <div style={styles.controls}>
