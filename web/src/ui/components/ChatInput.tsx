@@ -179,6 +179,28 @@ export function ChatInput({
     }
   }, [hasChapter, selectedLevel, onContextChange])
 
+  const editorStyle = React.useMemo<React.CSSProperties>(() => ({
+    ...styles.editor,
+    fontSize: isMobile ? '16px' : styles.editor.fontSize,
+    lineHeight: isMobile ? '24px' : '20px',
+    padding: isMobile ? '14px 16px' : styles.editor.padding,
+    WebkitTextSizeAdjust: '100%',
+  }), [isMobile])
+
+  const placeholderStyle = React.useMemo<React.CSSProperties>(() => ({
+    ...styles.placeholder,
+    fontSize: isMobile ? '16px' : styles.placeholder.fontSize,
+    lineHeight: isMobile ? '24px' : '20px',
+  }), [isMobile])
+
+  const contextSelectorStyle = React.useMemo<React.CSSProperties>(() => ({
+    ...styles.select,
+    fontSize: isMobile ? '16px' : styles.select.fontSize,
+    padding: isMobile ? '10px 14px' : styles.select.padding,
+    paddingRight: isMobile ? '2.75rem' : styles.select.paddingRight,
+    lineHeight: isMobile ? '24px' : '20px',
+  }), [isMobile])
+
   return (
     <div style={styles.container}>
       {/* Context selector */}
@@ -274,13 +296,11 @@ export function ChatInput({
                     }}
                     disabled={isDisabled}
                     style={{
-                      ...styles.select,
+                      ...contextSelectorStyle,
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
                       cursor: (disabled || isStreaming) ? 'not-allowed' : 'pointer',
-                      padding: '6px 8px',
-                      paddingRight: '2.5rem',
                     }}
                   >
                     <span style={{ 
@@ -395,7 +415,7 @@ export function ChatInput({
                   value={getSelectedValue()}
                   onChange={handleContextChange}
                   disabled={isDisabled}
-                  style={styles.select}
+                  style={contextSelectorStyle}
                 >
                   <option value="none">{t("chatInput.noContext")}</option>
                   <option value="page">{t("chatInput.currentPage")}</option>
@@ -419,7 +439,7 @@ export function ChatInput({
               <div
                 ref={editorRef}
                 style={{
-                  ...styles.editor,
+                  ...editorStyle,
                   backgroundColor: isDisabled ? '#F9FAFB' : 'transparent',
                   opacity: isDisabled ? 0.6 : 1,
                   cursor: isDisabled ? 'not-allowed' : 'text'
@@ -433,7 +453,7 @@ export function ChatInput({
                 onKeyDown={handleKeyDown}
                 suppressContentEditableWarning
               />
-              <div style={styles.placeholder}>
+              <div style={placeholderStyle}>
                 {isFocused || hasText ? '' : offlinePlaceholder}
               </div>
             </div>

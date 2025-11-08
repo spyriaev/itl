@@ -258,6 +258,7 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
       zIndex: 1000,
       boxShadow: isMobile ? '0 0 20px rgba(0, 0, 0, 0.3)' : '-4px 0 12px rgba(0, 0, 0, 0.1)',
       animation: 'slideInRight 0.3s ease-out',
+      fontSize: isMobile ? 16 : 'inherit',
     }}>
       {/* Header */}
       <div style={{
@@ -299,7 +300,7 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
             color: '#374151',
             border: '1px solid #D1D5DB',
             borderRadius: 4,
-            fontSize: 12,
+            fontSize: isMobile ? 16 : 12,
             cursor: 'pointer',
           }}
         >

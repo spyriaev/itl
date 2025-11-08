@@ -93,6 +93,9 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
   const zoomMenuButtonRef = useRef<HTMLButtonElement | null>(null)
   const zoomMenuRef = useRef<HTMLDivElement | null>(null)
   const mobileFitToTextAppliedRef = useRef<boolean>(false)
+  const initialScaleCalculatedRef = useRef<boolean>(false)
+  const prevChatVisibleRef = useRef<boolean>(isChatVisible)
+  const prevDocumentUrlRef = useRef<string | null>(null)
 
   // Refs для отслеживания скролла
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -223,49 +226,54 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
   useEffect(() => {
     if (!documentInfo?.url) return
 
+    const documentUrl = documentInfo.url
+    const documentUrlChanged = prevDocumentUrlRef.current !== documentUrl
+    if (documentUrlChanged) {
+      prevDocumentUrlRef.current = documentUrl
+      initialScaleCalculatedRef.current = false
+    }
+
+    const chatVisibilityChanged = prevChatVisibleRef.current !== isChatVisible
+    prevChatVisibleRef.current = isChatVisible
+
+    if ((isMobile || isTablet) && chatVisibilityChanged && !documentUrlChanged && initialScaleCalculatedRef.current) {
+      return
+    }
+
     const calculateScale = async () => {
       try {
-        // PDF document should already be loaded/cached from the document list screen
-        // Load PDF document (should be fast if cached)
-        const loadingTask = pdfjs.getDocument({ url: documentInfo.url })
+        const loadingTask = pdfjs.getDocument({ url: documentUrl })
         const pdf = await loadingTask.promise
 
-        // Calculate optimal scale
         const page = await pdf.getPage(1)
         const viewport = page.getViewport({ scale: 1.0 })
         const pageWidth = viewport.width
 
-        // Get available container width
         const container = scrollContainerRef.current
         let availableWidth: number
-        
+
         if (container) {
           const containerRect = container.getBoundingClientRect()
-          availableWidth = containerRect.width - 48 // Account for padding (24px on each side)
+          availableWidth = containerRect.width - 48
         } else {
-          // Fallback: use window width minus margins for chat and padding
           const windowWidth = window.innerWidth
           const chatWidth = isChatVisible && !isMobile ? 400 : 0
-          availableWidth = windowWidth - chatWidth - 48 // Account for padding (24px on each side)
+          availableWidth = windowWidth - chatWidth - 48
         }
 
-        // Calculate optimal scale
         let optimalScale = availableWidth / pageWidth
-
-        // Clamp scale to reasonable limits
         optimalScale = Math.max(0.1, Math.min(optimalScale, 3.0))
 
-        // Calculate initial page width based on scale
         const scaledPageWidth = pageWidth * optimalScale
         setInitialPageWidth(scaledPageWidth)
 
-        // Set initial scale before rendering
-    setScale(optimalScale)
-    if (scrollContainerRef.current) {
-      scrollContainerRef.current.scrollLeft = 0
-    }
+        setScale(optimalScale)
+        if (scrollContainerRef.current) {
+          scrollContainerRef.current.scrollLeft = 0
+        }
 
-        // Clean up the PDF (we only used it for scale calculation)
+        initialScaleCalculatedRef.current = true
+
         await pdf.destroy()
       } catch (error) {
         console.error('Error calculating scale:', error)
@@ -273,7 +281,7 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
     }
 
     calculateScale()
-  }, [documentInfo?.url, isChatVisible, isMobile])
+  }, [documentInfo?.url, isChatVisible, isMobile, isTablet])
 
   // Handle window resize
   useEffect(() => {
@@ -2556,6 +2564,7 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
   const backButtonRight = navControlTop !== undefined ? 24 : (isMobile ? 20 : 24)
   const topControlsGap = isMobile ? 8 : 12
   const zoomButtonSize = isMobile ? 26 : 32
+  const zoomDisplayValue = useMemo(() => scale.toFixed(1).replace('.', ','), [scale])
   const shouldDelayMobileRender = isMobile && !isMobileInitialScaleApplied
   const singlePageKnownWidth = pageWidths.get(currentPage)
   const singlePageEstimatedWidth = singlePageKnownWidth || initialPageWidth || (scale * 612)
@@ -2672,15 +2681,19 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
             ref={zoomMenuButtonRef}
             onClick={() => setIsZoomMenuOpen((prev) => !prev)}
             style={{
-              width: zoomButtonSize,
               height: zoomButtonSize,
-              borderRadius: '50%',
+              borderRadius: 9999,
               border: 'none',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
+              padding: '0 16px',
               backgroundColor: 'rgba(17, 24, 39, 0.9)',
               color: 'white',
+              fontSize: isMobile ? 8 : 12,
+              fontWeight: 600,
+              letterSpacing: '0.04em',
+              textTransform: 'none',
               cursor: 'pointer',
               transition: 'opacity 0.2s, transform 0.2s'
             }}
@@ -2694,13 +2707,9 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
             }}
             aria-haspopup="true"
             aria-expanded={isZoomMenuOpen}
-            aria-label="Open zoom options"
+            aria-label={`Open zoom options, current zoom ${zoomDisplayValue}`}
           >
-            <svg width="12" height="4" viewBox="0 0 12 4" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="2" cy="2" r="1.4" fill="currentColor" />
-              <circle cx="6" cy="2" r="1.4" fill="currentColor" />
-              <circle cx="10" cy="2" r="1.4" fill="currentColor" />
-            </svg>
+            {`zoom x ${zoomDisplayValue}`}
           </button>
           {isZoomMenuOpen && (
             <div
