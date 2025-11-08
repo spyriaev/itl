@@ -294,3 +294,24 @@ export async function clearDocumentListCache(): Promise<void> {
   }
 }
 
+/**
+ * Remove a single document from cache
+ */
+export async function removeDocumentFromCache(documentId: string): Promise<void> {
+  try {
+    await initDocumentListCache()
+    if (!db) return
+
+    const transaction = db.transaction([STORE_DOCUMENTS], 'readwrite')
+    const store = transaction.objectStore(STORE_DOCUMENTS)
+
+    await new Promise<void>((resolve, reject) => {
+      const request = store.delete(documentId)
+      request.onsuccess = () => resolve()
+      request.onerror = () => reject(request.error)
+    })
+  } catch (error) {
+    console.error('Error removing document from cache:', error)
+  }
+}
+

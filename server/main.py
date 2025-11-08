@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, status, Request
+from fastapi import FastAPI, Depends, HTTPException, status, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from sqlalchemy.orm import Session
@@ -246,6 +246,69 @@ async def list_documents_endpoint(
         )
     
     return list_documents(db, user_id, limit, offset)
+
+
+@app.delete("/api/documents/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_document_endpoint(
+    document_id: str,
+    user_id: str = Depends(get_current_user_id),
+    db: Session = Depends(get_db)
+):
+    """Delete a document owned by the current user"""
+    # Check database connectivity
+    if not test_database_connection():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database not available"
+        )
+    
+    document = get_document_by_id(db, document_id, user_id)
+    if not document:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found"
+        )
+    
+    if not supabase:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Supabase storage not available"
+        )
+    
+    storage_key = document.storage_key
+    size_bytes = document.size_bytes or 0
+    
+    # Remove file from storage first
+    try:
+        removal_response = supabase.storage.from_('pdfs').remove([storage_key])
+        if isinstance(removal_response, dict):
+            error = removal_response.get('error')
+            if error:
+                raise Exception(error)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete file from storage: {str(e)}"
+        )
+    
+    try:
+        db.delete(document)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete document: {str(e)}"
+        )
+    
+    # Update usage counters (ignore result, but ensure counts don't go negative)
+    try:
+        increment_user_usage(db, user_id, storage_bytes=-size_bytes, files=-1)
+    except Exception:
+        # Usage update failure shouldn't block deletion but log for debugging
+        logging.exception("Failed to decrement usage after deleting document %s", document_id)
+    
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 @app.get("/api/documents/{document_id}/view")
 async def get_document_view_url(

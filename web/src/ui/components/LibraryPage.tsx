@@ -7,7 +7,7 @@ import { DocumentList } from "./DocumentList"
 import { UserMenu } from "./UserMenu"
 import { OfflineIndicator, OfflineIndicatorIcon } from "./OfflineIndicator"
 import { PdfViewer } from "./PdfViewer"
-import { waitForDocumentUpload, fetchDocuments, getDocumentViewUrl, type DocumentViewInfo, type DocumentMetadata } from "../../services/uploadService"
+import { waitForDocumentUpload, fetchDocuments, getDocumentViewUrl, deleteDocument, type DocumentViewInfo, type DocumentMetadata } from "../../services/uploadService"
 import { pdfjs } from 'react-pdf'
 import "../styles/upload-page.css"
 import "../styles/typography.css"
@@ -25,6 +25,7 @@ export function LibraryPage() {
   const [loadingDocumentId, setLoadingDocumentId] = useState<string | null>(null)
   const [waitingForUpload, setWaitingForUpload] = useState<string | null>(null)
   const [isPdfReady, setIsPdfReady] = useState<boolean>(false)
+  const [deletingDocumentId, setDeletingDocumentId] = useState<string | null>(null)
 
   // Configure PDF.js worker (same as in PdfViewer)
   useEffect(() => {
@@ -72,6 +73,33 @@ export function LibraryPage() {
       console.error('Failed to refresh documents:', err)
     } finally {
       setDocumentsLoading(false)
+    }
+  }
+
+  const handleDeleteDocument = async (documentId: string) => {
+    const document = documents.find(doc => doc.id === documentId)
+    const title = document?.title || t("documentList.untitledDocument")
+    const confirmed = window.confirm(t("documentList.deleteConfirm", { title }))
+    if (!confirmed) {
+      return
+    }
+
+    try {
+      setDeletingDocumentId(documentId)
+      await deleteDocument(documentId)
+      setDocuments(prev => prev.filter(doc => doc.id !== documentId))
+
+      if (currentDocumentId === documentId) {
+        setCurrentDocumentId(null)
+        setPreloadedDocumentInfo(null)
+        setViewMode("library")
+        setIsPdfReady(false)
+      }
+    } catch (err) {
+      console.error('Failed to delete document:', err)
+      window.alert(t("documentList.deleteError"))
+    } finally {
+      setDeletingDocumentId(null)
     }
   }
 
@@ -257,6 +285,8 @@ export function LibraryPage() {
                 onDocumentClick={handleDocumentClick} 
                 loadingDocumentId={loadingDocumentId}
                 onRefresh={handleRefreshDocuments}
+                onDeleteDocument={handleDeleteDocument}
+                deletingDocumentId={deletingDocumentId}
               />
             </div>
           </>

@@ -1,7 +1,7 @@
 import { supabase, uploadPdfToStorage } from '../lib/supabase'
 import { extractDocumentStructure } from './documentService'
-import { getPdfFromCache, savePdfToCache, initCache } from './pdfCache'
-import { cacheDocumentList, getCachedDocumentList, initDocumentListCache, getCachedDocumentById } from './documentListCache'
+import { getPdfFromCache, savePdfToCache, initCache, removeFromCache } from './pdfCache'
+import { cacheDocumentList, getCachedDocumentList, initDocumentListCache, getCachedDocumentById, removeDocumentFromCache } from './documentListCache'
 import { isOnline } from '../hooks/useNetworkStatus'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
@@ -262,6 +262,41 @@ export async function fetchDocuments(limit: number = 50, offset: number = 0): Pr
       return cachedDocuments.slice(offset, offset + limit)
     }
     throw error
+  }
+}
+
+/**
+ * Delete a document
+ */
+export async function deleteDocument(documentId: string): Promise<void> {
+  const token = await getAuthToken()
+  if (!token) {
+    throw new Error('Not authenticated')
+  }
+
+  const response = await fetch(`${API_URL}/api/documents/${documentId}`, {
+    method: 'DELETE',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Failed to delete document' }))
+    throw new Error(error.error || 'Failed to delete document')
+  }
+
+  // Clean up cached data (best effort)
+  try {
+    await removeFromCache(documentId)
+  } catch (error) {
+    console.warn('[deleteDocument] Failed to remove PDF from cache:', error)
+  }
+
+  try {
+    await removeDocumentFromCache(documentId)
+  } catch (error) {
+    console.warn('[deleteDocument] Failed to remove document metadata from cache:', error)
   }
 }
 

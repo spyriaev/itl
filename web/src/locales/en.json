@@ -34,6 +34,11 @@
     "invalidDate": "Invalid date",
     "shared": "Shared",
     "share": "Share",
+    "actions": "Actions",
+    "delete": "Delete",
+    "deleting": "Deleting...",
+    "deleteConfirm": "Delete \"{{title}}\"? This action cannot be undone.",
+    "deleteError": "Failed to delete the document. Please try again.",
     "cached": "Cache",
     "cachedTooltip": "File is cached"
   },

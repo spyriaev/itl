@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef, Fragment } from "react"
 import { useTranslation } from "react-i18next"
 import { type DocumentMetadata } from "../../services/uploadService"
 import { isPdfCached } from "../../services/pdfCache"
@@ -12,6 +12,8 @@ interface DocumentListProps {
   onDocumentClick: (documentId: string) => void
   loadingDocumentId?: string | null
   onRefresh?: () => void
+  onDeleteDocument?: (documentId: string) => void
+  deletingDocumentId?: string | null
 }
 
 // Page badge component
@@ -83,10 +85,13 @@ function CacheBadge({ documentId }: { documentId: string }) {
   )
 }
 
-export function DocumentList({ documents, loading, onDocumentClick, loadingDocumentId, onRefresh }: DocumentListProps) {
+export function DocumentList({ documents, loading, onDocumentClick, loadingDocumentId, onRefresh, onDeleteDocument, deletingDocumentId }: DocumentListProps) {
   const { t } = useTranslation()
   const [error, setError] = useState<string | null>(null)
   const [isMobile, setIsMobile] = useState(false)
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  const actionMenuRefs = useRef<Map<string, HTMLDivElement | null>>(new Map())
+  const shareOpenersRef = useRef<Map<string, () => void>>(new Map())
 
   useEffect(() => {
     const mql = window.matchMedia('(max-width: 480px)')
@@ -109,6 +114,60 @@ export function DocumentList({ documents, loading, onDocumentClick, loadingDocum
       }
     }
   }, [])
+
+  useEffect(() => {
+    if (!openMenuId) {
+      return
+    }
+
+    const handleClickOutside = (event: MouseEvent) => {
+      const menu = actionMenuRefs.current.get(openMenuId)
+      if (menu && menu.contains(event.target as Node)) {
+        return
+      }
+      setOpenMenuId(null)
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setOpenMenuId(null)
+      }
+    }
+
+    document.addEventListener('click', handleClickOutside)
+    document.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      document.removeEventListener('click', handleClickOutside)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [openMenuId])
+
+  const setMenuRef = (id: string) => (node: HTMLDivElement | null) => {
+    if (node) {
+      actionMenuRefs.current.set(id, node)
+    } else {
+      actionMenuRefs.current.delete(id)
+    }
+  }
+
+  const closeMenu = () => setOpenMenuId(null)
+
+  const handleShareDocument = (docId: string) => {
+    const opener = shareOpenersRef.current.get(docId)
+    if (opener) {
+      opener()
+      requestAnimationFrame(() => closeMenu())
+    }
+  }
+
+  const registerShareOpener = (docId: string, openFn: (() => void) | null) => {
+    if (openFn) {
+      shareOpenersRef.current.set(docId, openFn)
+    } else {
+      shareOpenersRef.current.delete(docId)
+    }
+  }
 
   const formatFileSize = (bytes: number | null | undefined): string => {
     if (bytes === null || bytes === undefined || bytes < 0) {
@@ -231,147 +290,64 @@ export function DocumentList({ documents, loading, onDocumentClick, loadingDocum
       {/* List */}
       {isMobile ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {documents.map((doc) => (
-            <button
-              key={doc.id}
-              onClick={() => loadingDocumentId !== doc.id && onDocumentClick(doc.id)}
-              style={{
-                textAlign: 'left',
-                padding: 12,
-                border: '1px solid #EEF0F3',
-                borderRadius: 12,
-                backgroundColor: loadingDocumentId === doc.id ? '#f8f9fa' : 'white',
-                display: 'flex',
-                gap: 12,
-                alignItems: 'flex-start',
-                cursor: loadingDocumentId === doc.id ? 'wait' : 'pointer',
-              }}
-            >
-              <div className="document-icon-container">
-                <PageBadge currentPage={doc.lastViewedPage} />
-                <svg
-                  className="document-icon"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  style={{ flexShrink: 0 }}
-                >
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                  <polyline points="14 2 14 8 20 8"></polyline>
-                  <line x1="16" y1="13" x2="8" y2="13"></line>
-                  <line x1="16" y1="17" x2="8" y2="17"></line>
-                  <polyline points="10 9 9 9 8 9"></polyline>
-                </svg>
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'space-between', marginBottom: 4 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
-                    <span className="document-name" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>
-                      {doc.title || t("documentList.untitledDocument")}
-                    </span>
-                    {(doc.isShared || doc.hasActiveShare) && (
-                      <span style={{ 
-                        fontSize: 11, 
-                        color: '#6B7280', 
-                        backgroundColor: '#F3F4F6', 
-                        padding: '2px 6px', 
-                        borderRadius: 4,
-                        flexShrink: 0
-                      }}>
-                        {t("documentList.shared")}
+          {documents.map((doc) => {
+            const isLoadingDocument = loadingDocumentId === doc.id
+            const isDeletingDocument = deletingDocumentId === doc.id
+            return (
+            <Fragment key={doc.id}>
+              <ShareDocumentButton
+                documentId={doc.id}
+                onShareCreated={onRefresh}
+                onShareRevoked={onRefresh}
+                onExposeOpen={(openFn) => registerShareOpener(doc.id, openFn)}
+                renderTrigger={() => null}
+              />
+              <button
+                onClick={() => {
+                  if (openMenuId) {
+                    closeMenu()
+                  }
+                  if (!isLoadingDocument && !isDeletingDocument) {
+                    onDocumentClick(doc.id)
+                  }
+                }}
+                style={{
+                  textAlign: 'left',
+                  padding: 12,
+                  border: '1px solid #EEF0F3',
+                  borderRadius: 12,
+                  backgroundColor: (isLoadingDocument || isDeletingDocument) ? '#f8f9fa' : 'white',
+                  display: 'flex',
+                  gap: 12,
+                  alignItems: 'flex-start',
+                  cursor: (isLoadingDocument || isDeletingDocument) ? 'wait' : 'pointer',
+                }}
+              >
+                <div className="document-icon-container">
+                  <PageBadge currentPage={doc.lastViewedPage} />
+                  <svg
+                    className="document-icon"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    style={{ flexShrink: 0 }}
+                  >
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                    <polyline points="10 9 9 9 8 9"></polyline>
+                  </svg>
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'space-between', marginBottom: 4 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
+                      <span className="document-name" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>
+                        {doc.title || t("documentList.untitledDocument")}
                       </span>
-                    )}
-                    {doc.status === 'uploaded' && <CacheBadge documentId={doc.id} />}
-                    {doc.status === 'uploaded' && doc.questionsCount !== undefined && doc.questionsCount > 0 && (
-                      <span className="document-questions-badge" style={{ flexShrink: 0 }}>{doc.questionsCount}</span>
-                    )}
-                  </div>
-                  {!doc.isShared && doc.status === "uploaded" && (
-                    <div 
-                      onClick={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                      }}
-                      onMouseDown={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                      }}
-                      style={{ cursor: 'default', flexShrink: 0 }}
-                    >
-                      <ShareDocumentButton 
-                        documentId={doc.id}
-                        onShareCreated={onRefresh}
-                        onShareRevoked={onRefresh}
-                      />
-                    </div>
-                  )}
-                </div>
-                <div style={{ display: 'flex', gap: 12, marginTop: 8, color: '#6e7787', fontSize: 13 }}>
-                  {loadingDocumentId === doc.id ? (
-                    <span>{t("documentList.loading")}</span>
-                  ) : doc.status === "uploaded" ? (
-                    <>
-                      <span>{t("documentList.sizeLabel")} {formatFileSize(doc.sizeBytes)}</span>
-                      <span>{t("documentList.modifiedLabel")} {formatDate(doc.createdAt)}</span>
-                    </>
-                  ) : (
-                    <span>{t("documentList.loading")}</span>
-                  )}
-                </div>
-              </div>
-            </button>
-          ))}
-        </div>
-      ) : (
-        <div className="document-list-container">
-          <table className="document-table">
-            <thead className="document-table-header">
-              <tr>
-                <th>{t("documentList.name")}</th>
-                <th>{t("documentList.size")}</th>
-                <th>{t("documentList.lastModified")}</th>
-                <th>{t("documentList.questions")}</th>
-                <th style={{ width: 100 }}>{t("documentList.share")}</th>
-              </tr>
-            </thead>
-            <tbody className="document-table-body">
-              {documents.map((doc) => (
-                <tr 
-                  key={doc.id} 
-                  onClick={() => loadingDocumentId !== doc.id && onDocumentClick(doc.id)}
-                  style={{ 
-                    cursor: loadingDocumentId === doc.id ? 'wait' : 'pointer',
-                    backgroundColor: loadingDocumentId === doc.id ? '#f8f9fa' : 'transparent'
-                  }}
-                >
-                  <td>
-                    <div className="document-name-cell" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
-                        <div className="document-icon-container">
-                          <PageBadge currentPage={doc.lastViewedPage} />
-                          <svg
-                            className="document-icon"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          >
-                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                            <polyline points="14 2 14 8 20 8"></polyline>
-                            <line x1="16" y1="13" x2="8" y2="13"></line>
-                            <line x1="16" y1="17" x2="8" y2="17"></line>
-                            <polyline points="10 9 9 9 8 9"></polyline>
-                          </svg>
-                        </div>
-                        <span className="document-name" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>
-                          {doc.title || t("documentList.untitledDocument")}
-                        </span>
-                      </div>
                       {(doc.isShared || doc.hasActiveShare) && (
                         <span style={{ 
                           fontSize: 11, 
@@ -385,35 +361,259 @@ export function DocumentList({ documents, loading, onDocumentClick, loadingDocum
                         </span>
                       )}
                       {doc.status === 'uploaded' && <CacheBadge documentId={doc.id} />}
+                      {doc.status === 'uploaded' && doc.questionsCount !== undefined && doc.questionsCount > 0 && (
+                        <span className="document-questions-badge" style={{ flexShrink: 0 }}>{doc.questionsCount}</span>
+                      )}
                     </div>
-                  </td>
-                  <td className="document-size">
-                    {loadingDocumentId === doc.id ? t("documentList.loading") : (doc.status === "uploaded" ? formatFileSize(doc.sizeBytes) : t("documentList.loading"))}
-                  </td>
-                  <td className="document-date">
-                    {loadingDocumentId === doc.id ? t("documentList.loading") : (doc.status === "uploaded" ? formatDate(doc.createdAt) : t("documentList.loading"))}
-                  </td>
-                  <td>
-                    {doc.status === "uploaded" && doc.questionsCount !== undefined && doc.questionsCount > 0 && (
-                      <span className="document-questions-badge">{doc.questionsCount}</span>
+                    {!doc.isShared && (
+                      <div className="document-actions-wrapper">
+                        <button
+                          type="button"
+                          className="document-actions-button"
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            setOpenMenuId((current) => current === doc.id ? null : doc.id)
+                          }}
+                        >
+                          <svg
+                            width="16"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <circle cx="12" cy="5" r="1.5" />
+                            <circle cx="12" cy="12" r="1.5" />
+                            <circle cx="12" cy="19" r="1.5" />
+                          </svg>
+                        </button>
+                        {openMenuId === doc.id && (
+                          <div
+                            ref={setMenuRef(doc.id)}
+                            className="document-actions-menu"
+                          >
+                            <button
+                              type="button"
+                              className="document-actions-menu-item"
+                              onClick={(event) => {
+                                event.preventDefault()
+                                event.stopPropagation()
+                                handleShareDocument(doc.id)
+                              }}
+                              disabled={doc.status !== "uploaded"}
+                            >
+                              {doc.hasActiveShare ? t("documentList.shared") : t("documentList.share")}
+                            </button>
+                            {onDeleteDocument && (
+                              <button
+                                type="button"
+                                className="document-actions-menu-item document-actions-menu-item-danger"
+                                onClick={(event) => {
+                                  event.preventDefault()
+                                  event.stopPropagation()
+                                  if (!isDeletingDocument) {
+                                    closeMenu()
+                                    onDeleteDocument(doc.id)
+                                  }
+                                }}
+                                disabled={isDeletingDocument}
+                              >
+                                {isDeletingDocument ? t("documentList.deleting") : t("documentList.delete")}
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     )}
-                  </td>
-                  <td
-                    onClick={(e) => e.stopPropagation()}
-                    onMouseDown={(e) => e.stopPropagation()}
-                    style={{ cursor: 'default' }}
+                  </div>
+                  <div style={{ display: 'flex', gap: 12, marginTop: 8, color: '#6e7787', fontSize: 13 }}>
+                    {isDeletingDocument ? (
+                      <span>{t("documentList.deleting")}</span>
+                    ) : isLoadingDocument ? (
+                      <span>{t("documentList.loading")}</span>
+                    ) : doc.status === "uploaded" ? (
+                      <>
+                        <span>{t("documentList.sizeLabel")} {formatFileSize(doc.sizeBytes)}</span>
+                        <span>{t("documentList.modifiedLabel")} {formatDate(doc.createdAt)}</span>
+                      </>
+                    ) : (
+                      <span>{t("documentList.loading")}</span>
+                    )}
+                  </div>
+                </div>
+              </button>
+            </Fragment>
+          )
+        })}
+        </div>
+      ) : (
+        <div className="document-list-container">
+          <table className="document-table">
+            <thead className="document-table-header">
+              <tr>
+                <th>{t("documentList.name")}</th>
+                <th>{t("documentList.size")}</th>
+                <th>{t("documentList.lastModified")}</th>
+                <th>{t("documentList.questions")}</th>
+                <th style={{ width: 140 }}>{t("documentList.actions")}</th>
+              </tr>
+            </thead>
+            <tbody className="document-table-body">
+              {documents.map((doc) => {
+                const isLoadingDocument = loadingDocumentId === doc.id
+                const isDeletingDocument = deletingDocumentId === doc.id
+                return (
+                <Fragment key={doc.id}>
+                  <ShareDocumentButton
+                    documentId={doc.id}
+                    onShareCreated={onRefresh}
+                    onShareRevoked={onRefresh}
+                    onExposeOpen={(openFn) => registerShareOpener(doc.id, openFn)}
+                    renderTrigger={() => null}
+                  />
+                  <tr 
+                    onClick={() => {
+                      if (openMenuId) {
+                        closeMenu()
+                      }
+                      if (!isLoadingDocument && !isDeletingDocument) {
+                        onDocumentClick(doc.id)
+                      }
+                    }}
+                    style={{ 
+                      cursor: (isLoadingDocument || isDeletingDocument) ? 'wait' : 'pointer',
+                      backgroundColor: (isLoadingDocument || isDeletingDocument) ? '#f8f9fa' : 'transparent'
+                    }}
                   >
-                    {/* Show share button only for owned documents (not shared from others) */}
-                    {!doc.isShared && doc.status === "uploaded" && (
-                      <ShareDocumentButton 
-                        documentId={doc.id}
-                        onShareCreated={onRefresh}
-                        onShareRevoked={onRefresh}
-                      />
-                    )}
-                  </td>
-                </tr>
-              ))}
+                    <td>
+                      <div className="document-name-cell" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
+                          <div className="document-icon-container">
+                            <PageBadge currentPage={doc.lastViewedPage} />
+                            <svg
+                              className="document-icon"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
+                              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                              <polyline points="14 2 14 8 20 8"></polyline>
+                              <line x1="16" y1="13" x2="8" y2="13"></line>
+                              <line x1="16" y1="17" x2="8" y2="17"></line>
+                              <polyline points="10 9 9 9 8 9"></polyline>
+                            </svg>
+                          </div>
+                          <span className="document-name" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>
+                            {doc.title || t("documentList.untitledDocument")}
+                          </span>
+                        </div>
+                        {(doc.isShared || doc.hasActiveShare) && (
+                          <span style={{ 
+                            fontSize: 11, 
+                            color: '#6B7280', 
+                            backgroundColor: '#F3F4F6', 
+                            padding: '2px 6px', 
+                            borderRadius: 4,
+                            flexShrink: 0
+                          }}>
+                            {t("documentList.shared")}
+                          </span>
+                        )}
+                        {doc.status === 'uploaded' && <CacheBadge documentId={doc.id} />}
+                      </div>
+                    </td>
+                    <td className="document-size">
+                      {isDeletingDocument ? t("documentList.deleting") : (isLoadingDocument ? t("documentList.loading") : (doc.status === "uploaded" ? formatFileSize(doc.sizeBytes) : t("documentList.loading")))}
+                    </td>
+                    <td className="document-date">
+                      {isDeletingDocument ? t("documentList.deleting") : (isLoadingDocument ? t("documentList.loading") : (doc.status === "uploaded" ? formatDate(doc.createdAt) : t("documentList.loading")))}
+                    </td>
+                    <td>
+                      {doc.status === "uploaded" && doc.questionsCount !== undefined && doc.questionsCount > 0 && (
+                        <span className="document-questions-badge">{doc.questionsCount}</span>
+                      )}
+                    </td>
+                    <td
+                      onClick={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      style={{ cursor: 'default' }}
+                    >
+                      {!doc.isShared && (
+                        <div className="document-actions-wrapper">
+                          <button
+                            type="button"
+                            className="document-actions-button"
+                            onClick={(event) => {
+                              event.preventDefault()
+                              event.stopPropagation()
+                              setOpenMenuId((current) => current === doc.id ? null : doc.id)
+                            }}
+                          >
+                            <svg
+                              width="16"
+                              height="16"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
+                              <circle cx="12" cy="5" r="1.5" />
+                              <circle cx="12" cy="12" r="1.5" />
+                              <circle cx="12" cy="19" r="1.5" />
+                            </svg>
+                          </button>
+                          {openMenuId === doc.id && (
+                            <div
+                              ref={setMenuRef(doc.id)}
+                              className="document-actions-menu"
+                            >
+                              <button
+                                type="button"
+                                className="document-actions-menu-item"
+                                onClick={(event) => {
+                                  event.preventDefault()
+                                  event.stopPropagation()
+                                  handleShareDocument(doc.id)
+                                }}
+                                disabled={doc.status !== "uploaded"}
+                              >
+                                {doc.hasActiveShare ? t("documentList.shared") : t("documentList.share")}
+                              </button>
+                              {onDeleteDocument && (
+                                <button
+                                  type="button"
+                                  className="document-actions-menu-item document-actions-menu-item-danger"
+                                  onClick={(event) => {
+                                    event.preventDefault()
+                                    event.stopPropagation()
+                                    if (!isDeletingDocument) {
+                                      closeMenu()
+                                      onDeleteDocument(doc.id)
+                                    }
+                                  }}
+                                  disabled={isDeletingDocument}
+                                >
+                                  {isDeletingDocument ? t("documentList.deleting") : t("documentList.delete")}
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                </Fragment>
+              )
+            })}
             </tbody>
           </table>
         </div>

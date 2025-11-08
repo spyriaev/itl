@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useTranslation } from "react-i18next"
 import { createShareLink, revokeShareLink, getShareStatus, type ShareStatusResponse } from "../../services/shareService"
 
@@ -8,9 +8,16 @@ interface ShareDocumentButtonProps {
   documentId: string
   onShareCreated?: () => void
   onShareRevoked?: () => void
+  renderTrigger?: (helpers: {
+    open: () => void
+    loading: boolean
+    isShared: boolean
+    hasError: boolean
+  }) => React.ReactNode
+  onExposeOpen?: (openFn: (() => void) | null) => void
 }
 
-export function ShareDocumentButton({ documentId, onShareCreated, onShareRevoked }: ShareDocumentButtonProps) {
+export function ShareDocumentButton({ documentId, onShareCreated, onShareRevoked, renderTrigger, onExposeOpen }: ShareDocumentButtonProps) {
   const { t } = useTranslation()
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -90,13 +97,13 @@ export function ShareDocumentButton({ documentId, onShareCreated, onShareRevoked
     }
   }
 
-  const handleOpenModal = async () => {
+  const handleOpenModal = useCallback(async () => {
     setIsModalOpen(true)
     // Load status only if not already loaded
     if (!shareStatus) {
       await loadShareStatus()
     }
-  }
+  }, [shareStatus, loadShareStatus])
 
   const handleCloseModal = () => {
     setIsModalOpen(false)
@@ -105,71 +112,94 @@ export function ShareDocumentButton({ documentId, onShareCreated, onShareRevoked
     // Don't clear shareStatus to prevent flickering on reopen
   }
 
-  return (
-    <>
-      <div
-        onClick={(e) => {
+  useEffect(() => {
+    if (!onExposeOpen) {
+      return
+    }
+    onExposeOpen(handleOpenModal)
+    return () => {
+      onExposeOpen(null)
+    }
+  }, [handleOpenModal, onExposeOpen])
+
+  const triggerProps = {
+    open: () => {
+      handleOpenModal()
+    },
+    loading,
+    isShared: !!shareStatus?.hasActiveShare,
+    hasError: !!error
+  }
+
+  const defaultTrigger = (
+    <div
+      onClick={(e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        handleOpenModal()
+      }}
+      onMouseDown={(e) => {
+        e.preventDefault()
+        e.stopPropagation()
+      }}
+      onMouseUp={(e) => {
+        e.preventDefault()
+        e.stopPropagation()
+      }}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault()
           e.stopPropagation()
           handleOpenModal()
-        }}
-        onMouseDown={(e) => {
-          e.preventDefault()
-          e.stopPropagation()
-        }}
-        onMouseUp={(e) => {
-          e.preventDefault()
-          e.stopPropagation()
-        }}
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault()
-            e.stopPropagation()
-            handleOpenModal()
-          }
-        }}
-        style={{
-          background: 'transparent',
-          border: 'none',
-          cursor: 'pointer',
-          padding: '4px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color: '#6B7280',
-          borderRadius: '4px',
-          transition: 'all 0.2s',
-          outline: 'none',
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.backgroundColor = '#F3F4F6'
-          e.currentTarget.style.color = '#171A1F'
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.backgroundColor = 'transparent'
-          e.currentTarget.style.color = '#6B7280'
-        }}
-        title={t("shareDocument.share")}
+        }
+      }}
+      style={{
+        background: 'transparent',
+        border: 'none',
+        cursor: 'pointer',
+        padding: '4px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#6B7280',
+        borderRadius: '4px',
+        transition: 'all 0.2s',
+        outline: 'none',
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.backgroundColor = '#F3F4F6'
+        e.currentTarget.style.color = '#171A1F'
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.backgroundColor = 'transparent'
+        e.currentTarget.style.color = '#6B7280'
+      }}
+      title={t("shareDocument.share")}
+    >
+      <svg
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
       >
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <circle cx="18" cy="5" r="3"></circle>
-          <circle cx="6" cy="12" r="3"></circle>
-          <circle cx="18" cy="19" r="3"></circle>
-          <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
-          <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
-        </svg>
-      </div>
+        <circle cx="18" cy="5" r="3"></circle>
+        <circle cx="6" cy="12" r="3"></circle>
+        <circle cx="18" cy="19" r="3"></circle>
+        <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+        <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+      </svg>
+    </div>
+  )
+
+  return (
+    <>
+      {renderTrigger ? renderTrigger(triggerProps) : defaultTrigger}
 
       {isModalOpen && (
         <div style={styles.overlay} onClick={handleCloseModal}>

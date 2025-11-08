@@ -1063,14 +1063,14 @@ def increment_user_usage(
         usage = get_or_create_user_usage(db, user_id, str(plan.id))
         
         # Increment counters
-        if storage_bytes > 0:
-            usage.storage_bytes_used += storage_bytes
-        if files > 0:
-            usage.files_count += files
-        if tokens > 0:
-            usage.tokens_used += tokens
-        if questions > 0:
-            usage.questions_count += questions
+        if storage_bytes != 0:
+            usage.storage_bytes_used = max(0, usage.storage_bytes_used + storage_bytes)
+        if files != 0:
+            usage.files_count = max(0, usage.files_count + files)
+        if tokens != 0:
+            usage.tokens_used = max(0, usage.tokens_used + tokens)
+        if questions != 0:
+            usage.questions_count = max(0, usage.questions_count + questions)
         
         usage.updated_at = datetime.utcnow()
         

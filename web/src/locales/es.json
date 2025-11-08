@@ -34,6 +34,11 @@
     "invalidDate": "Fecha inválida",
     "shared": "Compartido",
     "share": "Compartir",
+    "actions": "Acciones",
+    "delete": "Eliminar",
+    "deleting": "Eliminando...",
+    "deleteConfirm": "¿Eliminar \"{{title}}\"? Esta acción no se puede deshacer.",
+    "deleteError": "No se pudo eliminar el documento. Inténtalo de nuevo.",
     "cached": "En caché",
     "cachedTooltip": "El archivo está en caché"
   },

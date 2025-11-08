@@ -34,6 +34,11 @@
     "invalidDate": "无效日期",
     "shared": "已共享",
     "share": "分享",
+    "actions": "操作",
+    "delete": "删除",
+    "deleting": "正在删除...",
+    "deleteConfirm": "删除“{{title}}”？此操作无法撤销。",
+    "deleteError": "无法删除该文档。请重试。",
     "cached": "缓存",
     "cachedTooltip": "文件已缓存"
   },
