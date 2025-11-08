@@ -2462,10 +2462,12 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
   const prevButtonDisabled = currentPage <= 1
   const nextButtonDisabled = currentPage >= numPages || numPages === 0
   const navigationRightOffset = isChatVisible && !isMobile ? 424 : 24
-  const navControlTop = 24
+  const navControlTop = isMobile ? undefined : 24
   const navControlHeight = isMobile ? 38 : 48
-  const backButtonSize = isMobile ? 32 : 48
-  const backButtonTop = navControlTop + navControlHeight / 2 - backButtonSize / 2
+  const backButtonSize = isMobile ? 38 : 48
+  const backButtonTop = isMobile
+    ? undefined
+    : navControlTop! + navControlHeight / 2 - backButtonSize / 2
 
   if (error) {
     return (
@@ -2566,8 +2568,9 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
         onClick={onClose}
         style={{
           position: 'fixed',
-          top: `${backButtonTop}px`,
-          left: 24,
+          top: navControlTop !== undefined ? `${backButtonTop}px` : 'auto',
+          bottom: navControlTop === undefined ? 24 : 'auto',
+          left: navControlTop !== undefined ? 24 : (isMobile ? 20 : 24),
           zIndex: 2000,
           width: backButtonSize,
           height: backButtonSize,
@@ -2606,13 +2609,14 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
         </svg>
       </button>
 
-      {/* Top Navigation Controls */}
+      {/* Navigation Controls */}
       {numPages > 0 && (
         <>
           <div
             style={{
               position: 'fixed',
-              top: 24,
+              top: navControlTop ?? undefined,
+              bottom: navControlTop === undefined ? (isMobile ? 24 : 32) : undefined,
               left: '50%',
               transform: 'translateX(-50%)',
               zIndex: 2000,
@@ -2764,7 +2768,8 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
                   ref={zoomMenuRef}
                   style={{
                     position: 'absolute',
-                    top: 'calc(100% + 10px)',
+                    top: navControlTop === undefined ? undefined : 'calc(100% + 10px)',
+                    bottom: navControlTop === undefined ? 'calc(100% + 10px)' : undefined,
                     left: '50%',
                     transform: 'translateX(-50%)',
                     backgroundColor: 'white',
