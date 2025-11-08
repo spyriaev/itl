@@ -33,7 +33,7 @@ class TokenInfo:
 class AIService:
     def __init__(self):
         self.provider = os.getenv("AI_PROVIDER", "deepseek").lower()
-        self.context_pages = int(os.getenv("CHAT_CONTEXT_PAGES", "2"))
+        self.context_pages = int(os.getenv("CHAT_CONTEXT_PAGES", "1"))
         
         # Token caching for GigaChat
         self._cached_token: Optional[TokenInfo] = None

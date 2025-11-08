@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react'
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 interface TextSelectionMenuProps {
@@ -11,6 +11,75 @@ interface TextSelectionMenuProps {
 export function TextSelectionMenu({ position, selectedText, onOptionClick, onClose }: TextSelectionMenuProps) {
   const { t } = useTranslation()
   const menuRef = useRef<HTMLDivElement>(null)
+  const animationFrameRef = useRef<number | null>(null)
+  const [menuPosition, setMenuPosition] = useState(position)
+
+  useLayoutEffect(() => {
+    setMenuPosition((prevPosition) => {
+      if (prevPosition.top === position.top && prevPosition.left === position.left) {
+        return prevPosition
+      }
+      return { top: position.top, left: position.left }
+    })
+
+    if (animationFrameRef.current !== null) {
+      cancelAnimationFrame(animationFrameRef.current)
+    }
+
+    animationFrameRef.current = requestAnimationFrame(() => {
+      if (!menuRef.current) {
+        return
+      }
+
+      const padding = 8
+      const viewportWidth = window.innerWidth
+      const viewportHeight = window.innerHeight
+      const rect = menuRef.current.getBoundingClientRect()
+
+      let top = position.top
+      let left = position.left
+
+      if (rect.height > viewportHeight - padding * 2) {
+        top = padding
+      } else {
+        const bottomOverflow = rect.bottom - (viewportHeight - padding)
+        if (bottomOverflow > 0) {
+          top = Math.max(padding, position.top - bottomOverflow)
+        }
+
+        if (rect.top < padding) {
+          top = padding
+        }
+      }
+
+      if (rect.width > viewportWidth - padding * 2) {
+        left = padding
+      } else {
+        const rightOverflow = rect.right - (viewportWidth - padding)
+        if (rightOverflow > 0) {
+          left = Math.max(padding, position.left - rightOverflow)
+        }
+
+        if (rect.left < padding) {
+          left = padding
+        }
+      }
+
+      setMenuPosition((prevPosition) => {
+        if (prevPosition.top === top && prevPosition.left === left) {
+          return prevPosition
+        }
+        return { top, left }
+      })
+    })
+
+    return () => {
+      if (animationFrameRef.current !== null) {
+        cancelAnimationFrame(animationFrameRef.current)
+        animationFrameRef.current = null
+      }
+    }
+  }, [position.left, position.top])
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent | TouchEvent) => {
@@ -103,8 +172,8 @@ export function TextSelectionMenu({ position, selectedText, onOptionClick, onClo
       data-text-selection-menu
       style={{
         position: 'fixed',
-        top: `${position.top}px`,
-        left: `${position.left}px`,
+        top: `${menuPosition.top}px`,
+        left: `${menuPosition.left}px`,
         backgroundColor: 'white',
         border: '1px solid #E5E7EB',
         borderRadius: 8,
@@ -113,6 +182,8 @@ export function TextSelectionMenu({ position, selectedText, onOptionClick, onClo
         width: 240,
         overflow: 'hidden',
         animation: 'fadeInMenu 0.1s ease-out',
+        maxHeight: 'calc(100vh - 16px)',
+        overflowY: 'auto',
       }}
       onClick={(e) => e.stopPropagation()}
       onMouseDown={(e) => e.stopPropagation()}

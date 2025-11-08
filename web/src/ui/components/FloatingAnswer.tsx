@@ -1,5 +1,7 @@
 import React, { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 interface LimitErrorData {
   error_type: string
@@ -438,11 +440,116 @@ export function FloatingAnswer({
             <>
               <div
                 style={{
-                  whiteSpace: 'pre-wrap',
                   wordBreak: 'break-word',
                 }}
               >
-                {answer || ''}
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  components={{
+                    p: ({ children }) => (
+                      <p style={{ margin: '0 0 12px 0', lineHeight: 1.6 }}>{children}</p>
+                    ),
+                    ul: ({ children }) => (
+                      <ul style={{ margin: '0 0 12px 0', paddingLeft: 20, lineHeight: 1.6 }}>
+                        {children}
+                      </ul>
+                    ),
+                    ol: ({ children }) => (
+                      <ol style={{ margin: '0 0 12px 0', paddingLeft: 20, lineHeight: 1.6 }}>
+                        {children}
+                      </ol>
+                    ),
+                    li: ({ children }) => <li style={{ marginBottom: 6 }}>{children}</li>,
+                    code: ({ children }) => (
+                      <code
+                        style={{
+                          backgroundColor: '#E5E7EB',
+                          padding: '2px 6px',
+                          borderRadius: 4,
+                          fontSize: 13,
+                          fontFamily: 'monospace',
+                        }}
+                      >
+                        {children}
+                      </code>
+                    ),
+                    pre: ({ children }) => (
+                      <pre
+                        style={{
+                          backgroundColor: '#E5E7EB',
+                          padding: 12,
+                          borderRadius: 8,
+                          overflow: 'auto',
+                          fontSize: 13,
+                          fontFamily: 'monospace',
+                          margin: '12px 0',
+                        }}
+                      >
+                        {children}
+                      </pre>
+                    ),
+                    blockquote: ({ children }) => (
+                      <blockquote
+                        style={{
+                          borderLeft: '4px solid #D1D5DB',
+                          paddingLeft: 12,
+                          margin: '12px 0',
+                          fontStyle: 'italic',
+                          color: '#6B7280',
+                        }}
+                      >
+                        {children}
+                      </blockquote>
+                    ),
+                    a: ({ children, href }) => (
+                      <a
+                        href={href}
+                        style={{ color: '#2563EB', textDecoration: 'underline' }}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {children}
+                      </a>
+                    ),
+                    table: ({ children }) => (
+                      <div style={{ overflowX: 'auto', margin: '12px 0' }}>
+                        <table
+                          style={{
+                            width: '100%',
+                            borderCollapse: 'collapse',
+                            fontSize: 13,
+                          }}
+                        >
+                          {children}
+                        </table>
+                      </div>
+                    ),
+                    th: ({ children }) => (
+                      <th
+                        style={{
+                          border: '1px solid #D1D5DB',
+                          padding: '8px 10px',
+                          backgroundColor: '#F3F4F6',
+                          textAlign: 'left',
+                        }}
+                      >
+                        {children}
+                      </th>
+                    ),
+                    td: ({ children }) => (
+                      <td
+                        style={{
+                          border: '1px solid #E5E7EB',
+                          padding: '8px 10px',
+                        }}
+                      >
+                        {children}
+                      </td>
+                    ),
+                  }}
+                >
+                  {answer || ''}
+                </ReactMarkdown>
                 {isStreaming && (
                   <span
                     style={{
