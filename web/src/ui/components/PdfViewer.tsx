@@ -72,6 +72,7 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false)
   const [isMobile, setIsMobile] = useState<boolean>(window.innerWidth < 1024)
   const [isTablet, setIsTablet] = useState<boolean>(window.innerWidth >= 640 && window.innerWidth < 1024)
+  const [isMobileInitialScaleApplied, setIsMobileInitialScaleApplied] = useState<boolean>(window.innerWidth >= 1024)
   const [pageQuestionsMap, setPageQuestionsMap] = useState<Map<number, PageQuestionsData>>(new Map())
   const [pageHeights, setPageHeights] = useState<Map<number, number>>(new Map())
   const [pageWidths, setPageWidths] = useState<Map<number, number>>(new Map())
@@ -284,6 +285,17 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
   }, [])
+
+  useEffect(() => {
+    if (!isMobile) {
+      setIsMobileInitialScaleApplied(true)
+      mobileFitToTextAppliedRef.current = false
+      return
+    }
+    if (!mobileFitToTextAppliedRef.current) {
+      setIsMobileInitialScaleApplied(false)
+    }
+  }, [isMobile])
 
   // Debounced progress saving
   const saveProgress = useCallback(
@@ -1597,7 +1609,7 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
     }
   }
 
-  const handleZoomMenuAction = useCallback((action: () => void | Promise<void>) => {
+  const handleZoomMenuAction = useCallback((action: () => void | Promise<unknown>) => {
     const result = action()
     if (result instanceof Promise) {
       result.finally(() => setIsZoomMenuOpen(false))
@@ -2119,7 +2131,7 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
     }, 50)
   }
 
-  const fitToWidth = async () => {
+  const fitToWidth = useCallback(async () => {
     // Предотвращаем множественные одновременные вызовы
     if (isZoomingRef.current) {
       return
@@ -2208,10 +2220,10 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
       
       // Update ref synchronously before setState to prevent race conditions
       currentScaleRef.current = optimalScale
-    setScale(optimalScale)
-    if (scrollContainerRef.current) {
-      scrollContainerRef.current.scrollLeft = 0
-    }
+      setScale(optimalScale)
+      if (scrollContainerRef.current) {
+        scrollContainerRef.current.scrollLeft = 0
+      }
 
       // Update visible range after a brief delay to allow state to update
       updateVisiblePageRangeTimeoutRef.current = setTimeout(() => {
@@ -2244,16 +2256,16 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
         updateVisiblePageRangeTimeoutRef.current = null
       }
     }
-  }
+  }, [scale, isMobile, isTablet, updateVisiblePageRange, updateVisiblePage])
 
-  const fitToTextWidth = async () => {
+  const fitToTextWidth = useCallback(async (): Promise<boolean> => {
     // Предотвращаем множественные одновременные вызовы
     if (isZoomingRef.current) {
-      return
+      return false
     }
 
     if (!pdfDocumentRef.current || !scrollContainerRef.current) {
-      return
+      return false
     }
 
     try {
@@ -2266,14 +2278,14 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
       // Проверяем, что компонент еще смонтирован и документ существует
       if (!pdfDocumentRef.current || !scrollContainerRef.current) {
         isZoomingRef.current = false
-        return
+        return false
       }
 
       // Получаем доступную ширину контейнера
       const container = scrollContainerRef.current
       if (!container) {
         isZoomingRef.current = false
-        return
+        return false
       }
 
       const containerRect = container.getBoundingClientRect()
@@ -2299,7 +2311,7 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
         // Если страница не найдена, fallback на fitToWidth
         isZoomingRef.current = false
         await fitToWidth()
-        return
+        return false
       }
 
       // Ищем текстовый контент внутри страницы
@@ -2308,7 +2320,7 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
         // Если текстовый слой не загружен, fallback на fitToWidth
         isZoomingRef.current = false
         await fitToWidth()
-        return
+        return false
       }
 
       // Находим все текстовые элементы (span)
@@ -2317,7 +2329,7 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
         // Если нет текстовых элементов, fallback на fitToWidth
         isZoomingRef.current = false
         await fitToWidth()
-        return
+        return false
       }
 
       // Вычисляем границы текста (минимальная левая и максимальная правая координаты)
@@ -2338,7 +2350,7 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
       if (maxTextRight === -Infinity || minTextLeft === Infinity) {
         isZoomingRef.current = false
         await fitToWidth()
-        return
+        return false
       }
 
       // Вычисляем реальную ширину текста (с учетом левой и правой границ)
@@ -2412,6 +2424,7 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
           }, 200)
         })
       }, 50)
+      return true
     } catch (error) {
       console.error('Error fitting to text width:', error)
       isZoomingRef.current = false
@@ -2425,8 +2438,9 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
       // Fallback на fitToWidth в случае ошибки
       isZoomingRef.current = false
       await fitToWidth()
+      return false
     }
-  }
+  }, [scale, currentPage, isMobile, isTablet, fitToWidth, updateVisiblePageRange, updateVisiblePage])
 
   useEffect(() => {
     if (!isMobile) {
@@ -2440,20 +2454,51 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
       return
     }
     let cancelled = false
-    const applyFitToText = async () => {
+    let retryTimeout: NodeJS.Timeout | null = null
+    const applyFitToText = async (attempt = 0) => {
       try {
-        await fitToTextWidth()
+        const success = await fitToTextWidth()
+        if (cancelled) {
+          return
+        }
+        if (success) {
+          mobileFitToTextAppliedRef.current = true
+          setIsMobileInitialScaleApplied(true)
+          return
+        }
+        if (attempt < 5) {
+          if (retryTimeout) {
+            clearTimeout(retryTimeout)
+          }
+          retryTimeout = setTimeout(() => {
+            applyFitToText(attempt + 1)
+          }, 200)
+        } else {
+          mobileFitToTextAppliedRef.current = true
+          setIsMobileInitialScaleApplied(true)
+        }
       } catch (err) {
         console.error('Failed to apply fit-to-text on mobile:', err)
-      } finally {
-        if (!cancelled) {
+        if (!cancelled && attempt < 5) {
+          if (retryTimeout) {
+            clearTimeout(retryTimeout)
+          }
+          retryTimeout = setTimeout(() => {
+            applyFitToText(attempt + 1)
+          }, 200)
+        } else if (!cancelled) {
           mobileFitToTextAppliedRef.current = true
+          setIsMobileInitialScaleApplied(true)
         }
       }
     }
     applyFitToText()
     return () => {
       cancelled = true
+      if (retryTimeout) {
+        clearTimeout(retryTimeout)
+        retryTimeout = null
+      }
     }
   }, [isMobile, isFullyRendered, currentPage, fitToTextWidth])
 
@@ -2494,6 +2539,7 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
   const backButtonTop = isMobile
     ? undefined
     : navControlTop! + navControlHeight / 2 - backButtonSize / 2
+  const shouldDelayMobileRender = isMobile && !isMobileInitialScaleApplied
 
   if (error) {
     return (
@@ -2991,9 +3037,34 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
             overscrollBehaviorX: 'contain',
             overscrollBehaviorY: 'auto',
             marginRight: isChatVisible ? (isMobile ? 0 : 400) : 0,
-            transition: 'margin-right 0.3s ease-out',
+            transition: 'margin-right 0.3s ease-out, opacity 0.2s ease-out',
             position: 'relative',
+            opacity: shouldDelayMobileRender ? 0 : 1,
+            pointerEvents: shouldDelayMobileRender ? 'none' : 'auto',
           }}>
+          {shouldDelayMobileRender && (
+            <div style={{
+              position: 'absolute',
+              inset: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              pointerEvents: 'none',
+              background: 'linear-gradient(180deg, rgba(245,245,245,0.9) 0%, rgba(245,245,245,0.7) 100%)',
+            }}>
+              <div style={{
+                padding: '12px 20px',
+                borderRadius: 9999,
+                backgroundColor: 'rgba(17, 24, 39, 0.85)',
+                color: 'white',
+                fontSize: 13,
+                fontWeight: 500,
+                boxShadow: '0 10px 18px -6px rgba(0,0,0,0.4)',
+              }}>
+                Optimizing view…
+              </div>
+            </div>
+          )}
           {continuousScroll ? (
             /* Continuous Scroll Mode - Virtualized rendering for memory efficiency */
           <div style={{
