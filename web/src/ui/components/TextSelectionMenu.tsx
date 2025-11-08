@@ -140,7 +140,11 @@ export function TextSelectionMenu({ position, selectedText, onOptionClick, onClo
             wordBreak: 'break-word',
           }}
         >
-          "{truncatedSelectedText}"
+          <span className="selected-text-quote"></span>
+          <span key={selectedText} className="selected-text-highlight">
+            {truncatedSelectedText}
+          </span>
+          <span className="selected-text-quote"></span>
         </div>
       </div>
 
@@ -194,6 +198,43 @@ export function TextSelectionMenu({ position, selectedText, onOptionClick, onClo
           to {
             opacity: 1;
             transform: translateY(0);
+          }
+        }
+
+        .selected-text-highlight {
+          display: inline-block;
+          color: #2563EB;
+          background: linear-gradient(
+            90deg,
+            #2563EB 0%,
+            #2563EB 35%,
+            #3B82F6 45%,
+            #60A5FA 55%,
+            #3B82F6 65%,
+            #2563EB 100%
+          );
+          background-size: 250% 100%;
+          background-clip: text;
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          animation: shimmerBlueSelected 2s ease-in-out 0s 2;
+          animation-fill-mode: forwards;
+        }
+
+        .selected-text-quote {
+          color: #9CA3AF;
+          font-style: normal;
+        }
+
+        @keyframes shimmerBlueSelected {
+          0% {
+            background-position: 150% center;
+          }
+          50% {
+            background-position: 0% center;
+          }
+          100% {
+            background-position: -150% center;
           }
         }
       `}</style>
