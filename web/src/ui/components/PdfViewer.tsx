@@ -2570,6 +2570,38 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
   const singlePageEstimatedWidth = singlePageKnownWidth || initialPageWidth || (scale * 612)
   const singlePageContainerWidth = Math.max(120, (singlePageEstimatedWidth || 0) + 32)
 
+  const safeAreaInsets = {
+    top: 'env(safe-area-inset-top, 0px)',
+    right: 'env(safe-area-inset-right, 0px)',
+    bottom: 'env(safe-area-inset-bottom, 0px)',
+    left: 'env(safe-area-inset-left, 0px)',
+  } as const
+
+  const addSafeAreaInset = (value: number | string, inset: string) => {
+    if (typeof value === 'number') {
+      return value === 0 ? inset : `calc(${value}px + ${inset})`
+    }
+    if (value === 'auto') {
+      return value
+    }
+    return `calc(${value} + ${inset})`
+  }
+
+  const addOptionalSafeAreaInset = (value: number | string | undefined, inset: string) => {
+    if (value === undefined) {
+      return undefined
+    }
+    return addSafeAreaInset(value, inset)
+  }
+
+  const backButtonTopWithSafeArea = addSafeAreaInset(backButtonTopPosition, safeAreaInsets.top)
+  const backButtonRightWithSafeArea = addSafeAreaInset(backButtonRight, safeAreaInsets.right)
+  const navControlBottomOffset = navControlTop === undefined ? (isMobile ? 24 : 32) : undefined
+  const navControlTopWithSafeArea = addOptionalSafeAreaInset(navControlTop, safeAreaInsets.top)
+  const navControlBottomWithSafeArea = addOptionalSafeAreaInset(navControlBottomOffset, safeAreaInsets.bottom)
+  const assistantButtonBottomWithSafeArea = addSafeAreaInset(assistantButtonPosition.bottom, safeAreaInsets.bottom)
+  const assistantButtonRightWithSafeArea = addSafeAreaInset(assistantButtonPosition.right, safeAreaInsets.right)
+
   if (error) {
     return (
       <div style={{
@@ -2653,23 +2685,63 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
   // в отрисовке страниц для continuousScroll
   const WINDOW_RENDER_DISTANCE = 4 // чуть шире окно для textLayer, чтобы не пропадал текст при зуме
   return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: '#f5f5f5',
-      zIndex: 1000,
-      display: 'flex',
-      flexDirection: 'column',
-    }}>
+    <div
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: '#ffffff',
+        zIndex: 1000,
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
+      {/* Safe area fillers to keep unused regions white while allowing scroll under them */}
+      <div
+        style={{
+          position: 'fixed',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          height: safeAreaInsets.bottom,
+          backgroundColor: '#ffffff',
+          zIndex: 1500,
+          pointerEvents: 'none',
+        }}
+      />
+      <div
+        style={{
+          position: 'fixed',
+          top: 0,
+          bottom: 0,
+          left: 0,
+          width: safeAreaInsets.left,
+          backgroundColor: '#ffffff',
+          zIndex: 1500,
+          pointerEvents: 'none',
+        }}
+      />
+      <div
+        style={{
+          position: 'fixed',
+          top: 0,
+          bottom: 0,
+          right: 0,
+          width: safeAreaInsets.right,
+          backgroundColor: '#ffffff',
+          zIndex: 1500,
+          pointerEvents: 'none',
+        }}
+      />
+
       {/* Top Controls */}
       <div
         style={{
           position: 'fixed',
-          top: backButtonTopPosition,
-          right: backButtonRight,
+          top: backButtonTopWithSafeArea,
+          right: backButtonRightWithSafeArea,
           display: 'flex',
           alignItems: 'center',
           gap: topControlsGap,
@@ -2947,8 +3019,8 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
           <div
             style={{
               position: 'fixed',
-              top: navControlTop ?? undefined,
-              bottom: navControlTop === undefined ? (isMobile ? 24 : 32) : undefined,
+              top: navControlTopWithSafeArea,
+              bottom: navControlBottomWithSafeArea,
               left: '50%',
               transform: 'translateX(-50%)',
               zIndex: 2000,
@@ -3077,11 +3149,14 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
       )}
 
       {/* Main Content Area */}
-      <div style={{
-        flex: 1,
-        display: 'flex',
-        overflow: 'hidden',
-      }}>
+      <div
+        style={{
+          flex: 1,
+          display: 'flex',
+          overflow: 'hidden',
+          backgroundColor: '#f5f5f5',
+        }}
+      >
         {/* PDF Content */}
         <div
           ref={scrollContainerRef}
@@ -3091,7 +3166,10 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
             display: 'flex',
             alignItems: 'flex-start',
             justifyContent: 'center',
-            padding: 24,
+            paddingTop: isMobile ? 0 : 24,
+            paddingLeft: isMobile ? 16 : 24,
+            paddingRight: isMobile ? 16 : 24,
+            paddingBottom: `calc(${isMobile ? 16 : 24}px + ${safeAreaInsets.bottom})`,
             overflowX: 'hidden',
             overflowY: 'scroll',
             WebkitOverflowScrolling: 'touch',
@@ -3503,7 +3581,12 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
                 zIndex: 2000,
                 display: 'flex',
                 justifyContent: 'flex-end',
-                backgroundColor: 'rgba(0,0,0,0.35)'
+                backgroundColor: 'rgba(0,0,0,0.35)',
+                paddingTop: safeAreaInsets.top,
+                paddingBottom: safeAreaInsets.bottom,
+                paddingLeft: safeAreaInsets.left,
+                paddingRight: safeAreaInsets.right,
+                boxSizing: 'border-box'
               }}
             >
               {/* Panel справа */}
@@ -3557,8 +3640,8 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
         <div
           style={{
             position: 'fixed',
-            bottom: assistantButtonPosition.bottom,
-            right: assistantButtonPosition.right,
+            bottom: assistantButtonBottomWithSafeArea,
+            right: assistantButtonRightWithSafeArea,
             zIndex: 3000,
             width: 52,
             height: 52,

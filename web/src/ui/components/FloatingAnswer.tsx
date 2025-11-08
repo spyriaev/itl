@@ -34,6 +34,12 @@ export function FloatingAnswer({
   const { t } = useTranslation()
   const contentRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const safeAreaInsets = {
+    top: 'env(safe-area-inset-top, 0px)',
+    right: 'env(safe-area-inset-right, 0px)',
+    bottom: 'env(safe-area-inset-bottom, 0px)',
+    left: 'env(safe-area-inset-left, 0px)',
+  } as const
 
   // Auto-scroll to answer when it appears
   useEffect(() => {
@@ -127,7 +133,7 @@ export function FloatingAnswer({
   }, [limitError, isError, errorInfo])
 
   // Calculate position - center by default, or use provided position
-  const containerStyle: React.CSSProperties = position
+  const baseContainerStyle: React.CSSProperties = position
     ? {
         position: 'fixed',
         top: `${position.top}px`,
@@ -141,6 +147,13 @@ export function FloatingAnswer({
         left: '50%',
         transform: 'translate(-50%, -50%)',
       }
+
+  const containerStyle: React.CSSProperties = {
+    ...baseContainerStyle,
+    maxHeight: `calc(100vh - 80px - ${safeAreaInsets.top} - ${safeAreaInsets.bottom})`,
+    marginTop: position ? undefined : safeAreaInsets.top,
+    marginBottom: position ? undefined : safeAreaInsets.bottom,
+  }
 
   return (
     <>
@@ -168,9 +181,9 @@ export function FloatingAnswer({
           borderRadius: 12,
           boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
           zIndex: 5001,
-          width: '90%',
-          maxWidth: 600,
-          maxHeight: 'calc(100vh - 80px)',
+          width: `calc(90% - ${safeAreaInsets.left} - ${safeAreaInsets.right})`,
+          maxWidth: `calc(600px - ${safeAreaInsets.left} - ${safeAreaInsets.right})`,
+          maxHeight: `calc(100vh - 80px - ${safeAreaInsets.top} - ${safeAreaInsets.bottom})`,
           display: 'flex',
           flexDirection: 'column',
           animation: 'slideUpFadeIn 0.3s ease-out',
