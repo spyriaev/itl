@@ -2544,6 +2544,7 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
 
   const prevButtonDisabled = currentPage <= 1
   const nextButtonDisabled = currentPage >= numPages || numPages === 0
+  const showPrevNextButtons = !continuousScroll
   const navigationRightOffset = isChatVisible && !isMobile ? 424 : 24
   const navControlTop = isMobile ? undefined : 24
   const navControlHeight = isMobile ? 38 : 48
@@ -2750,73 +2751,77 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
               Safari pagination forced
             </div>
             )}
-            <button
-              onClick={goToPrevPage}
-              disabled={prevButtonDisabled}
-              style={{
-                width: isMobile ? 26 : 32,
-                height: isMobile ? 26 : 32,
-                borderRadius: '9999px',
-                border: 'none',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: prevButtonDisabled ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.25)',
-                color: 'white',
-                cursor: prevButtonDisabled ? 'not-allowed' : 'pointer',
-                transition: 'background-color 0.2s, transform 0.2s'
-              }}
-              onMouseEnter={(e) => {
-                if (!prevButtonDisabled) {
-                  e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.35)'
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!prevButtonDisabled) {
-                  e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.25)'
-                }
-              }}
-              aria-label="Previous page"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="15 18 9 12 15 6" />
-              </svg>
-            </button>
+            {showPrevNextButtons && (
+              <button
+                onClick={goToPrevPage}
+                disabled={prevButtonDisabled}
+                style={{
+                  width: isMobile ? 26 : 32,
+                  height: isMobile ? 26 : 32,
+                  borderRadius: '9999px',
+                  border: 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: prevButtonDisabled ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.25)',
+                  color: 'white',
+                  cursor: prevButtonDisabled ? 'not-allowed' : 'pointer',
+                  transition: 'background-color 0.2s, transform 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  if (!prevButtonDisabled) {
+                    e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.35)'
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!prevButtonDisabled) {
+                    e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.25)'
+                  }
+                }}
+                aria-label="Previous page"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="15 18 9 12 15 6" />
+                </svg>
+              </button>
+            )}
             <div style={{ fontSize: isMobile ? 12 : 14, fontWeight: 500, whiteSpace: 'nowrap' }}>
               Page {currentPage} / {numPages}
             </div>
-            <button
-              onClick={goToNextPage}
-              disabled={nextButtonDisabled}
-              style={{
-                width: isMobile ? 26 : 32,
-                height: isMobile ? 26 : 32,
-                borderRadius: '9999px',
-                border: 'none',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: nextButtonDisabled ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.25)',
-                color: 'white',
-                cursor: nextButtonDisabled ? 'not-allowed' : 'pointer',
-                transition: 'background-color 0.2s, transform 0.2s'
-              }}
-              onMouseEnter={(e) => {
-                if (!nextButtonDisabled) {
-                  e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.35)'
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!nextButtonDisabled) {
-                  e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.25)'
-                }
-              }}
-              aria-label="Next page"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="9 18 15 12 9 6" />
-              </svg>
-            </button>
+            {showPrevNextButtons && (
+              <button
+                onClick={goToNextPage}
+                disabled={nextButtonDisabled}
+                style={{
+                  width: isMobile ? 26 : 32,
+                  height: isMobile ? 26 : 32,
+                  borderRadius: '9999px',
+                  border: 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: nextButtonDisabled ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.25)',
+                  color: 'white',
+                  cursor: nextButtonDisabled ? 'not-allowed' : 'pointer',
+                  transition: 'background-color 0.2s, transform 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  if (!nextButtonDisabled) {
+                    e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.35)'
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!nextButtonDisabled) {
+                    e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.25)'
+                  }
+                }}
+                aria-label="Next page"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="9 18 15 12 9 6" />
+                </svg>
+              </button>
+            )}
             <div style={{ position: 'relative' }}>
               <button
                 ref={zoomMenuButtonRef}
