@@ -149,46 +149,59 @@ export function TextSelectionMenu({ position, selectedText, onOptionClick, onClo
       </div>
 
       {/* Menu options */}
-      {options.map((option, index) => (
-        <button
-          key={option.id}
-          onClick={(e) => handleOptionClick(e, option.id, option.questionTemplate)}
-          onTouchEnd={(e) => {
-            e.preventDefault()
-            e.stopPropagation()
-            handleOptionClick(e, option.id, option.questionTemplate)
-          }}
-          style={{
-            width: '100%',
-            padding: '10px 14px',
-            backgroundColor: 'transparent',
-            border: 'none',
-            fontSize: 13,
-            color: '#374151',
-            cursor: 'pointer',
-            textAlign: 'left',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            transition: 'background-color 0.15s',
-            borderBottom: index < options.length - 1 ? '1px solid #F3F4F6' : 'none',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = '#F9FAFB'
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = 'transparent'
-          }}
-          onTouchStart={(e) => {
-            e.currentTarget.style.backgroundColor = '#F9FAFB'
-          }}
-        >
-          <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center' }}>
-            {option.icon}
-          </div>
-          <span>{option.label}</span>
-        </button>
-      ))}
+      <div
+        style={{
+          padding: '10px 8px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 6
+        }}
+      >
+        {options.map((option) => (
+          <button
+            key={option.id}
+            onClick={(e) => handleOptionClick(e, option.id, option.questionTemplate)}
+            onTouchEnd={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              handleOptionClick(e, option.id, option.questionTemplate)
+            }}
+            style={{
+              width: '100%',
+              padding: '6px 10px',
+              backgroundColor: 'transparent',
+              border: 'none',
+              fontSize: 14,
+              color: '#1F2937',
+              fontWeight: 500,
+              cursor: 'pointer',
+              textAlign: 'left',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              borderRadius: 8,
+              transition: 'background-color 0.2s, color 0.2s'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'rgba(37, 99, 235, 0.08)'
+              e.currentTarget.style.color = '#1D4ED8'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent'
+              e.currentTarget.style.color = '#1F2937'
+            }}
+            onTouchStart={(e) => {
+              e.currentTarget.style.backgroundColor = 'rgba(37, 99, 235, 0.08)'
+              e.currentTarget.style.color = '#1D4ED8'
+            }}
+          >
+            <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 20, height: 20 }}>
+              {option.icon}
+            </div>
+            <span>{option.label}</span>
+          </button>
+        ))}
+      </div>
       <style>{`
         @keyframes fadeInMenu {
           from {

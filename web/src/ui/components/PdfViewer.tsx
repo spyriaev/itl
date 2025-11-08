@@ -2870,10 +2870,10 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
                     boxShadow: '0 25px 50px -12px rgba(30, 64, 175, 0.35)',
                     minWidth: isMobile ? 200 : 220,
                     maxWidth: 260,
-                    padding: 12,
+                    padding: '10px 8px',
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: 8,
+                    gap: 6,
                     zIndex: 2100
                   }}
                   data-zoom-menu
@@ -2889,7 +2889,7 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
                       gap: 8,
                       border: 'none',
                       borderRadius: 8,
-                      padding: '8px 12px',
+                      padding: '6px 10px',
                       backgroundColor: 'transparent',
                       cursor: 'pointer',
                       fontSize: 14,
@@ -2917,7 +2917,7 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
                       gap: 8,
                       border: 'none',
                       borderRadius: 8,
-                      padding: '8px 12px',
+                      padding: '6px 10px',
                       backgroundColor: 'transparent',
                       cursor: 'pointer',
                       fontSize: 14,
@@ -2945,7 +2945,7 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
                       gap: 8,
                       border: 'none',
                       borderRadius: 8,
-                      padding: '8px 12px',
+                      padding: '6px 10px',
                       backgroundColor: 'transparent',
                       cursor: 'pointer',
                       fontSize: 14,
@@ -2962,7 +2962,13 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
                       e.currentTarget.style.color = '#1F2937'
                     }}
                   >
-                    <span style={{ display: 'flex', width: 20, justifyContent: 'center' }}>⟲</span>
+                    <span style={{ display: 'flex', width: 20, height: 20, alignItems: 'center', justifyContent: 'center' }}>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="12" cy="12" r="7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                        <path d="M12 5V2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                        <polyline points="15 5 12 2 9 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </span>
                     Reset Zoom
                   </button>
                   <div style={{ height: 1, backgroundColor: 'rgba(148, 163, 184, 0.35)', margin: '4px 0' }} />
@@ -2974,7 +2980,7 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
                       gap: 8,
                       border: 'none',
                       borderRadius: 8,
-                      padding: '8px 12px',
+                      padding: '6px 10px',
                       backgroundColor: 'transparent',
                       cursor: 'pointer',
                       fontSize: 14,
@@ -2991,7 +2997,13 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
                       e.currentTarget.style.color = '#1F2937'
                     }}
                   >
-                    <span style={{ display: 'flex', width: 20, justifyContent: 'center' }}>⇔</span>
+                    <span style={{ display: 'flex', width: 20, height: 20, alignItems: 'center', justifyContent: 'center' }}>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="4.5" y="5" width="15" height="14" rx="2.2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                        <polyline points="10 9 7 12 10 15" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                        <polyline points="14 9 17 12 14 15" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </span>
                     Fit to Page Width
                   </button>
                   <button
@@ -3002,7 +3014,7 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
                       gap: 8,
                       border: 'none',
                       borderRadius: 8,
-                      padding: '8px 12px',
+                      padding: '6px 10px',
                       backgroundColor: 'transparent',
                       cursor: 'pointer',
                       fontSize: 14,
@@ -3019,7 +3031,15 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
                       e.currentTarget.style.color = '#1F2937'
                     }}
                   >
-                    <span style={{ display: 'flex', width: 20, justifyContent: 'center' }}>≋</span>
+                    <span style={{ display: 'flex', width: 20, height: 20, alignItems: 'center', justifyContent: 'center' }}>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M6 8H18" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                        <path d="M6 12H16" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                        <path d="M6 16H18" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                        <path d="M5 9H4V15H5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                        <path d="M19 9H20V15H19" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </span>
                     Fit to Text Width
                   </button>
                 </div>
