@@ -259,7 +259,10 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
         setInitialPageWidth(scaledPageWidth)
 
         // Set initial scale before rendering
-        setScale(optimalScale)
+    setScale(optimalScale)
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollLeft = 0
+    }
 
         // Clean up the PDF (we only used it for scale calculation)
         await pdf.destroy()
@@ -2150,7 +2153,17 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
       }
 
       const containerRect = container.getBoundingClientRect()
-      const availableWidth = containerRect.width - 48 // Учитываем padding (24px с каждой стороны)
+      const containerHorizontalPadding = 48 // padding scroll-контейнера (24px с каждой стороны)
+      const mobileCardPaddingX = 0
+      const desktopCardPaddingX = 14
+      const cardPaddingX = (isMobile || isTablet) ? mobileCardPaddingX : desktopCardPaddingX
+      const innerContainerWidth = Math.max(0, containerRect.width - containerHorizontalPadding)
+      const viewportPadding = (isMobile || isTablet) ? 16 : 80
+      const viewportLimit = typeof window !== 'undefined'
+        ? Math.max(0, window.innerWidth - viewportPadding)
+        : innerContainerWidth
+      const usableWidth = Math.max(0, Math.min(innerContainerWidth, viewportLimit))
+      const availableWidth = Math.max(120, usableWidth - cardPaddingX)
 
       // Вычисляем оптимальный scale
       let optimalScale: number
@@ -2195,7 +2208,10 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
       
       // Update ref synchronously before setState to prevent race conditions
       currentScaleRef.current = optimalScale
-      setScale(optimalScale)
+    setScale(optimalScale)
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollLeft = 0
+    }
 
       // Update visible range after a brief delay to allow state to update
       updateVisiblePageRangeTimeoutRef.current = setTimeout(() => {
@@ -2261,7 +2277,17 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
       }
 
       const containerRect = container.getBoundingClientRect()
-      const availableWidth = containerRect.width - 48 // Учитываем padding (24px с каждой стороны)
+      const containerHorizontalPadding = 48 // padding scroll-контейнера (24px с каждой стороны)
+      const mobileCardPaddingX = 0
+      const desktopCardPaddingX = 14
+      const cardPaddingX = (isMobile || isTablet) ? mobileCardPaddingX : desktopCardPaddingX
+      const innerContainerWidth = Math.max(0, containerRect.width - containerHorizontalPadding)
+      const viewportPadding = (isMobile || isTablet) ? 16 : 80
+      const viewportLimit = typeof window !== 'undefined'
+        ? Math.max(0, window.innerWidth - viewportPadding)
+        : innerContainerWidth
+      const usableWidth = Math.max(0, Math.min(innerContainerWidth, viewportLimit))
+      const availableWidth = Math.max(120, usableWidth - cardPaddingX)
 
       // Находим текстовый слой текущей страницы
       // react-pdf создает структуру: .react-pdf__Page__textContent > span
@@ -2960,7 +2986,7 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
             justifyContent: 'center',
             padding: 24,
             overflow: 'auto',
-            overflowX: 'auto',
+            overflowX: 'hidden',
             WebkitOverflowScrolling: 'touch',
             overscrollBehaviorX: 'contain',
             overscrollBehaviorY: 'auto',
@@ -2976,7 +3002,7 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
             alignItems: 'center',
             gap: 16,
             width: '100%',
-            minWidth: 'max-content',
+            maxWidth: '100%',
           }}>
               <Document
                 file={documentInfo.url}
@@ -2996,7 +3022,7 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
                     const knownWidth = pageWidths.get(pageNumber)
                     // Use initialPageWidth if available, otherwise fallback to scale * 612 (standard PDF width)
                     const estimatedWidth = knownWidth || initialPageWidth || (scale * 612)
-                    const containerWidth = knownWidth ? `${knownWidth + 32}px` : `${estimatedWidth + 32}px` // 32px for padding (16px * 2)
+                    const containerWidth = knownWidth ? knownWidth + 32 : estimatedWidth + 32 // 32px for padding (16px * 2)
                     return (
                       <div
                         key={pageNumber}
@@ -3008,13 +3034,14 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
                           padding: 16,
                           marginBottom: 8,
                           minHeight: isInRange ? 'auto' : `${knownHeight}px`,
-                          width: containerWidth,
-                          minWidth: `${estimatedWidth + 32}px`,
-                          maxWidth: 'min(100%, calc(100vw - 80px))',
+                          width: '100%',
+                          maxWidth: `${containerWidth}px`,
+                          margin: '0 auto',
                           display: 'flex',
                           flexDirection: 'column',
                           alignItems: 'center',
                           justifyContent: 'center',
+                          boxSizing: 'border-box',
                         }}
                       >
                         {isInRange ? (
@@ -3024,8 +3051,11 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
                                 pdfPageRefs.current[index] = el
                               }}
                               style={{
-                                width: `${estimatedWidth}px`,
-                                minWidth: `${estimatedWidth}px`,
+                                width: '100%',
+                                maxWidth: `${estimatedWidth}px`,
+                                display: 'flex',
+                                justifyContent: 'center',
+                                boxSizing: 'border-box',
                               }}
                             >
                               <Page
@@ -3036,12 +3066,15 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
                                 renderAnnotationLayer={true}
                                 loading={
                                   <div style={{
-                                    width: `${estimatedWidth}px`,
-                                    minWidth: `${estimatedWidth}px`,
+                                    width: '100%',
+                                    maxWidth: `${estimatedWidth}px`,
+                                    display: 'flex',
+                                    justifyContent: 'center',
                                     height: `${knownHeight}px`,
                                     backgroundColor: 'white',
                                     borderRadius: 8,
                                     boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
+                                    boxSizing: 'border-box',
                                   }}>
                                     {/* Empty placeholder to prevent layout shift */}
                                   </div>
