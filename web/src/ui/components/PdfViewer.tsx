@@ -10,7 +10,6 @@ import {
 import { ChatProvider, useChat } from '../../contexts/ChatContext'
 import { ChatPanel } from './ChatPanel'
 import { PageRelatedQuestions } from './PageRelatedQuestions'
-import { ZoomControl } from './ZoomControl'
 import { TextSelectionMenu } from './TextSelectionMenu'
 import { FloatingAnswer } from './FloatingAnswer'
 import 'react-pdf/dist/Page/AnnotationLayer.css'
@@ -79,6 +78,7 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
   const [initialPageWidth, setInitialPageWidth] = useState<number | null>(null)
   const [visiblePageRange, setVisiblePageRange] = useState<{ start: number, end: number }>({ start: 1, end: 10 })
   const [assistantButtonPosition, setAssistantButtonPosition] = useState<{ right: number | string, bottom: number | string }>({ right: 24, bottom: 24 })
+  const [isZoomMenuOpen, setIsZoomMenuOpen] = useState<boolean>(false)
 
   // Text selection state
   const [selectionMenu, setSelectionMenu] = useState<{ position: { top: number; left: number }, selectedText: string, pageNumber: number } | null>(null)
@@ -89,6 +89,9 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
   const questionTimestampRef = useRef<number | null>(null)
   const questionPageNumberRef = useRef<number | null>(null)
   const questionThreadIdRef = useRef<string | null>(null)
+  const zoomMenuButtonRef = useRef<HTMLButtonElement | null>(null)
+  const zoomMenuRef = useRef<HTMLDivElement | null>(null)
+  const mobileFitToTextAppliedRef = useRef<boolean>(false)
 
   // Refs для отслеживания скролла
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -119,6 +122,19 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
 
   // Get chat context for navigation and assistant state
   const { navigateToMessage, isStreaming, startNewConversation, activeThread, sendMessage } = useChat()
+
+  const isSafariBrowser = useMemo(() => {
+    if (typeof window === 'undefined') return false
+    const ua = window.navigator.userAgent
+    const vendor = window.navigator.vendor
+    const isSafari = /Safari/.test(ua) && !/Chrome|CriOS|Chromium|Android/.test(ua)
+    const isAppleVendor = vendor?.includes('Apple')
+    return isSafari || isAppleVendor
+  }, [])
+
+  const shouldForceSinglePageMode = useMemo(() => {
+    return isSafariBrowser && numPages > 200
+  }, [isSafariBrowser, numPages])
 
   // Cooldown для форс-восстановления, чтобы не зациклиться пока страницы ещё не смонтировались
   const lastForceRestoreRef = useRef(0)
@@ -1537,6 +1553,9 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
       const newPage = currentPage - 1
       setCurrentPage(newPage)
       saveProgress(newPage)
+      if (continuousScroll) {
+        scrollToPage(newPage)
+      }
     }
   }
 
@@ -1545,6 +1564,9 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
       const newPage = currentPage + 1
       setCurrentPage(newPage)
       saveProgress(newPage)
+      if (continuousScroll) {
+        scrollToPage(newPage)
+      }
     }
   }
 
@@ -1552,10 +1574,16 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
     if (page >= 1 && page <= numPages) {
       setCurrentPage(page)
       saveProgress(page)
+      if (continuousScroll) {
+        scrollToPage(page)
+      }
     }
   }
 
   const toggleContinuousScroll = () => {
+    if (shouldForceSinglePageMode) {
+      return
+    }
     setContinuousScroll(!continuousScroll)
 
     // Если переключаемся в режим непрерывного скролла, прокручиваем к текущей странице
@@ -1565,6 +1593,43 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
       }, 100)
     }
   }
+
+  const handleZoomMenuAction = useCallback((action: () => void | Promise<void>) => {
+    const result = action()
+    if (result instanceof Promise) {
+      result.finally(() => setIsZoomMenuOpen(false))
+    } else {
+      setIsZoomMenuOpen(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (shouldForceSinglePageMode && continuousScroll) {
+      setContinuousScroll(false)
+    }
+  }, [shouldForceSinglePageMode, continuousScroll])
+
+  useEffect(() => {
+    if (!isZoomMenuOpen) {
+      return
+    }
+    const handleOutsideClick = (event: MouseEvent | TouchEvent) => {
+      const target = event.target as Node | null
+      if (
+        (zoomMenuRef.current && zoomMenuRef.current.contains(target)) ||
+        (zoomMenuButtonRef.current && zoomMenuButtonRef.current.contains(target))
+      ) {
+        return
+      }
+      setIsZoomMenuOpen(false)
+    }
+    document.addEventListener('mousedown', handleOutsideClick, true)
+    document.addEventListener('touchstart', handleOutsideClick, true)
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick, true)
+      document.removeEventListener('touchstart', handleOutsideClick, true)
+    }
+  }, [isZoomMenuOpen])
 
   // Вычисление позиции кнопки ассистента на основе ширины страницы
   useEffect(() => {
@@ -2200,7 +2265,10 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
 
       // Находим текстовый слой текущей страницы
       // react-pdf создает структуру: .react-pdf__Page__textContent > span
-      const pageElement = pageRefs.current[currentPage - 1]
+      let pageElement = pageRefs.current[currentPage - 1] as HTMLElement | null | undefined
+      if (!pageElement && scrollContainerRef.current) {
+        pageElement = scrollContainerRef.current.querySelector(`.react-pdf__Page[data-page-number="${currentPage}"]`) as HTMLElement | null
+      }
       if (!pageElement) {
         // Если страница не найдена, fallback на fitToWidth
         isZoomingRef.current = false
@@ -2334,6 +2402,35 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
     }
   }
 
+  useEffect(() => {
+    if (!isMobile) {
+      mobileFitToTextAppliedRef.current = false
+      return
+    }
+    if (!isFullyRendered) {
+      return
+    }
+    if (mobileFitToTextAppliedRef.current) {
+      return
+    }
+    let cancelled = false
+    const applyFitToText = async () => {
+      try {
+        await fitToTextWidth()
+      } catch (err) {
+        console.error('Failed to apply fit-to-text on mobile:', err)
+      } finally {
+        if (!cancelled) {
+          mobileFitToTextAppliedRef.current = true
+        }
+      }
+    }
+    applyFitToText()
+    return () => {
+      cancelled = true
+    }
+  }, [isMobile, isFullyRendered, currentPage, fitToTextWidth])
+
   const toggleFullscreen = useCallback(() => {
     if (!document.fullscreenElement) {
       document.documentElement.requestFullscreen().then(() => {
@@ -2361,6 +2458,14 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
       document.removeEventListener('fullscreenchange', handleFullscreenChange)
     }
   }, [])
+
+  const prevButtonDisabled = currentPage <= 1
+  const nextButtonDisabled = currentPage >= numPages || numPages === 0
+  const navigationRightOffset = isChatVisible && !isMobile ? 424 : 24
+  const navControlTop = 24
+  const navControlHeight = isMobile ? 38 : 48
+  const backButtonSize = isMobile ? 32 : 48
+  const backButtonTop = navControlTop + navControlHeight / 2 - backButtonSize / 2
 
   if (error) {
     return (
@@ -2461,39 +2566,377 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
         onClick={onClose}
         style={{
           position: 'fixed',
-          top: 24,
+          top: `${backButtonTop}px`,
           left: 24,
           zIndex: 2000,
-          width: 40,
-          height: 40,
+          width: backButtonSize,
+          height: backButtonSize,
           borderRadius: '50%',
-          backgroundColor: '#F0F4FF',
+          backgroundColor: 'rgba(17, 24, 39, 0.9)',
           border: 'none',
           cursor: 'pointer',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.3), 0 4px 6px -2px rgb(0 0 0 / 0.2)',
-          transition: 'opacity 0.2s',
+          boxShadow: '0 8px 14px -4px rgba(0, 0, 0, 0.35)',
+          transition: 'opacity 0.2s, transform 0.2s',
           padding: 0,
         }}
-        onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.9')}
-        onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.opacity = '0.9'
+          e.currentTarget.style.transform = 'translateY(-1px)'
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.opacity = '1'
+          e.currentTarget.style.transform = 'translateY(0)'
+        }}
         aria-label="Back to Library"
       >
         <svg
-          width="20"
-          height="20"
+          width="16"
+          height="16"
           viewBox="0 0 24 24"
           fill="none"
-          stroke="#2563EB"
-          strokeWidth="2.5"
+          stroke="#D1D5DB"
+          strokeWidth="2.3"
           strokeLinecap="round"
           strokeLinejoin="round"
         >
           <polyline points="15 18 9 12 15 6" />
         </svg>
       </button>
+
+      {/* Top Navigation Controls */}
+      {numPages > 0 && (
+        <>
+          <div
+            style={{
+              position: 'fixed',
+              top: 24,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              zIndex: 2000,
+              display: 'flex',
+              justifyContent: 'center',
+              pointerEvents: 'none'
+            }}
+          >
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: isMobile ? 6 : 8,
+              backgroundColor: 'rgba(17, 24, 39, 0.9)',
+              color: 'white',
+              borderRadius: 9999,
+              padding: isMobile ? '6px 12px' : '8px 16px',
+              boxShadow: '0 10px 20px -5px rgba(0, 0, 0, 0.35)',
+              backdropFilter: 'blur(12px)',
+              pointerEvents: 'auto',
+              position: 'relative'
+            }}
+          >
+            {shouldForceSinglePageMode && (
+            <div
+              style={{
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                  transform: isMobile ? 'translate(-50%, calc(-50% - 30px))' : 'translate(-50%, calc(-50% - 35px))',
+                  fontSize: isMobile ? 7 : 8,
+                fontWeight: 600,
+                color: 'rgba(255,255,255,0.85)',
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+                whiteSpace: 'nowrap',
+                pointerEvents: 'none',
+                padding: '2px 8px',
+                backgroundColor: 'rgba(17,24,39,0.85)',
+                borderRadius: 9999,
+                boxShadow: '0 4px 10px rgba(0,0,0,0.25)'
+              }}
+            >
+              Safari pagination forced
+            </div>
+            )}
+            <button
+              onClick={goToPrevPage}
+              disabled={prevButtonDisabled}
+              style={{
+                width: isMobile ? 26 : 32,
+                height: isMobile ? 26 : 32,
+                borderRadius: '9999px',
+                border: 'none',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: prevButtonDisabled ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.25)',
+                color: 'white',
+                cursor: prevButtonDisabled ? 'not-allowed' : 'pointer',
+                transition: 'background-color 0.2s, transform 0.2s'
+              }}
+              onMouseEnter={(e) => {
+                if (!prevButtonDisabled) {
+                  e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.35)'
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!prevButtonDisabled) {
+                  e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.25)'
+                }
+              }}
+              aria-label="Previous page"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="15 18 9 12 15 6" />
+              </svg>
+            </button>
+            <div style={{ fontSize: isMobile ? 12 : 14, fontWeight: 500, whiteSpace: 'nowrap' }}>
+              Page {currentPage} / {numPages}
+            </div>
+            <button
+              onClick={goToNextPage}
+              disabled={nextButtonDisabled}
+              style={{
+                width: isMobile ? 26 : 32,
+                height: isMobile ? 26 : 32,
+                borderRadius: '9999px',
+                border: 'none',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: nextButtonDisabled ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.25)',
+                color: 'white',
+                cursor: nextButtonDisabled ? 'not-allowed' : 'pointer',
+                transition: 'background-color 0.2s, transform 0.2s'
+              }}
+              onMouseEnter={(e) => {
+                if (!nextButtonDisabled) {
+                  e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.35)'
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!nextButtonDisabled) {
+                  e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.25)'
+                }
+              }}
+              aria-label="Next page"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
+            </button>
+            <div style={{ position: 'relative' }}>
+              <button
+                ref={zoomMenuButtonRef}
+                onClick={() => setIsZoomMenuOpen((prev) => !prev)}
+                style={{
+                width: isMobile ? 26 : 32,
+                height: isMobile ? 26 : 32,
+                  borderRadius: '9999px',
+                  border: 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: 'rgba(255,255,255,0.2)',
+                  color: 'white',
+                  cursor: 'pointer',
+                  transition: 'background-color 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.35)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.2)'
+                }}
+                aria-haspopup="true"
+                aria-expanded={isZoomMenuOpen}
+                aria-label="Open zoom options"
+              >
+                <svg width="12" height="4" viewBox="0 0 12 4" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="2" cy="2" r="1.4" fill="currentColor" />
+                  <circle cx="6" cy="2" r="1.4" fill="currentColor" />
+                  <circle cx="10" cy="2" r="1.4" fill="currentColor" />
+                </svg>
+              </button>
+              {isZoomMenuOpen && (
+                <div
+                  ref={zoomMenuRef}
+                  style={{
+                    position: 'absolute',
+                    top: 'calc(100% + 10px)',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    backgroundColor: 'white',
+                    color: '#111827',
+                    borderRadius: 12,
+                    boxShadow: '0 25px 50px -12px rgba(30, 64, 175, 0.35)',
+                    minWidth: isMobile ? 200 : 220,
+                    maxWidth: 260,
+                    padding: 12,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 8,
+                    zIndex: 2100
+                  }}
+                  data-zoom-menu
+                >
+                  <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: '0.02em', color: '#1D4ED8', textTransform: 'uppercase' }}>
+                    Zoom Options
+                  </div>
+                  <button
+                    onClick={() => handleZoomMenuAction(zoomIn)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      border: 'none',
+                      borderRadius: 8,
+                      padding: '8px 12px',
+                      backgroundColor: 'transparent',
+                      cursor: 'pointer',
+                      fontSize: 14,
+                      color: '#1F2937',
+                      fontWeight: 500,
+                      transition: 'background-color 0.2s, color 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = 'rgba(37, 99, 235, 0.08)'
+                      e.currentTarget.style.color = '#1D4ED8'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent'
+                      e.currentTarget.style.color = '#1F2937'
+                    }}
+                  >
+                    <span style={{ display: 'flex', width: 20, justifyContent: 'center' }}>+</span>
+                    Zoom In
+                  </button>
+                  <button
+                    onClick={() => handleZoomMenuAction(zoomOut)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      border: 'none',
+                      borderRadius: 8,
+                      padding: '8px 12px',
+                      backgroundColor: 'transparent',
+                      cursor: 'pointer',
+                      fontSize: 14,
+                      color: '#1F2937',
+                      fontWeight: 500,
+                      transition: 'background-color 0.2s, color 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = 'rgba(37, 99, 235, 0.08)'
+                      e.currentTarget.style.color = '#1D4ED8'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent'
+                      e.currentTarget.style.color = '#1F2937'
+                    }}
+                  >
+                    <span style={{ display: 'flex', width: 20, justifyContent: 'center' }}>−</span>
+                    Zoom Out
+                  </button>
+                  <button
+                    onClick={() => handleZoomMenuAction(resetZoom)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      border: 'none',
+                      borderRadius: 8,
+                      padding: '8px 12px',
+                      backgroundColor: 'transparent',
+                      cursor: 'pointer',
+                      fontSize: 14,
+                      color: '#1F2937',
+                      fontWeight: 500,
+                      transition: 'background-color 0.2s, color 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = 'rgba(37, 99, 235, 0.08)'
+                      e.currentTarget.style.color = '#1D4ED8'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent'
+                      e.currentTarget.style.color = '#1F2937'
+                    }}
+                  >
+                    <span style={{ display: 'flex', width: 20, justifyContent: 'center' }}>⟲</span>
+                    Reset Zoom
+                  </button>
+                  <div style={{ height: 1, backgroundColor: 'rgba(148, 163, 184, 0.35)', margin: '4px 0' }} />
+                  <button
+                    onClick={() => handleZoomMenuAction(fitToWidth)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      border: 'none',
+                      borderRadius: 8,
+                      padding: '8px 12px',
+                      backgroundColor: 'transparent',
+                      cursor: 'pointer',
+                      fontSize: 14,
+                      color: '#1F2937',
+                      fontWeight: 500,
+                      transition: 'background-color 0.2s, color 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = 'rgba(37, 99, 235, 0.08)'
+                      e.currentTarget.style.color = '#1D4ED8'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent'
+                      e.currentTarget.style.color = '#1F2937'
+                    }}
+                  >
+                    <span style={{ display: 'flex', width: 20, justifyContent: 'center' }}>⇔</span>
+                    Fit to Page Width
+                  </button>
+                  <button
+                    onClick={() => handleZoomMenuAction(fitToTextWidth)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      border: 'none',
+                      borderRadius: 8,
+                      padding: '8px 12px',
+                      backgroundColor: 'transparent',
+                      cursor: 'pointer',
+                      fontSize: 14,
+                      color: '#1F2937',
+                      fontWeight: 500,
+                      transition: 'background-color 0.2s, color 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = 'rgba(37, 99, 235, 0.08)'
+                      e.currentTarget.style.color = '#1D4ED8'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent'
+                      e.currentTarget.style.color = '#1F2937'
+                    }}
+                  >
+                    <span style={{ display: 'flex', width: 20, justifyContent: 'center' }}>≋</span>
+                    Fit to Text Width
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+          </div>
+          {shouldForceSinglePageMode && (
+            <div style={{ position: 'absolute', top: -6, left: '50%', transform: 'translateX(-50%)', fontSize: 10, fontWeight: 600, color: 'rgba(255,255,255,0.85)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+              Safari pagination forced
+            </div>
+          )}
+        </>
+      )}
 
       {/* Main Content Area */}
       <div style={{
@@ -2508,7 +2951,7 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
           style={{
             flex: 1,
             display: 'flex',
-            alignItems: continuousScroll ? 'flex-start' : 'center',
+            alignItems: 'flex-start',
             justifyContent: 'center',
             padding: 24,
             overflow: 'auto',
@@ -2860,19 +3303,6 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
           />
         )}
       </div>
-
-      {/* Floating Zoom Control */}
-      <ZoomControl
-        scale={scale}
-        onZoomIn={zoomIn}
-        onZoomOut={zoomOut}
-        onFitToWidth={fitToWidth}
-        onFitToTextWidth={fitToTextWidth}
-        isTablet={isTablet}
-        isChatVisible={isChatVisible}
-        scrollContainerRef={scrollContainerRef}
-        isMobile={isMobile}
-      />
 
       {/* Floating Open AI Assistant button (hidden when chat is visible) */}
       {!isChatVisible && (
