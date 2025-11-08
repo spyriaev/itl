@@ -1609,6 +1609,18 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
     }
   }
 
+  useEffect(() => {
+    if (continuousScroll) {
+      return
+    }
+    const container = scrollContainerRef.current
+    if (!container) {
+      return
+    }
+    // Сбрасываем горизонтальное смещение при переключении страниц
+    container.scrollTo({ left: 0, behavior: 'auto' })
+  }, [continuousScroll, currentPage])
+
   const handleZoomMenuAction = useCallback((action: () => void | Promise<unknown>) => {
     const result = action()
     if (result instanceof Promise) {
@@ -2540,6 +2552,9 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
     ? undefined
     : navControlTop! + navControlHeight / 2 - backButtonSize / 2
   const shouldDelayMobileRender = isMobile && !isMobileInitialScaleApplied
+  const singlePageKnownWidth = pageWidths.get(currentPage)
+  const singlePageEstimatedWidth = singlePageKnownWidth || initialPageWidth || (scale * 612)
+  const singlePageContainerWidth = Math.max(120, (singlePageEstimatedWidth || 0) + 32)
 
   if (error) {
     return (
@@ -3031,8 +3046,8 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
             alignItems: 'flex-start',
             justifyContent: 'center',
             padding: 24,
-            overflow: 'auto',
             overflowX: 'hidden',
+            overflowY: 'scroll',
             WebkitOverflowScrolling: 'touch',
             overscrollBehaviorX: 'contain',
             overscrollBehaviorY: 'auto',
@@ -3041,6 +3056,8 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
             position: 'relative',
             opacity: shouldDelayMobileRender ? 0 : 1,
             pointerEvents: shouldDelayMobileRender ? 'none' : 'auto',
+            willChange: shouldDelayMobileRender ? 'opacity' : undefined,
+            scrollbarGutter: 'stable both-edges',
           }}>
           {shouldDelayMobileRender && (
             <div style={{
@@ -3314,37 +3331,113 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
               </Document>
             </div>
           ) : (
-            /* Single Page Mode - Original behavior */
+            /* Single Page Mode */
             <div style={{
               backgroundColor: 'white',
               borderRadius: 8,
               boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
               padding: 16,
+              margin: '0 auto',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              width: '100%',
+              maxWidth: `${singlePageContainerWidth}px`,
+              boxSizing: 'border-box',
+              gap: 8,
             }}>
-              <Document
-                file={documentInfo.url}
-                onLoadSuccess={onDocumentLoadSuccess}
-                onLoadError={() => setError('Failed to load PDF document')}
-                options={pdfOptions}
-              >
-                <Page
-                  key={`page-${currentPage}-scale-${scale}`}
-                  pageNumber={currentPage}
-                  scale={scale}
-                  renderTextLayer={true}
-                  renderAnnotationLayer={true}
-                  onLoadSuccess={(page) => {
-                    // Call onRenderComplete when single page is loaded
-                    if (!renderCompleteCalledRef.current) {
-                      renderCompleteCalledRef.current = true
-                      setIsFullyRendered(true)
-                      requestAnimationFrame(() => {
-                        onRenderComplete?.()
-                      })
+              <div style={{
+                width: '100%',
+                display: 'flex',
+                justifyContent: 'center',
+              }}>
+                <Document
+                  file={documentInfo.url}
+                  onLoadSuccess={onDocumentLoadSuccess}
+                  onLoadError={() => setError('Failed to load PDF document')}
+                  options={pdfOptions}
+                >
+                  <Page
+                    key={`page-${currentPage}-scale-${scale}`}
+                    pageNumber={currentPage}
+                    scale={scale}
+                    renderTextLayer={true}
+                    renderAnnotationLayer={true}
+                    onLoadSuccess={(page) => {
+                      // Call onRenderComplete when single page is loaded
+                      if (!renderCompleteCalledRef.current) {
+                        renderCompleteCalledRef.current = true
+                        setIsFullyRendered(true)
+                        requestAnimationFrame(() => {
+                          onRenderComplete?.()
+                        })
+                      }
+                    }}
+                  />
+                </Document>
+              </div>
+              {pageWidths.get(currentPage) && (
+                <div style={{
+                  textAlign: 'center',
+                  marginTop: 4,
+                  fontSize: 12,
+                  color: '#6B7280',
+                  fontWeight: 500,
+                }}>
+                  Page {currentPage} of {numPages}
+                </div>
+              )}
+              {pageWidths.get(currentPage) && (
+                <div style={{
+                  width: `${singlePageEstimatedWidth}px`,
+                  maxWidth: 'min(100%, calc(100vw - 80px))',
+                  overflow: 'hidden',
+                  boxSizing: 'border-box',
+                  margin: '0 auto',
+                }}>
+                  <PageRelatedQuestions
+                    questionsData={pageQuestionsMap.get(currentPage) || null}
+                    onQuestionClick={handleQuestionClick}
+                    isStreaming={(() => {
+                      if (!chatIsStreaming || messages.length === 0) return false
+                      const lastUserMessage = [...messages].reverse().find(msg =>
+                        msg.role === 'user' &&
+                        msg.pageContext === currentPage
+                      )
+                      if (!lastUserMessage) return false
+                      const assistantMessage = messages.find(msg =>
+                        msg.role === 'assistant' &&
+                        msg.pageContext === currentPage &&
+                        messages.indexOf(msg) > messages.indexOf(lastUserMessage)
+                      )
+                      return !assistantMessage || !assistantMessage.content || assistantMessage.content.trim() === ''
+                    })()}
+                    currentPageNumber={
+                      chatIsStreaming && messages.length > 0
+                        ? (() => {
+                            const lastUserMessage = [...messages].reverse().find(msg =>
+                              msg.role === 'user' &&
+                              msg.pageContext === currentPage
+                            )
+                            return lastUserMessage ? currentPage : undefined
+                          })()
+                        : undefined
                     }
-                  }}
-                />
-              </Document>
+                    streamingQuestionText={
+                      chatIsStreaming && messages.length > 0
+                        ? (() => {
+                            const lastUserMessage = [...messages].reverse().find(msg =>
+                              msg.role === 'user' &&
+                              msg.pageContext === currentPage &&
+                              msg.content
+                            )
+                            return lastUserMessage?.content || undefined
+                          })()
+                        : undefined
+                    }
+                  />
+                </div>
+              )}
             </div>
           )}
         </div>
