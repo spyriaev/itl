@@ -22,6 +22,8 @@ body {
   overflow-x: hidden; /* Prevent horizontal scroll */
   max-width: 100vw; /* Prevent overflow on iOS */
   position: relative;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Header Styles */
@@ -65,6 +67,10 @@ body {
   overflow-x: hidden; /* Prevent horizontal scroll */
   width: 100%;
   box-sizing: border-box;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 /* Documents Header */
@@ -124,11 +130,15 @@ body {
   background-color: #ffffff;
   border-radius: 16px;
   padding: 80px 40px;
-  margin-bottom: 24px;
+  margin-bottom: 0;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   overflow-x: hidden; /* Prevent horizontal scroll */
   width: 100%;
   box-sizing: border-box;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .upload-dropzone {
@@ -309,27 +319,21 @@ body {
 /* Column widths: Name flexes most; others compact */
 .document-table th:nth-child(1),
 .document-table td:nth-child(1) {
-  width: 58%;
+  width: 56%;
 }
 
 .document-table th:nth-child(2),
 .document-table td:nth-child(2) {
-  width: 14%;
+  width: 18%;
 }
 
 .document-table th:nth-child(3),
 .document-table td:nth-child(3) {
-  width: 18%;
+  width: 14%;
 }
 
 .document-table th:nth-child(4),
 .document-table td:nth-child(4) {
-  width: 10%;
-  text-align: right;
-}
-
-.document-table th:nth-child(5),
-.document-table td:nth-child(5) {
   width: 12%;
   text-align: right;
 }
@@ -402,19 +406,20 @@ body {
 
 .document-page-badge {
   position: absolute;
-  bottom: -6px;
+  bottom: -8px;
   right: -6px;
-  background-color: #2d66f5;
-  color: #ffffff;
-  font-size: 9px;
-  font-weight: 700;
-  padding: 2px 5px;
-  border-radius: 8px;
+  background-color: #ffffff;
+  color: #6e7787;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 9999px;
   line-height: 1;
-  min-width: 16px;
+  min-width: 18px;
   text-align: center;
   z-index: 2;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  border: 1px solid #d1d5db;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
 }
 
 .document-icon {
@@ -436,24 +441,40 @@ body {
 
 .document-size {
   color: #6e7787;
+  font-size: 16px;
 }
 
 .document-date {
   color: #6e7787;
+  font-size: 16px;
+}
+
+.document-meta-row {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+  color: #6e7787;
+  font-size: 16px;
 }
 
 .document-questions-badge {
+  position: absolute;
+  top: -8px;
+  right: -8px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 32px;
-  height: 24px;
-  padding: 0 10px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
   background-color: #1dd75b;
   color: #ffffff;
-  border-radius: 12px;
-  font-size: 13px;
+  border-radius: 9999px;
+  font-size: 10px;
   font-weight: 600;
+  line-height: 1;
+  z-index: 3;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
 }
 
 .document-actions-wrapper {
@@ -791,6 +812,15 @@ body {
     font-size: 14px;
   }
 
+  .document-size,
+  .document-date {
+    font-size: 14px;
+  }
+
+  .document-meta-row {
+    font-size: 14px;
+  }
+
   .info-card {
     padding: 24px;
   }
@@ -901,6 +931,15 @@ body {
     font-size: 13px;
   }
 
+  .document-size,
+  .document-date {
+    font-size: 13px;
+  }
+
+  .document-meta-row {
+    font-size: 13px;
+  }
+
   .upload-text-hint {
     font-size: 12px;
   }
@@ -1001,11 +1040,6 @@ body {
   }
 
   /* Position questions badge on mobile */
-  .document-table-body td:nth-child(4) {
-    margin-top: 0;
-    display: inline-block;
-  }
-
   .document-actions-button {
     width: 28px;
     height: 28px;
@@ -1043,8 +1077,8 @@ body {
     display: none;
   }
 
-  .document-table th:nth-child(5),
-  .document-table td:nth-child(5) {
+  .document-table th:nth-child(4),
+  .document-table td:nth-child(4) {
     width: 28%;
   }
 

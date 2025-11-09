@@ -29,6 +29,23 @@ function PageBadge({ currentPage }: { currentPage?: number | null }) {
   )
 }
 
+function QuestionsBadge({ count }: { count?: number | null }) {
+  const { t } = useTranslation()
+
+  if (!count || count <= 0) {
+    return null
+  }
+
+  return (
+    <span
+      className="document-questions-badge"
+      title={t("documentList.questionsBadgeTitle", { defaultValue: "Вопросов: {{count}}", count })}
+    >
+      {count}
+    </span>
+  )
+}
+
 // Cache badge component
 function CacheBadge({ documentId }: { documentId: string }) {
   const { t } = useTranslation()
@@ -300,7 +317,7 @@ export function DocumentList({ documents, loading, onDocumentClick, loadingDocum
                 onShareCreated={onRefresh}
                 onShareRevoked={onRefresh}
                 onExposeOpen={(openFn) => registerShareOpener(doc.id, openFn)}
-                renderTrigger={() => null}
+                renderTrigger={() => <span style={{ display: 'none' }} aria-hidden="true" />}
               />
               <button
                 onClick={() => {
@@ -325,6 +342,7 @@ export function DocumentList({ documents, loading, onDocumentClick, loadingDocum
               >
                 <div className="document-icon-container">
                   <PageBadge currentPage={doc.lastViewedPage} />
+                  {doc.status === "uploaded" && <QuestionsBadge count={doc.questionsCount} />}
                   <svg
                     className="document-icon"
                     viewBox="0 0 24 24"
@@ -361,9 +379,6 @@ export function DocumentList({ documents, loading, onDocumentClick, loadingDocum
                         </span>
                       )}
                       {doc.status === 'uploaded' && <CacheBadge documentId={doc.id} />}
-                      {doc.status === 'uploaded' && doc.questionsCount !== undefined && doc.questionsCount > 0 && (
-                        <span className="document-questions-badge" style={{ flexShrink: 0 }}>{doc.questionsCount}</span>
-                      )}
                     </div>
                     {!doc.isShared && (
                       <div className="document-actions-wrapper">
@@ -430,7 +445,7 @@ export function DocumentList({ documents, loading, onDocumentClick, loadingDocum
                       </div>
                     )}
                   </div>
-                  <div style={{ display: 'flex', gap: 12, marginTop: 8, color: '#6e7787', fontSize: 13 }}>
+                  <div className="document-meta-row">
                     {isDeletingDocument ? (
                       <span>{t("documentList.deleting")}</span>
                     ) : isLoadingDocument ? (
@@ -458,7 +473,6 @@ export function DocumentList({ documents, loading, onDocumentClick, loadingDocum
                 <th>{t("documentList.name")}</th>
                 <th>{t("documentList.size")}</th>
                 <th>{t("documentList.lastModified")}</th>
-                <th>{t("documentList.questions")}</th>
                 <th style={{ width: 140 }}>{t("documentList.actions")}</th>
               </tr>
             </thead>
@@ -473,7 +487,7 @@ export function DocumentList({ documents, loading, onDocumentClick, loadingDocum
                     onShareCreated={onRefresh}
                     onShareRevoked={onRefresh}
                     onExposeOpen={(openFn) => registerShareOpener(doc.id, openFn)}
-                    renderTrigger={() => null}
+                    renderTrigger={() => <span style={{ display: 'none' }} aria-hidden="true" />}
                   />
                   <tr 
                     onClick={() => {
@@ -494,6 +508,7 @@ export function DocumentList({ documents, loading, onDocumentClick, loadingDocum
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
                           <div className="document-icon-container">
                             <PageBadge currentPage={doc.lastViewedPage} />
+                            {doc.status === "uploaded" && <QuestionsBadge count={doc.questionsCount} />}
                             <svg
                               className="document-icon"
                               viewBox="0 0 24 24"
@@ -534,11 +549,6 @@ export function DocumentList({ documents, loading, onDocumentClick, loadingDocum
                     </td>
                     <td className="document-date">
                       {isDeletingDocument ? t("documentList.deleting") : (isLoadingDocument ? t("documentList.loading") : (doc.status === "uploaded" ? formatDate(doc.createdAt) : t("documentList.loading")))}
-                    </td>
-                    <td>
-                      {doc.status === "uploaded" && doc.questionsCount !== undefined && doc.questionsCount > 0 && (
-                        <span className="document-questions-badge">{doc.questionsCount}</span>
-                      )}
                     </td>
                     <td
                       onClick={(e) => e.stopPropagation()}
