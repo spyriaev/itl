@@ -152,7 +152,7 @@ class AIService:
         
         if context_type == "document":
             # Include all pages (with limit)
-            max_pages = 50  # Limit to avoid context overflow
+            max_pages = 1  # Limit to avoid context overflow
             for i in range(1, min(total_pages, max_pages) + 1):
                 pages.add(i)
         elif context_type in ["chapter", "section"] and chapter_info:
@@ -166,12 +166,6 @@ class AIService:
             # Default: page context (current + surrounding pages)
             pages.add(current_page)
             
-            # Add surrounding pages
-            for i in range(1, self.context_pages + 1):
-                if current_page - i >= 1:
-                    pages.add(current_page - i)
-                if current_page + i <= total_pages:
-                    pages.add(current_page + i)
         
         return sorted(list(pages))
     
@@ -271,13 +265,19 @@ You do not have access to any PDF document context. Answer questions to the best
         current_page: int, 
         total_pages: int,
         context_type: str = "page",
-        chapter_info: Optional[dict] = None
+        chapter_info: Optional[dict] = None,
+        preloaded_context_text: Optional[str] = None,
+        preloaded_context_pages: Optional[List[int]] = None
     ) -> AsyncGenerator[str, None]:
         """Generate streaming response from AI API with PDF context"""
         try:
             # Extract text from relevant pages
-            context_pages = self.build_context_pages(current_page, total_pages, context_type, chapter_info)
-            pdf_text = await self.extract_text_from_pdf(pdf_url, context_pages)
+            context_pages = preloaded_context_pages or self.build_context_pages(
+                current_page, total_pages, context_type, chapter_info
+            )
+            pdf_text = preloaded_context_text
+            if pdf_text is None:
+                pdf_text = await self.extract_text_from_pdf(pdf_url, context_pages)
             
             # Build context description
             if context_type == "document":

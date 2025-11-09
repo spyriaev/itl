@@ -55,6 +55,7 @@ class ChatMessage(Base):
     page_context = Column(Integer, nullable=True)  # Page number when message was sent
     chapter_id = Column(UUID(as_uuid=True), ForeignKey("document_structure.id", ondelete="SET NULL"), nullable=True)
     context_type = Column(Text, default="page")  # 'page', 'chapter', 'section', 'document'
+    context_text = Column(Text, nullable=True)  # Raw context text provided to the assistant
     tokens_used = Column(Integer, nullable=True)  # Tokens used for this message (AI responses)
     usage_tracked_at = Column(DateTime(timezone=True), nullable=True)  # When usage was tracked
     created_at = Column(DateTime(timezone=True), server_default=func.now())

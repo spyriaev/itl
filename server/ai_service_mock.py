@@ -14,6 +14,8 @@ import logging
 import asyncio
 import random
 from typing import List, AsyncGenerator, Optional
+from io import BytesIO
+import fitz  # PyMuPDF
 
 logger = logging.getLogger(__name__)
 
@@ -78,29 +80,29 @@ class MockAIService:
         logger.info("🔧 Mock AI Service initialized (для тестирования)")
     
     async def extract_text_from_pdf(self, pdf_url: str, page_numbers: List[int]) -> str:
-        """
-        Эмуляция извлечения текста из PDF.
-        
-        Args:
-            pdf_url: URL документа
-            page_numbers: Список номеров страниц
+        try:
+            import httpx
+            async with httpx.AsyncClient() as client:
+                response = await client.get(pdf_url)
+                response.raise_for_status()
+                pdf_data = BytesIO(response.content)
             
-        Returns:
-            Сгенерированный текст для имитации содержимого PDF
-        """
-        logger.debug(f"📄 Mock: Extracting text from pages {page_numbers}")
-        
-        # Имитируем задержку
-        await asyncio.sleep(0.1)
-        
-        # Генерируем реалистичное содержимое страниц
-        text_parts = []
-        for page_num in page_numbers:
-            # Генерируем реалистичный текст для страницы
-            page_text = self._generate_mock_page_content(page_num)
-            text_parts.append(f"--- Page {page_num} ---\n{page_text}")
-        
-        return "\n\n".join(text_parts)
+            doc = fitz.open(stream=pdf_data, filetype="pdf")
+            text_parts = []
+            
+            for page_num in page_numbers:
+                if 1 <= page_num <= doc.page_count:
+                    page = doc[page_num - 1]  # PyMuPDF uses 0-based indexing
+                    text = page.get_text()
+                    if text.strip():
+                        text_parts.append(f"--- Page {page_num} ---\n{text.strip()}")
+            
+            doc.close()
+            return "\n\n".join(text_parts)
+            
+        except Exception as e:
+            logger.error(f"Error extracting text from PDF: {e}")
+            return f"Error extracting text from pages {page_numbers}: {str(e)}"
     
     def build_context_pages(self, current_page: int, total_pages: int, 
                            context_type: str = "page", chapter_info: Optional[dict] = None) -> List[int]:
@@ -134,12 +136,7 @@ class MockAIService:
             # По умолчанию: контекст страницы (текущая + окружающие страницы)
             pages.add(current_page)
             
-            # Добавляем окружающие страницы
-            for i in range(1, self.context_pages + 1):
-                if current_page - i >= 1:
-                    pages.add(current_page - i)
-                if current_page + i <= total_pages:
-                    pages.add(current_page + i)
+
         
         return sorted(list(pages))
     
@@ -198,7 +195,9 @@ class MockAIService:
         current_page: int, 
         total_pages: int,
         context_type: str = "page",
-        chapter_info: Optional[dict] = None
+        chapter_info: Optional[dict] = None,
+        preloaded_context_text: Optional[str] = None,
+        preloaded_context_pages: Optional[List[int]] = None
     ) -> AsyncGenerator[str, None]:
         """
         Генерация стримингового ответа с контекстом документа.
@@ -210,6 +209,8 @@ class MockAIService:
             total_pages: Общее количество страниц
             context_type: Тип контекста
             chapter_info: Информация о главе
+            preloaded_context_text: Предварительно извлеченный текст контекста (если есть)
+            preloaded_context_pages: Предварительно рассчитанные страницы контекста (если есть)
             
         Yields:
             Токены ответа по мере генерации
@@ -224,8 +225,12 @@ class MockAIService:
         last_message = messages[-1]["content"] if messages else "Не могу понять ваш вопрос"
         
         # Имитируем извлечение текста из PDF для расчета токенов контекста
-        context_pages = self.build_context_pages(current_page, total_pages, context_type, chapter_info)
-        pdf_text = await self.extract_text_from_pdf(pdf_url, context_pages)
+        context_pages = preloaded_context_pages or self.build_context_pages(
+            current_page, total_pages, context_type, chapter_info
+        )
+        pdf_text = preloaded_context_text
+        if pdf_text is None:
+            pdf_text = await self.extract_text_from_pdf(pdf_url, context_pages)
         
         # Добавляем системное сообщение с контекстом (как в реальном сервисе)
         system_message = {

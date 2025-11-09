@@ -244,7 +244,8 @@ def create_chat_message(
     content: str, 
     page_context: Optional[int] = None,
     context_type: str = "page",
-    chapter_id: Optional[str] = None
+    chapter_id: Optional[str] = None,
+    context_text: Optional[str] = None
 ) -> MessageResponse:
     """Create a new chat message"""
     message = ChatMessage(
@@ -254,7 +255,8 @@ def create_chat_message(
         content=content,
         page_context=page_context,
         context_type=context_type,
-        chapter_id=uuid.UUID(chapter_id) if chapter_id else None
+        chapter_id=uuid.UUID(chapter_id) if chapter_id else None,
+        context_text=context_text
     )
     
     db.add(message)

@@ -864,12 +864,107 @@ async def send_chat_message(
     # None means "no context", so we need to check if it's explicitly "none" or None
     use_context = request.pageContext is not None or (context_type and context_type != "none")
     
-    # Save user message with context info
+    # Build thread history text
+    history_lines = []
+    for existing_message in thread_with_messages.messages:
+        role_label = "USER" if existing_message.role == "user" else "ASSISTANT"
+        history_lines.append(f"{role_label}: {existing_message.content}")
+    history_text = "\n\n".join(history_lines)
+    
+    # Resolve context-related metadata
+    current_page = request.pageContext or document.last_viewed_page or 1
+    total_pages = 100  # Default fallback until exact page count is known
+    if use_context and context_type and context_type != "none":
+        effective_context_type = context_type
+    elif use_context:
+        effective_context_type = "page"
+    else:
+        effective_context_type = "none"
+    
+    chapter_info = None
+    if use_context and context_type in ["chapter", "section"] and chapter_id:
+        from models import DocumentStructure
+        chapter = db.query(DocumentStructure).filter(DocumentStructure.id == uuid.UUID(chapter_id)).first()
+        if chapter:
+            chapter_info = {
+                "id": str(chapter.id),
+                "title": chapter.title,
+                "pageFrom": chapter.page_from,
+                "pageTo": chapter.page_to
+            }
+    
+    document_context_text = None
+    context_pages = None
+    pdf_url = None
+    
+    if use_context:
+        # Get document view URL for AI context
+        try:
+            if not supabase:
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail="Supabase storage not available"
+                )
+            
+            signed_url_response = supabase.storage.from_('pdfs').create_signed_url(
+                document.storage_key,
+                expires_in=3600
+            )
+            
+            if not signed_url_response.get('signedURL'):
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Failed to create signed URL"
+                )
+            
+            pdf_url = signed_url_response['signedURL']
+        
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to create signed URL: {str(e)}"
+            )
+        
+        context_pages = ai_service.build_context_pages(
+            current_page, total_pages, effective_context_type, chapter_info
+        )
+        document_context_text = await ai_service.extract_text_from_pdf(pdf_url, context_pages)
+    
+    # Compose full context payload for analytics
+    context_sections = []
+    if history_text:
+        context_sections.append(f"Thread history:\n{history_text}")
+    
+    if use_context:
+        context_details = []
+        if request.pageContext is not None:
+            context_details.append(f"requested page {request.pageContext}")
+        if context_pages:
+            context_details.append(f"context pages: {', '.join(map(str, context_pages))}")
+        if chapter_info:
+            chapter_range = f"pages {chapter_info['pageFrom']}-{chapter_info['pageTo']}" if chapter_info.get("pageTo") else f"starting at page {chapter_info['pageFrom']}"
+            context_details.append(f"chapter \"{chapter_info['title']}\" ({chapter_range})")
+        context_header = "Document context"
+        if context_details:
+            context_header += f" ({'; '.join(context_details)})"
+        context_body = document_context_text or "No document context extracted."
+        context_sections.append(f"{context_header}:\n{context_body}")
+    
+    if request.content:
+        context_sections.append(f"User request:\n{request.content}")
+    
+    full_context_payload = "\n\n---\n\n".join(context_sections)
+    
+    # Save user message with compiled context payload
     user_message = create_chat_message(
-        db, thread_id, "user", request.content, 
+        db,
+        thread_id,
+        "user",
+        request.content,
         page_context=request.pageContext,
-        context_type=context_type or "none",
-        chapter_id=chapter_id
+        context_type=effective_context_type,
+        chapter_id=chapter_id,
+        context_text=full_context_payload
     )
     
     # Prepare messages for AI (excluding the just-added user message)
@@ -913,6 +1008,7 @@ async def send_chat_message(
                     page_context=None,
                     context_type="none",
                     chapter_id=None,
+                    context_text=full_context_payload,
                     tokens_used=tokens_used if tokens_used > 0 else None,
                     usage_tracked_at=datetime.utcnow() if tokens_used > 0 else None
                 )
@@ -956,52 +1052,6 @@ async def send_chat_message(
             }
         )
     
-    # Get document view URL for AI context (only if we're using context)
-    try:
-        if not supabase:
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Supabase storage not available"
-            )
-            
-        signed_url_response = supabase.storage.from_('pdfs').create_signed_url(
-            document.storage_key,
-            expires_in=3600
-        )
-        
-        if not signed_url_response.get('signedURL'):
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to create signed URL"
-            )
-        
-        pdf_url = signed_url_response['signedURL']
-        
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to create signed URL: {str(e)}"
-        )
-    
-    # Get current page context (use request pageContext or document's last viewed page)
-    current_page = request.pageContext or document.last_viewed_page or 1
-    
-    # Get chapter info if context is chapter/section
-    chapter_info = None
-    if context_type in ["chapter", "section"] and chapter_id:
-        from models import DocumentStructure
-        chapter = db.query(DocumentStructure).filter(DocumentStructure.id == uuid.UUID(chapter_id)).first()
-        if chapter:
-            chapter_info = {
-                "id": str(chapter.id),
-                "title": chapter.title,
-                "pageFrom": chapter.page_from,
-                "pageTo": chapter.page_to
-            }
-    
-    # Estimate total pages (this is a rough estimate, could be improved)
-    total_pages = 100  # Default fallback
-    
     async def generate_response():
         """Generate streaming response with context"""
         assistant_content = ""
@@ -1012,7 +1062,14 @@ async def send_chat_message(
         try:
             # Stream AI response with context type
             async for chunk in ai_service.generate_response_stream(
-                ai_messages, pdf_url, current_page, total_pages, context_type, chapter_info
+                ai_messages,
+                pdf_url,
+                current_page,
+                total_pages,
+                effective_context_type,
+                chapter_info,
+                preloaded_context_text=document_context_text,
+                preloaded_context_pages=context_pages
             ):
                 if isinstance(chunk, dict) and chunk.get('type') == 'usage':
                     # Extract token usage info
@@ -1032,8 +1089,9 @@ async def send_chat_message(
                 role="assistant",
                 content=assistant_content,
                 page_context=current_page,
-                context_type=context_type,
+                context_type=effective_context_type,
                 chapter_id=uuid.UUID(chapter_id) if chapter_id else None,
+                    context_text=full_context_payload,
                 tokens_used=tokens_used if tokens_used > 0 else None,
                 usage_tracked_at=datetime.utcnow() if tokens_used > 0 else None
             )
