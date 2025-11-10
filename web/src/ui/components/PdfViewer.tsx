@@ -80,6 +80,7 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
   const [visiblePageRange, setVisiblePageRange] = useState<{ start: number, end: number }>({ start: 1, end: 10 })
   const [assistantButtonPosition, setAssistantButtonPosition] = useState<{ right: number | string, bottom: number | string }>({ right: 24, bottom: 24 })
   const [pendingChatScaleRestore, setPendingChatScaleRestore] = useState<number | null>(null)
+  const [safariScrollOverride, setSafariScrollOverride] = useState<boolean>(false)
 
   // Text selection state
   const [selectionMenu, setSelectionMenu] = useState<{ position: { top: number; left: number }, selectedText: string, pageNumber: number } | null>(null)
@@ -223,6 +224,10 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
 
     loadDocument()
   }, [documentId, preloadedDocumentInfo])
+
+  useEffect(() => {
+    setSafariScrollOverride(false)
+  }, [documentId])
 
   // Calculate initial scale to avoid flickering (PDF is already loaded on document list screen)
   useEffect(() => {
@@ -1408,8 +1413,8 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
   }, [numPages, visiblePageRange])
 
   // Функция для прокрутки к определенной странице
-  const scrollToPage = useCallback((pageNumber: number) => {
-    if (!continuousScroll || !scrollContainerRef.current || pageRefs.current.length === 0) {
+  const scrollToPage = useCallback((pageNumber: number, options?: { force?: boolean }) => {
+    if ((!continuousScroll && !options?.force) || !scrollContainerRef.current || pageRefs.current.length === 0) {
       return
     }
 
@@ -1631,19 +1636,27 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
     }
   }
 
-  const toggleContinuousScroll = () => {
-    if (shouldForceSinglePageMode) {
+  const handleScrollModeChange = useCallback((mode: 'scroll' | 'pages') => {
+    if (mode === 'scroll') {
+      if (shouldForceSinglePageMode) {
+        setSafariScrollOverride(true)
+      }
+      if (!continuousScroll) {
+        setContinuousScroll(true)
+        setTimeout(() => {
+          scrollToPage(currentPage, { force: true })
+        }, 100)
+      }
       return
     }
-    setContinuousScroll(!continuousScroll)
 
-    // Если переключаемся в режим непрерывного скролла, прокручиваем к текущей странице
-    if (!continuousScroll) {
-      setTimeout(() => {
-        scrollToPage(currentPage)
-      }, 100)
+    if (continuousScroll) {
+      setContinuousScroll(false)
     }
-  }
+    if (safariScrollOverride) {
+      setSafariScrollOverride(false)
+    }
+  }, [continuousScroll, currentPage, scrollToPage, shouldForceSinglePageMode, safariScrollOverride])
 
   useEffect(() => {
     if (continuousScroll) {
@@ -1658,10 +1671,14 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
   }, [continuousScroll, currentPage])
 
   useEffect(() => {
-    if (shouldForceSinglePageMode && continuousScroll) {
-      setContinuousScroll(false)
+    if (shouldForceSinglePageMode) {
+      if (continuousScroll && !safariScrollOverride) {
+        setContinuousScroll(false)
+      }
+    } else if (safariScrollOverride) {
+      setSafariScrollOverride(false)
     }
-  }, [shouldForceSinglePageMode, continuousScroll])
+  }, [shouldForceSinglePageMode, continuousScroll, safariScrollOverride])
 
   // Вычисление позиции кнопки ассистента на основе ширины страницы
   useEffect(() => {
@@ -2639,6 +2656,9 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
   const prevButtonDisabled = currentPage <= 1
   const nextButtonDisabled = currentPage >= numPages || numPages === 0
   const showPrevNextButtons = !continuousScroll
+  const showScrollModeToggle = isSafariBrowser && numPages > 0
+  const isScrollModeActive = continuousScroll
+  const safariScrollModeActive = shouldForceSinglePageMode && safariScrollOverride && isScrollModeActive
   const navControlTop = isMobile ? undefined : 24
   const backButtonSize = isMobile ? 38 : 48
   const topControlsGap = isMobile ? 8 : 12
@@ -2848,7 +2868,7 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
               position: 'relative'
             }}
           >
-            {shouldForceSinglePageMode && (
+            {shouldForceSinglePageMode && !safariScrollOverride && !continuousScroll && (
             <div
               style={{
                 position: 'absolute',
@@ -2868,7 +2888,7 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
                 boxShadow: '0 4px 10px rgba(0,0,0,0.25)'
               }}
             >
-              Safari pagination forced
+              Safari pagination recommended
             </div>
             )}
             {showPrevNextButtons && (
@@ -2944,9 +2964,9 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
             )}
           </div>
           </div>
-          {shouldForceSinglePageMode && (
+          {shouldForceSinglePageMode && !safariScrollOverride && !continuousScroll && (
             <div style={{ position: 'absolute', top: -6, left: '50%', transform: 'translateX(-50%)', fontSize: 10, fontWeight: 600, color: 'rgba(255,255,255,0.85)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-              Safari pagination forced
+              Safari pagination recommended
             </div>
           )}
         </>
@@ -3452,6 +3472,101 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
           gap: topControlsGap,
         }}
       >
+        {showScrollModeToggle && (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: isMobile ? 4 : 6 }}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+                padding: isMobile ? '2px 4px' : '4px 6px',
+                borderRadius: 9999,
+                backgroundColor: 'rgba(17, 24, 39, 0.9)',
+                boxShadow: '0 8px 14px -4px rgba(0, 0, 0, 0.35)',
+              }}
+            >
+              <button
+                onClick={() => handleScrollModeChange('scroll')}
+                aria-pressed={isScrollModeActive}
+                style={{
+                  border: 'none',
+                  borderRadius: 9999,
+                  padding: isMobile ? '4px 10px' : '6px 14px',
+                  backgroundColor: isScrollModeActive ? '#F9FAFB' : 'transparent',
+                  color: isScrollModeActive ? '#111827' : 'rgba(255,255,255,0.9)',
+                  fontSize: isMobile ? 8 : 11,
+                  fontWeight: 600,
+                  letterSpacing: '0.04em',
+                  cursor: 'pointer',
+                  transition: 'background-color 0.2s, color 0.2s, transform 0.2s',
+                  textTransform: 'uppercase',
+                }}
+                onMouseEnter={(e) => {
+                  if (!isScrollModeActive) {
+                    e.currentTarget.style.color = '#F9FAFB'
+                  }
+                  e.currentTarget.style.transform = 'translateY(-1px)'
+                }}
+                onMouseLeave={(e) => {
+                  if (!isScrollModeActive) {
+                    e.currentTarget.style.color = 'rgba(255,255,255,0.9)'
+                  }
+                  e.currentTarget.style.transform = 'translateY(0)'
+                }}
+              >
+                Scroll
+              </button>
+              <button
+                onClick={() => handleScrollModeChange('pages')}
+                aria-pressed={!isScrollModeActive}
+                style={{
+                  border: 'none',
+                  borderRadius: 9999,
+                  padding: isMobile ? '4px 10px' : '6px 14px',
+                  backgroundColor: !isScrollModeActive ? '#F9FAFB' : 'transparent',
+                  color: !isScrollModeActive ? '#111827' : 'rgba(255,255,255,0.9)',
+                  fontSize: isMobile ? 8 : 11,
+                  fontWeight: 600,
+                  letterSpacing: '0.04em',
+                  cursor: 'pointer',
+                  transition: 'background-color 0.2s, color 0.2s, transform 0.2s',
+                  textTransform: 'uppercase',
+                }}
+                onMouseEnter={(e) => {
+                  if (isScrollModeActive) {
+                    e.currentTarget.style.color = '#F9FAFB'
+                  }
+                  e.currentTarget.style.transform = 'translateY(-1px)'
+                }}
+                onMouseLeave={(e) => {
+                  if (isScrollModeActive) {
+                    e.currentTarget.style.color = 'rgba(255,255,255,0.9)'
+                  }
+                  e.currentTarget.style.transform = 'translateY(0)'
+                }}
+              >
+                Pages
+              </button>
+            </div>
+            {safariScrollModeActive && (
+              <div
+                style={{
+                  fontSize: 9,
+                  fontWeight: 600,
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  color: 'rgba(255,255,255,0.8)',
+                  backgroundColor: 'rgba(17, 24, 39, 0.8)',
+                  borderRadius: 9999,
+                  padding: '2px 8px',
+                  boxShadow: '0 4px 10px rgba(0, 0, 0, 0.25)',
+                }}
+              >
+                Scroll mode enabled
+              </div>
+            )}
+          </div>
+        )}
         <div style={{ position: 'relative' }}>
           <button
             ref={zoomMenuButtonRef}
