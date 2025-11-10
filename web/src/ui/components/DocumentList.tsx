@@ -487,7 +487,7 @@ export function DocumentList({ documents, loading, onDocumentClick, loadingDocum
                     onShareCreated={onRefresh}
                     onShareRevoked={onRefresh}
                     onExposeOpen={(openFn) => registerShareOpener(doc.id, openFn)}
-                    renderTrigger={() => <span style={{ display: 'none' }} aria-hidden="true" />}
+                    renderTrigger={() => null}
                   />
                   <tr 
                     onClick={() => {

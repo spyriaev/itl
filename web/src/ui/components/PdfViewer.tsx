@@ -79,7 +79,6 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
   const [initialPageWidth, setInitialPageWidth] = useState<number | null>(null)
   const [visiblePageRange, setVisiblePageRange] = useState<{ start: number, end: number }>({ start: 1, end: 10 })
   const [assistantButtonPosition, setAssistantButtonPosition] = useState<{ right: number | string, bottom: number | string }>({ right: 24, bottom: 24 })
-  const [isZoomMenuOpen, setIsZoomMenuOpen] = useState<boolean>(false)
 
   // Text selection state
   const [selectionMenu, setSelectionMenu] = useState<{ position: { top: number; left: number }, selectedText: string, pageNumber: number } | null>(null)
@@ -1629,42 +1628,11 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
     container.scrollTo({ left: 0, behavior: 'auto' })
   }, [continuousScroll, currentPage])
 
-  const handleZoomMenuAction = useCallback((action: () => void | Promise<unknown>) => {
-    const result = action()
-    if (result instanceof Promise) {
-      result.finally(() => setIsZoomMenuOpen(false))
-    } else {
-      setIsZoomMenuOpen(false)
-    }
-  }, [])
-
   useEffect(() => {
     if (shouldForceSinglePageMode && continuousScroll) {
       setContinuousScroll(false)
     }
   }, [shouldForceSinglePageMode, continuousScroll])
-
-  useEffect(() => {
-    if (!isZoomMenuOpen) {
-      return
-    }
-    const handleOutsideClick = (event: MouseEvent | TouchEvent) => {
-      const target = event.target as Node | null
-      if (
-        (zoomMenuRef.current && zoomMenuRef.current.contains(target)) ||
-        (zoomMenuButtonRef.current && zoomMenuButtonRef.current.contains(target))
-      ) {
-        return
-      }
-      setIsZoomMenuOpen(false)
-    }
-    document.addEventListener('mousedown', handleOutsideClick, true)
-    document.addEventListener('touchstart', handleOutsideClick, true)
-    return () => {
-      document.removeEventListener('mousedown', handleOutsideClick, true)
-      document.removeEventListener('touchstart', handleOutsideClick, true)
-    }
-  }, [isZoomMenuOpen])
 
   // Вычисление позиции кнопки ассистента на основе ширины страницы
   useEffect(() => {
@@ -2461,6 +2429,10 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
       return false
     }
   }, [scale, currentPage, isMobile, isTablet, fitToWidth, updateVisiblePageRange, updateVisiblePage])
+
+  const handleZoomButtonClick = useCallback(() => {
+    void fitToTextWidth()
+  }, [fitToTextWidth])
 
   useEffect(() => {
     if (!isMobile) {
@@ -3369,7 +3341,7 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
         <div style={{ position: 'relative' }}>
           <button
             ref={zoomMenuButtonRef}
-            onClick={() => setIsZoomMenuOpen((prev) => !prev)}
+            onClick={handleZoomButtonClick}
             style={{
               height: zoomButtonSize,
               borderRadius: 9999,
@@ -3395,199 +3367,10 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
               e.currentTarget.style.opacity = '1'
               e.currentTarget.style.transform = 'translateY(0)'
             }}
-            aria-haspopup="true"
-            aria-expanded={isZoomMenuOpen}
-            aria-label={`Open zoom options, current zoom ${zoomDisplayValue}`}
+            aria-label="Smart zoom"
           >
-            {`zoom x ${zoomDisplayValue}`}
+            smart zoom
           </button>
-          {isZoomMenuOpen && (
-            <div
-              ref={zoomMenuRef}
-              style={{
-                position: 'absolute',
-                top: 'calc(100% + 10px)',
-                right: 0,
-                backgroundColor: 'white',
-                color: '#111827',
-                borderRadius: 12,
-                boxShadow: '0 25px 50px -12px rgba(30, 64, 175, 0.35)',
-                minWidth: isMobile ? 200 : 220,
-                maxWidth: 260,
-                padding: '10px 8px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 6,
-                zIndex: 3100
-              }}
-              data-zoom-menu
-            >
-              <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: '0.02em', color: '#1D4ED8', textTransform: 'uppercase' }}>
-                Zoom Options
-              </div>
-              <button
-                onClick={() => handleZoomMenuAction(zoomIn)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  border: 'none',
-                  borderRadius: 8,
-                  padding: '6px 10px',
-                  backgroundColor: 'transparent',
-                  cursor: 'pointer',
-                  fontSize: 14,
-                  color: '#1F2937',
-                  fontWeight: 500,
-                  transition: 'background-color 0.2s, color 0.2s'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'rgba(37, 99, 235, 0.08)'
-                  e.currentTarget.style.color = '#1D4ED8'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent'
-                  e.currentTarget.style.color = '#1F2937'
-                }}
-              >
-                <span style={{ display: 'flex', width: 20, justifyContent: 'center' }}>+</span>
-                Zoom In
-              </button>
-              <button
-                onClick={() => handleZoomMenuAction(zoomOut)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  border: 'none',
-                  borderRadius: 8,
-                  padding: '6px 10px',
-                  backgroundColor: 'transparent',
-                  cursor: 'pointer',
-                  fontSize: 14,
-                  color: '#1F2937',
-                  fontWeight: 500,
-                  transition: 'background-color 0.2s, color 0.2s'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'rgba(37, 99, 235, 0.08)'
-                  e.currentTarget.style.color = '#1D4ED8'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent'
-                  e.currentTarget.style.color = '#1F2937'
-                }}
-              >
-                <span style={{ display: 'flex', width: 20, justifyContent: 'center' }}>−</span>
-                Zoom Out
-              </button>
-              <button
-                onClick={() => handleZoomMenuAction(resetZoom)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  border: 'none',
-                  borderRadius: 8,
-                  padding: '6px 10px',
-                  backgroundColor: 'transparent',
-                  cursor: 'pointer',
-                  fontSize: 14,
-                  color: '#1F2937',
-                  fontWeight: 500,
-                  transition: 'background-color 0.2s, color 0.2s'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'rgba(37, 99, 235, 0.08)'
-                  e.currentTarget.style.color = '#1D4ED8'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent'
-                  e.currentTarget.style.color = '#1F2937'
-                }}
-              >
-                <span style={{ display: 'flex', width: 20, height: 20, alignItems: 'center', justifyContent: 'center' }}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="12" cy="12" r="7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                    <path d="M12 5V2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                    <polyline points="15 5 12 2 9 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </span>
-                Reset Zoom
-              </button>
-              <div style={{ height: 1, backgroundColor: 'rgba(148, 163, 184, 0.35)', margin: '4px 0' }} />
-              <button
-                onClick={() => handleZoomMenuAction(fitToWidth)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  border: 'none',
-                  borderRadius: 8,
-                  padding: '6px 10px',
-                  backgroundColor: 'transparent',
-                  cursor: 'pointer',
-                  fontSize: 14,
-                  color: '#1F2937',
-                  fontWeight: 500,
-                  transition: 'background-color 0.2s, color 0.2s'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'rgba(37, 99, 235, 0.08)'
-                  e.currentTarget.style.color = '#1D4ED8'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent'
-                  e.currentTarget.style.color = '#1F2937'
-                }}
-              >
-                <span style={{ display: 'flex', width: 20, height: 20, alignItems: 'center', justifyContent: 'center' }}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <rect x="4.5" y="5" width="15" height="14" rx="2.2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-                    <polyline points="10 9 7 12 10 15" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-                    <polyline points="14 9 17 12 14 15" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </span>
-                Fit to Page Width
-              </button>
-              <button
-                onClick={() => handleZoomMenuAction(fitToTextWidth)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  border: 'none',
-                  borderRadius: 8,
-                  padding: '6px 10px',
-                  backgroundColor: 'transparent',
-                  cursor: 'pointer',
-                  fontSize: 14,
-                  color: '#1F2937',
-                  fontWeight: 500,
-                  transition: 'background-color 0.2s, color 0.2s'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'rgba(37, 99, 235, 0.08)'
-                  e.currentTarget.style.color = '#1D4ED8'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent'
-                  e.currentTarget.style.color = '#1F2937'
-                }}
-              >
-                <span style={{ display: 'flex', width: 20, height: 20, alignItems: 'center', justifyContent: 'center' }}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M6 8H18" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-                    <path d="M6 12H16" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-                    <path d="M6 16H18" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-                    <path d="M5 9H4V15H5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-                    <path d="M19 9H20V15H19" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </span>
-                Fit to Text Width
-              </button>
-            </div>
-          )}
         </div>
         <button
           onClick={onClose}
