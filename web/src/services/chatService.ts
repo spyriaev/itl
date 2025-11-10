@@ -325,7 +325,7 @@ class ChatService {
     documentId: string,
     firstMessage: string,
     pageContext?: number,
-    contextType?: string,
+    contextType?: ContextType,
     chapterId?: string,
     onChunk?: (content: string) => void,
     onComplete?: (messageId: string) => void,
