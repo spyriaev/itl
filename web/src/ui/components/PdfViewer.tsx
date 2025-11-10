@@ -16,7 +16,7 @@ import 'react-pdf/dist/Page/AnnotationLayer.css'
 import 'react-pdf/dist/Page/TextLayer.css'
 
 // Configure PDF.js worker
-pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`
+pdfjs.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString()
 
 // Configure PDF.js for better memory management
 const pdfOptions = {
@@ -25,7 +25,7 @@ const pdfOptions = {
   // Enable automatic cleanup
   enableXfa: false,
   // Limit image cache
-  maxImageSize: 5242880, // 5MB max per image
+  maxImageSize: -1, // -1 disables the limit to avoid dropping large images
   // Use standard font data from CDN to avoid bundling
   standardFontDataUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/standard_fonts/`,
 }
