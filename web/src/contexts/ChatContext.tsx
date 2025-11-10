@@ -5,6 +5,7 @@ import {
   initQuestionsCache
 } from '../services/questionsCache'
 import { isOnline } from '../hooks/useNetworkStatus'
+import type { ContextType } from '../types/document'
 
 interface ChatContextType {
   // State
@@ -20,8 +21,8 @@ interface ChatContextType {
   loadThreads: (documentId: string) => Promise<void>
   selectThread: (threadId: string) => Promise<void>
   createNewThread: (documentId: string, title?: string) => Promise<ChatThread>
-  sendMessage: (content: string, pageContext?: number, contextType?: string, chapterId?: string) => Promise<void>
-  startNewConversation: (documentId: string, firstMessage: string, pageContext?: number, contextType?: string, chapterId?: string) => Promise<void>
+  sendMessage: (content: string, pageContext?: number, contextType?: ContextType, chapterId?: string) => Promise<void>
+  startNewConversation: (documentId: string, firstMessage: string, pageContext?: number, contextType?: ContextType, chapterId?: string) => Promise<void>
   navigateToMessage: (threadId: string, messageId: string) => Promise<void>
   clearError: () => void
 }
@@ -91,11 +92,14 @@ export function ChatProvider({ children }: ChatProviderProps) {
       // Try to load from cache first
       const cachedMessages = await getCachedMessages(threadId)
       if (cachedMessages.length > 0) {
+        const normalizedCachedMessages: ChatMessage[] = cachedMessages.map(({ threadId: _threadId, ...rest }) => ({
+          ...rest
+        }))
         // Find the thread in the threads list
         const thread = threads.find(t => t.id === threadId)
         if (thread) {
           setActiveThread(thread)
-          setMessages(cachedMessages)
+          setMessages(normalizedCachedMessages)
         }
       }
       
@@ -147,7 +151,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
     }
   }, [threads])
 
-  const sendMessage = useCallback(async (content: string, pageContext?: number, contextType?: string, chapterId?: string) => {
+  const sendMessage = useCallback(async (content: string, pageContext?: number, contextType?: ContextType, chapterId?: string) => {
     if (!activeThread) {
       setError('No active thread')
       return
@@ -163,14 +167,19 @@ export function ChatProvider({ children }: ChatProviderProps) {
       setIsStreaming(true)
       setError(null)
 
+      const resolvedContextType: ContextType =
+        contextType ?? (typeof pageContext === 'number' ? 'page' : 'none')
+      const resolvedPageContext = resolvedContextType === 'page' ? pageContext : undefined
+      const resolvedChapterId = resolvedContextType === 'chapter' ? chapterId : undefined
+
       // Add user message immediately
       const userMessage: ChatMessage = {
         id: `temp-${Date.now()}`,
         role: 'user',
         content,
-        pageContext,
-        contextType,
-        chapterId,
+        pageContext: resolvedPageContext,
+        contextType: resolvedContextType,
+        chapterId: resolvedChapterId,
         createdAt: new Date().toISOString()
       }
       setMessages(prev => [...prev, userMessage])
@@ -181,9 +190,9 @@ export function ChatProvider({ children }: ChatProviderProps) {
         id: assistantMessageId,
         role: 'assistant',
         content: '',
-        pageContext,
-        contextType,
-        chapterId,
+        pageContext: resolvedPageContext,
+        contextType: resolvedContextType,
+        chapterId: resolvedChapterId,
         createdAt: new Date().toISOString()
       }
       setMessages(prev => [...prev, assistantMessage])
@@ -191,7 +200,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
       // Stream the response
       await chatService.sendMessage(
         activeThread.id,
-        { content, pageContext, contextType, chapterId },
+        { content, pageContext: resolvedPageContext, contextType: resolvedContextType, chapterId: resolvedChapterId },
         (chunk) => {
           // Update the streaming assistant message
           setMessages(prev => prev.map(msg => 
@@ -246,7 +255,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
     documentId: string, 
     firstMessage: string, 
     pageContext?: number,
-    contextType?: string,
+    contextType?: ContextType,
     chapterId?: string
   ) => {
     // Check if offline
@@ -260,13 +269,18 @@ export function ChatProvider({ children }: ChatProviderProps) {
       setError(null)
 
       // Add messages to state FIRST before streaming starts
+      const resolvedContextType: ContextType =
+        contextType ?? (typeof pageContext === 'number' ? 'page' : 'none')
+      const resolvedPageContext = resolvedContextType === 'page' ? pageContext : undefined
+      const resolvedChapterId = resolvedContextType === 'chapter' ? chapterId : undefined
+
       const userMessage: ChatMessage = {
         id: `temp-user-${Date.now()}`,
         role: 'user',
         content: firstMessage,
-        pageContext,
-        contextType,
-        chapterId,
+        pageContext: resolvedPageContext,
+        contextType: resolvedContextType,
+        chapterId: resolvedChapterId,
         createdAt: new Date().toISOString()
       }
       
@@ -275,9 +289,9 @@ export function ChatProvider({ children }: ChatProviderProps) {
         id: assistantMessageId,
         role: 'assistant',
         content: '',
-        pageContext,
-        contextType,
-        chapterId,
+        pageContext: resolvedPageContext,
+        contextType: resolvedContextType,
+        chapterId: resolvedChapterId,
         createdAt: new Date().toISOString()
       }
       
@@ -301,9 +315,9 @@ export function ChatProvider({ children }: ChatProviderProps) {
           newThread.id,
           { 
             content: firstMessage, 
-            pageContext,
-            contextType,
-            chapterId
+            pageContext: resolvedPageContext,
+            contextType: resolvedContextType,
+            chapterId: resolvedChapterId
           },
           (chunk) => {
             // Handle streaming for new conversation
@@ -399,10 +413,13 @@ export function ChatProvider({ children }: ChatProviderProps) {
       // Try to load from cache first
       const cachedMessages = await getCachedMessages(threadId)
       if (cachedMessages.length > 0) {
+        const normalizedCachedMessages: ChatMessage[] = cachedMessages.map(({ threadId: _threadId, ...rest }) => ({
+          ...rest
+        }))
         const thread = threads.find(t => t.id === threadId)
         if (thread) {
           setActiveThread(thread)
-          setMessages(cachedMessages)
+          setMessages(normalizedCachedMessages)
           setTargetMessageId(messageId)
           setTimeout(() => setTargetMessageId(null), 3000)
         }

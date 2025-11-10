@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { DocumentStructureItem } from '../../types/document'
+import { ContextType, DocumentStructureItem } from '../../types/document'
 import { useNetworkStatus } from '../../hooks/useNetworkStatus'
 
 interface ChatInputProps {
@@ -13,8 +13,8 @@ interface ChatInputProps {
   // Context selection props
   contextItems?: DocumentStructureItem[]
   currentPage?: number
-  selectedLevel?: number | null | 'none'
-  onContextChange?: (level: number | null | 'none') => void
+  contextType?: ContextType
+  onContextChange?: (type: ContextType) => void
   isMobile?: boolean
 }
 
@@ -27,7 +27,7 @@ export function ChatInput({
   isStreaming = false,
   contextItems = [],
   currentPage = 1,
-  selectedLevel = null,
+  contextType = 'page',
   onContextChange,
   isMobile = false
 }: ChatInputProps) {
@@ -99,30 +99,23 @@ export function ChatInput({
   const handleContextChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     if (!onContextChange) return
     const value = e.target.value
-    if (value === 'page') {
-      onContextChange(null)
-    } else if (value === 'none') {
+    if (value === 'none') {
       onContextChange('none')
     } else if (value === 'chapter') {
-      // Find the current chapter based on contextItems
-      const currentChapter = contextItems.find(item => item.level === 1)
-      if (currentChapter) {
-        onContextChange(currentChapter.level)
-      }
+      onContextChange('chapter')
+    } else {
+      onContextChange('page')
     }
   }
 
   const handleMobileContextChange = (value: string) => {
     if (!onContextChange) return
-    if (value === 'page') {
-      onContextChange(null)
-    } else if (value === 'none') {
+    if (value === 'none') {
       onContextChange('none')
     } else if (value === 'chapter') {
-      const currentChapter = contextItems.find(item => item.level === 1)
-      if (currentChapter) {
-        onContextChange(currentChapter.level)
-      }
+      onContextChange('chapter')
+    } else {
+      onContextChange('page')
     }
     setIsContextMenuOpen(false)
   }
@@ -144,9 +137,9 @@ export function ChatInput({
   }, [isContextMenuOpen])
 
   const getContextDisplay = () => {
-    if (selectedLevel === 'none') return ''
-    if (selectedLevel === null) return `${t("chatMessage.page")} ${currentPage}`
-    const item = contextItems.find(item => item.level === selectedLevel)
+    if (contextType === 'none') return ''
+    if (contextType === 'page') return `${t("chatMessage.page")} ${currentPage}`
+    const item = contextItems[contextItems.length - 1]
     if (item) {
       const cleanTitle = item.title
         .replace(/[☑☒☐✓✗×◊◆►▸▹►▲▼]/g, '')
@@ -157,27 +150,14 @@ export function ChatInput({
     return ''
   }
 
-  const hasChapter = contextItems.some(item => item.level === 1)
+  const hasChapter = contextItems.length > 0
 
-  const getSelectedValue = () => {
-    if (selectedLevel === 'none') return 'none'
-    if (selectedLevel === null) return 'page'
-    // If selectedLevel is a number, it means we have a chapter/section selected
-    if (hasChapter) {
-      return 'chapter'
-    }
-    // If no chapter structure but selectedLevel is a number, we need to reset
-    // This happens when user previously had chapter selected but structure changed
-    return 'page'
-  }
-
-  // Effect to reset invalid selectedLevel when chapter structure disappears
+  // Effect to reset invalid chapter selection when chapter structure disappears
   React.useEffect(() => {
-    if (onContextChange && typeof selectedLevel === 'number' && !hasChapter) {
-      // Reset to page if chapter structure is no longer available
-      onContextChange(null)
+    if (onContextChange && contextType === 'chapter' && !hasChapter) {
+      onContextChange('page')
     }
-  }, [hasChapter, selectedLevel, onContextChange])
+  }, [hasChapter, contextType, onContextChange])
 
   const editorStyle = React.useMemo<React.CSSProperties>(() => ({
     ...styles.editor,
@@ -310,8 +290,8 @@ export function ChatInput({
                       textOverflow: 'ellipsis',
                       whiteSpace: 'nowrap',
                     }}>
-                      {getSelectedValue() === 'none' ? t("chatInput.noContext") :
-                       getSelectedValue() === 'page' ? t("chatInput.currentPage") :
+                      {contextType === 'none' ? t("chatInput.noContext") :
+                       contextType === 'page' ? t("chatInput.currentPage") :
                        t("chatInput.currentChapter")}
                     </span>
                   </button>
@@ -337,10 +317,10 @@ export function ChatInput({
                         style={{
                           width: '100%',
                           padding: '8px 12px',
-                          backgroundColor: getSelectedValue() === 'none' ? '#EFF6FF' : 'transparent',
+                          backgroundColor: contextType === 'none' ? '#EFF6FF' : 'transparent',
                           border: 'none',
                           fontSize: 13,
-                          color: getSelectedValue() === 'none' ? '#2d66f5' : '#374151',
+                          color: contextType === 'none' ? '#2d66f5' : '#374151',
                           cursor: 'pointer',
                           textAlign: 'left',
                           display: 'flex',
@@ -348,7 +328,7 @@ export function ChatInput({
                           gap: 8,
                         }}
                       >
-                        {getSelectedValue() === 'none' && (
+                        {contextType === 'none' && (
                           <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <path d="M11.6667 3.5L5.25 9.91667L2.33334 7" stroke="#2d66f5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                           </svg>
@@ -361,10 +341,10 @@ export function ChatInput({
                         style={{
                           width: '100%',
                           padding: '8px 12px',
-                          backgroundColor: getSelectedValue() === 'page' ? '#EFF6FF' : 'transparent',
+                          backgroundColor: contextType === 'page' ? '#EFF6FF' : 'transparent',
                           border: 'none',
                           fontSize: 13,
-                          color: getSelectedValue() === 'page' ? '#2d66f5' : '#374151',
+                          color: contextType === 'page' ? '#2d66f5' : '#374151',
                           cursor: 'pointer',
                           textAlign: 'left',
                           display: 'flex',
@@ -373,7 +353,7 @@ export function ChatInput({
                           borderTop: '1px solid #F3F4F6',
                         }}
                       >
-                        {getSelectedValue() === 'page' && (
+                        {contextType === 'page' && (
                           <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <path d="M11.6667 3.5L5.25 9.91667L2.33334 7" stroke="#2d66f5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                           </svg>
@@ -387,10 +367,10 @@ export function ChatInput({
                           style={{
                             width: '100%',
                             padding: '8px 12px',
-                            backgroundColor: getSelectedValue() === 'chapter' ? '#EFF6FF' : 'transparent',
+                            backgroundColor: contextType === 'chapter' ? '#EFF6FF' : 'transparent',
                             border: 'none',
                             fontSize: 13,
-                            color: getSelectedValue() === 'chapter' ? '#2d66f5' : '#374151',
+                            color: contextType === 'chapter' ? '#2d66f5' : '#374151',
                             cursor: 'pointer',
                             textAlign: 'left',
                             display: 'flex',
@@ -399,7 +379,7 @@ export function ChatInput({
                             borderTop: '1px solid #F3F4F6',
                           }}
                         >
-                          {getSelectedValue() === 'chapter' && (
+                          {contextType === 'chapter' && (
                             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
                               <path d="M11.6667 3.5L5.25 9.91667L2.33334 7" stroke="#2d66f5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                             </svg>
@@ -412,7 +392,7 @@ export function ChatInput({
                 </>
               ) : (
                 <select
-                  value={getSelectedValue()}
+                  value={contextType}
                   onChange={handleContextChange}
                   disabled={isDisabled}
                   style={contextSelectorStyle}

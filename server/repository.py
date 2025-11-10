@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, and_, or_, func
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Literal
 import uuid
 import secrets
 from datetime import datetime, date, timedelta
@@ -14,6 +14,8 @@ from models import (
     UserPlan, PlanLimits, UserUsage, UserPlanResponse, PlanLimitsResponse, UserUsageResponse,
     DocumentShare, DocumentShareAccess, ShareDocumentResponse, ShareStatusResponse
 )
+
+ContextTypeLiteral = Literal['page', 'chapter', 'none']
 
 def create_document(db: Session, request: CreateDocumentRequest, user_id: str) -> DocumentResponse:
     """Create a new document record"""
@@ -243,7 +245,7 @@ def create_chat_message(
     role: str, 
     content: str, 
     page_context: Optional[int] = None,
-    context_type: str = "page",
+    context_type: ContextTypeLiteral = "page",
     chapter_id: Optional[str] = None,
     context_text: Optional[str] = None
 ) -> MessageResponse:

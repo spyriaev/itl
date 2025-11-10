@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase'
+import type { ContextType } from '../types/document'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
 
@@ -14,7 +15,7 @@ export interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
   pageContext?: number
-  contextType?: string
+  contextType?: ContextType
   chapterId?: string
   createdAt: string
 }
@@ -30,7 +31,7 @@ export interface CreateThreadRequest {
 export interface CreateMessageRequest {
   content: string
   pageContext?: number
-  contextType?: string
+  contextType?: ContextType
   chapterId?: string
 }
 

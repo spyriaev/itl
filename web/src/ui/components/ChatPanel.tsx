@@ -44,11 +44,12 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
       onInitialInputValueUsed?.()
     }
   }, [initialInputValue, isVisible, onInitialInputValueUsed])
-  const [selectedLevel, setSelectedLevel] = useState<number | null | 'none'>(null)
+  const [contextType, setContextType] = useState<ContextType>(() =>
+    typeof currentPage === 'number' ? 'page' : 'none'
+  )
   const [chapterInfo, setChapterInfo] = useState<ChapterInfo | null>(null)
   const [documentStructure, setDocumentStructure] = useState<any>(null)
   const [contextItems, setContextItems] = useState<DocumentStructureItem[]>([])
-  const userSelectionRef = useRef<number | null | 'none'>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messageRefs = useRef<Map<string, HTMLDivElement>>(new Map())
   const prevMessagesLengthRef = useRef<number>(0)
@@ -144,9 +145,8 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
   }
 
   // Track user manual selection changes in ContextSelector
-  const handleContextChange = useCallback((level: number | null | 'none') => {
-    userSelectionRef.current = level
-    setSelectedLevel(level)
+  const handleContextChange = useCallback((type: ContextType) => {
+    setContextType(type)
   }, [])
 
   // Load context items when page changes
@@ -158,8 +158,6 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
       const deepestItem = items.length > 0 ? items[items.length - 1] : null
       
       if (deepestItem) {
-        const previousItem = contextItems[0]
-        
         // Pass all items in the path to ChatInput so it can find the chapter
         setContextItems(items)
         setChapterInfo({
@@ -170,22 +168,18 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
           pageTo: deepestItem.pageTo
         })
         
-        // Don't auto-change user's selection if they chose 'none' or 'null'
-        // Only auto-update if user previously selected a section
-        if (selectedLevel !== null && selectedLevel !== 'none') {
-          // User previously selected a section, update to new section level
-          setSelectedLevel(deepestItem.level)
-        }
-        // If selectedLevel is null or 'none', don't change it - let user choose manually
       } else {
         setChapterInfo(null)
         setContextItems([])
-        if (selectedLevel !== null && selectedLevel !== 'none') {
-          setSelectedLevel(null)
-        }
       }
     }
-  }, [currentPage, documentStructure, selectedLevel])
+  }, [currentPage, documentStructure])
+
+  useEffect(() => {
+    if (!chapterInfo && contextType === 'chapter') {
+      setContextType(typeof currentPage === 'number' ? 'page' : 'none')
+    }
+  }, [chapterInfo, contextType, currentPage])
 
   const handleSendMessage = async () => {
     if (!inputValue.trim() || isStreaming) return
@@ -193,32 +187,24 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
     const message = inputValue.trim()
     setInputValue('')
 
-    // Determine context type and chapter ID based on selected level
-    if (selectedLevel === 'none') {
-      // Send without any context
-      try {
-        if (activeThread) {
-          await sendMessage(message, undefined, undefined, undefined)
-        } else {
-          await startNewConversation(documentId, message, undefined, undefined, undefined)
-        }
-      } catch (err) {
-        console.error('Failed to send message:', err)
-      }
-      return
-    }
-
-    const selectedItem = contextItems.find(item => item.level === selectedLevel)
-    const contextType = selectedLevel === null ? 'page' : 'section'
-    const chapterId = selectedItem?.id
+    const selectedChapter = chapterInfo
+    const hasPage = typeof currentPage === 'number'
+    const effectiveContextType: ContextType =
+      contextType === 'chapter' && !selectedChapter
+        ? (hasPage ? 'page' : 'none')
+        : contextType === 'page' && !hasPage
+          ? 'none'
+          : contextType
+    const pageValue = effectiveContextType === 'page' && hasPage ? currentPage : undefined
+    const chapterId = effectiveContextType === 'chapter' ? selectedChapter?.id : undefined
 
     try {
       if (activeThread) {
         // Send message to existing thread
-        await sendMessage(message, currentPage, contextType, chapterId)
+        await sendMessage(message, pageValue, effectiveContextType, chapterId)
       } else {
         // Start new conversation
-        await startNewConversation(documentId, message, currentPage, contextType, chapterId)
+        await startNewConversation(documentId, message, pageValue, effectiveContextType, chapterId)
       }
     } catch (err) {
       console.error('Failed to send message:', err)
@@ -472,7 +458,7 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
           isStreaming={isStreaming}
           contextItems={contextItems || []}
           currentPage={currentPage || 1}
-          selectedLevel={selectedLevel}
+          contextType={contextType}
           onContextChange={handleContextChange}
           isMobile={isMobile}
         />

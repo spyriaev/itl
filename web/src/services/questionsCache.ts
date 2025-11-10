@@ -6,6 +6,7 @@
 
 import { PageQuestionsData, PageQuestion } from './chatService'
 import type { ChatMessage } from './chatService'
+import type { ContextType } from '../types/document'
 import { updateDocumentSyncMetadata, getDocumentSyncMetadata } from './documentListCache'
 
 const DB_NAME = 'questions_cache_db'
@@ -28,10 +29,26 @@ interface CachedMessage {
   role: 'user' | 'assistant'
   content: string
   pageContext?: number
-  contextType?: string
+  contextType?: ContextType
   chapterId?: string
   createdAt: string
 }
+const normalizeContextType = (value?: string): ContextType | undefined => {
+  if (!value) return undefined
+  switch (value) {
+    case 'page':
+      return 'page'
+    case 'chapter':
+    case 'section':
+    case 'document':
+      return 'chapter'
+    case 'none':
+      return 'none'
+    default:
+      return undefined
+  }
+}
+
 
 interface CachedPageQuestions {
   documentId: string
@@ -246,7 +263,7 @@ export async function cacheMessages(threadId: string, messages: (ChatMessage | C
         role: message.role,
         content: message.content,
         pageContext: message.pageContext,
-        contextType: message.contextType,
+        contextType: normalizeContextType(message.contextType),
         chapterId: message.chapterId,
         createdAt: message.createdAt
       }
@@ -295,7 +312,7 @@ export async function appendMessages(threadId: string, messages: (ChatMessage | 
         role: message.role,
         content: message.content,
         pageContext: message.pageContext,
-        contextType: message.contextType,
+        contextType: normalizeContextType(message.contextType),
         chapterId: message.chapterId,
         createdAt: message.createdAt
       }
@@ -337,7 +354,10 @@ export async function getCachedMessages(threadId: string): Promise<CachedMessage
     return new Promise((resolve, reject) => {
       const request = index.getAll(range)
       request.onsuccess = () => {
-        const messages = request.result || []
+        const messages = (request.result || []).map((message: CachedMessage) => ({
+          ...message,
+          contextType: normalizeContextType(message.contextType),
+        }))
         // Sort by createdAt
         messages.sort((a, b) => 
           new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()

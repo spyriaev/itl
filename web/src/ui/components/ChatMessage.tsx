@@ -2,7 +2,7 @@ import React from 'react'
 import { useTranslation } from 'react-i18next'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { DocumentStructureItem } from '../../types/document'
+import { DocumentStructureItem, ContextType } from '../../types/document'
 
 interface ChatMessageProps {
   message: {
@@ -10,7 +10,7 @@ interface ChatMessageProps {
     role: 'user' | 'assistant'
     content: string
     pageContext?: number
-    contextType?: string
+    contextType?: ContextType
     chapterId?: string
     createdAt: string
   }
@@ -48,8 +48,8 @@ export function ChatMessage({ message, documentStructure }: ChatMessageProps) {
     ? findChapterById(documentStructure, message.chapterId)
     : null
 
-  const isChapterContext = message.contextType === 'chapter' || message.contextType === 'section'
-  const shouldShowChapterInfo = isChapterContext && chapterInfo && message.pageContext
+  const isChapterContext = message.contextType === 'chapter'
+  const shouldShowChapterInfo = isChapterContext && chapterInfo
 
   return (
     <div style={{

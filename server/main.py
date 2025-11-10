@@ -2,7 +2,7 @@ from fastapi import FastAPI, Depends, HTTPException, status, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from sqlalchemy.orm import Session
-from typing import List, Optional
+from typing import List, Optional, Literal
 from dataclasses import dataclass
 import os
 import logging
@@ -37,6 +37,18 @@ from repository import (
     check_user_has_document_access
 )
 from pdf_utils import extract_pdf_outline
+
+ContextTypeLiteral = Literal['page', 'chapter', 'none']
+
+
+def normalize_context_type(value: Optional[str]) -> ContextTypeLiteral:
+    if value in ("chapter", "section", "document"):
+        return "chapter"
+    if value == "page":
+        return "page"
+    if value == "none":
+        return "none"
+    return "none"
 
 # Custom exception for limit exceeded errors
 @dataclass
@@ -840,9 +852,12 @@ async def send_chat_message(
         )
     
     # Get context type and chapter info
-    # If contextType is None/undefined, use "none" to skip context entirely
-    context_type = request.contextType if request.contextType is not None else None
-    chapter_id = request.chapterId
+    context_type: ContextTypeLiteral = normalize_context_type(request.contextType)
+    page_context_value = request.pageContext if context_type == "page" else None
+    if context_type == "none" and request.pageContext is not None:
+        context_type = "page"
+        page_context_value = request.pageContext
+    chapter_id = request.chapterId if context_type == "chapter" and request.chapterId else None
     
     # Check questions limit before proceeding
     usage_data = get_user_usage(db, user_id)
@@ -861,8 +876,7 @@ async def send_chat_message(
         )
     
     # Determine if we should use context at all
-    # None means "no context", so we need to check if it's explicitly "none" or None
-    use_context = request.pageContext is not None or (context_type and context_type != "none")
+    use_context = context_type != "none"
     
     # Build thread history text
     history_lines = []
@@ -872,17 +886,12 @@ async def send_chat_message(
     history_text = "\n\n".join(history_lines)
     
     # Resolve context-related metadata
-    current_page = request.pageContext or document.last_viewed_page or 1
+    current_page = request.pageContext
     total_pages = 100  # Default fallback until exact page count is known
-    if use_context and context_type and context_type != "none":
-        effective_context_type = context_type
-    elif use_context:
-        effective_context_type = "page"
-    else:
-        effective_context_type = "none"
+    effective_context_type = context_type if use_context else "none"
     
     chapter_info = None
-    if use_context and context_type in ["chapter", "section"] and chapter_id:
+    if use_context and context_type == "chapter" and chapter_id:
         from models import DocumentStructure
         chapter = db.query(DocumentStructure).filter(DocumentStructure.id == uuid.UUID(chapter_id)).first()
         if chapter:
@@ -961,7 +970,7 @@ async def send_chat_message(
         thread_id,
         "user",
         request.content,
-        page_context=request.pageContext,
+        page_context=page_context_value,
         context_type=effective_context_type,
         chapter_id=chapter_id,
         context_text=full_context_payload

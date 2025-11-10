@@ -225,12 +225,16 @@ class MockAIService:
         last_message = messages[-1]["content"] if messages else "Не могу понять ваш вопрос"
         
         # Имитируем извлечение текста из PDF для расчета токенов контекста
-        context_pages = preloaded_context_pages or self.build_context_pages(
-            current_page, total_pages, context_type, chapter_info
-        )
-        pdf_text = preloaded_context_text
-        if pdf_text is None:
-            pdf_text = await self.extract_text_from_pdf(pdf_url, context_pages)
+        if context_type == "none":
+            context_pages = preloaded_context_pages or []
+            pdf_text = preloaded_context_text or "Контекст не предоставлен (режим без документа)."
+        else:
+            context_pages = preloaded_context_pages or self.build_context_pages(
+                current_page, total_pages, context_type, chapter_info
+            )
+            pdf_text = preloaded_context_text
+            if pdf_text is None:
+                pdf_text = await self.extract_text_from_pdf(pdf_url, context_pages)
         
         # Добавляем системное сообщение с контекстом (как в реальном сервисе)
         system_message = {
@@ -242,7 +246,7 @@ class MockAIService:
         # Генерируем ответ
         response = await self._generate_mock_response(
             last_message, 
-            has_context=True,
+            has_context=context_type != "none",
             page=current_page,
             context_type=context_type
         )

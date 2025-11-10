@@ -22,4 +22,4 @@ export interface ChapterInfo {
   pageTo: number | null
 }
 
-export type ContextType = 'page' | 'chapter' | 'section' | 'document'
+export type ContextType = 'page' | 'chapter' | 'none'

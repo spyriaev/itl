@@ -4,7 +4,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import Optional, List, Literal
 from datetime import date
 import uuid
 
@@ -54,7 +54,7 @@ class ChatMessage(Base):
     content = Column(Text, nullable=False)
     page_context = Column(Integer, nullable=True)  # Page number when message was sent
     chapter_id = Column(UUID(as_uuid=True), ForeignKey("document_structure.id", ondelete="SET NULL"), nullable=True)
-    context_type = Column(Text, default="page")  # 'page', 'chapter', 'section', 'document'
+    context_type = Column(Text, default="page")  # 'page', 'chapter', 'none'
     context_text = Column(Text, nullable=True)  # Raw context text provided to the assistant
     tokens_used = Column(Integer, nullable=True)  # Tokens used for this message (AI responses)
     usage_tracked_at = Column(DateTime(timezone=True), nullable=True)  # When usage was tracked
@@ -156,7 +156,7 @@ class ThreadResponse(BaseModel):
 class CreateMessageRequest(BaseModel):
     content: str
     pageContext: Optional[int] = Field(None, alias="pageContext")
-    contextType: Optional[str] = Field("page", alias="contextType")
+    contextType: Optional[Literal['page', 'chapter', 'none']] = Field(None, alias="contextType")
     chapterId: Optional[str] = Field(None, alias="chapterId")
     
     class Config:
@@ -167,7 +167,7 @@ class MessageResponse(BaseModel):
     role: str
     content: str
     pageContext: Optional[int] = None
-    contextType: Optional[str] = None
+    contextType: Optional[Literal['page', 'chapter', 'none']] = None
     chapterId: Optional[str] = None
     createdAt: str
     
