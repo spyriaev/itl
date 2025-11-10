@@ -79,6 +79,7 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
   const [initialPageWidth, setInitialPageWidth] = useState<number | null>(null)
   const [visiblePageRange, setVisiblePageRange] = useState<{ start: number, end: number }>({ start: 1, end: 10 })
   const [assistantButtonPosition, setAssistantButtonPosition] = useState<{ right: number | string, bottom: number | string }>({ right: 24, bottom: 24 })
+  const [pendingChatScaleRestore, setPendingChatScaleRestore] = useState<number | null>(null)
 
   // Text selection state
   const [selectionMenu, setSelectionMenu] = useState<{ position: { top: number; left: number }, selectedText: string, pageNumber: number } | null>(null)
@@ -94,6 +95,8 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
   const mobileFitToTextAppliedRef = useRef<boolean>(false)
   const initialScaleCalculatedRef = useRef<boolean>(false)
   const prevChatVisibleRef = useRef<boolean>(isChatVisible)
+  const chatScaleBeforeOpenRef = useRef<number | null>(null)
+  const chatZoomManuallyAdjustedRef = useRef<boolean>(false)
   const prevDocumentUrlRef = useRef<string | null>(null)
 
   // Refs для отслеживания скролла
@@ -233,6 +236,32 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
     }
 
     const chatVisibilityChanged = prevChatVisibleRef.current !== isChatVisible
+
+    if (chatVisibilityChanged) {
+      if (isChatVisible) {
+        if (chatScaleBeforeOpenRef.current === null) {
+          chatScaleBeforeOpenRef.current = currentScaleRef.current
+        }
+        chatZoomManuallyAdjustedRef.current = false
+      } else {
+        const previousScale = chatScaleBeforeOpenRef.current
+        const shouldRestoreScale = !chatZoomManuallyAdjustedRef.current && previousScale !== null
+
+        chatScaleBeforeOpenRef.current = null
+        chatZoomManuallyAdjustedRef.current = false
+        prevChatVisibleRef.current = isChatVisible
+
+        if (shouldRestoreScale && previousScale !== null && !documentUrlChanged) {
+          setPendingChatScaleRestore(previousScale)
+          return
+        }
+
+        if (!documentUrlChanged) {
+          return
+        }
+      }
+    }
+
     prevChatVisibleRef.current = isChatVisible
 
     if ((isMobile || isTablet) && chatVisibilityChanged && !documentUrlChanged && initialScaleCalculatedRef.current) {
@@ -1941,6 +1970,12 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
     const oldScale = scale
     const newScale = Math.min(scale + 0.25, 3.0)
     const scaleRatio = newScale / oldScale
+    if (isChatVisible) {
+      chatZoomManuallyAdjustedRef.current = true
+    }
+    if (isChatVisible) {
+      chatZoomManuallyAdjustedRef.current = true
+    }
     
     // Recalculate page heights and widths proportionally to new scale
     setPageHeights(prev => {
@@ -2069,6 +2104,9 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
     const oldScale = scale
     const newScale = 1.0
     const scaleRatio = newScale / oldScale
+    if (isChatVisible) {
+      chatZoomManuallyAdjustedRef.current = true
+    }
     
     // Recalculate page heights and widths proportionally to new scale
     setPageHeights(prev => {
@@ -2189,6 +2227,12 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
       }
 
       const scaleRatio = optimalScale / oldScale
+      if (isChatVisible) {
+        chatZoomManuallyAdjustedRef.current = true
+      }
+      if (isChatVisible) {
+        chatZoomManuallyAdjustedRef.current = true
+      }
       
       // Recalculate page heights and widths proportionally to new scale
       setPageHeights(prev => {
@@ -2433,6 +2477,76 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
   const handleZoomButtonClick = useCallback(() => {
     void fitToTextWidth()
   }, [fitToTextWidth])
+
+  useEffect(() => {
+    if (pendingChatScaleRestore === null) {
+      return
+    }
+
+    const targetScale = Math.max(0.1, Math.min(pendingChatScaleRestore, 3.0))
+    setPendingChatScaleRestore(null)
+
+    const previousScale = currentScaleRef.current
+    if (Math.abs(targetScale - previousScale) < 0.0001) {
+      currentScaleRef.current = targetScale
+      setScale(targetScale)
+      return
+    }
+
+    if (!scrollContainerRef.current) {
+      currentScaleRef.current = targetScale
+      setScale(targetScale)
+      return
+    }
+
+    isZoomingRef.current = true
+
+    const scaleRatio = targetScale / previousScale
+
+    setPageHeights(prev => {
+      const next = new Map<number, number>()
+      prev.forEach((height, pageNum) => {
+        next.set(pageNum, height * scaleRatio)
+      })
+      return next
+    })
+
+    setPageWidths(prev => {
+      const next = new Map<number, number>()
+      prev.forEach((width, pageNum) => {
+        next.set(pageNum, width * scaleRatio)
+      })
+      return next
+    })
+
+    if (updateVisiblePageRangeTimeoutRef.current) {
+      clearTimeout(updateVisiblePageRangeTimeoutRef.current)
+      updateVisiblePageRangeTimeoutRef.current = null
+    }
+
+    currentScaleRef.current = targetScale
+    setScale(targetScale)
+
+    updateVisiblePageRangeTimeoutRef.current = setTimeout(() => {
+      if (!scrollContainerRef.current) {
+        isZoomingRef.current = false
+        return
+      }
+
+      updateVisiblePageRange()
+      requestAnimationFrame(() => {
+        if (!scrollContainerRef.current) {
+          isZoomingRef.current = false
+          return
+        }
+
+        updateVisiblePage()
+        setTimeout(() => {
+          isZoomingRef.current = false
+        }, 200)
+      })
+    }, 50)
+  }, [pendingChatScaleRestore, updateVisiblePageRange, updateVisiblePage])
 
   useEffect(() => {
     if (!isMobile) {
