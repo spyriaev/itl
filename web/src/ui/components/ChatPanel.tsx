@@ -50,6 +50,8 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
   const [chapterInfo, setChapterInfo] = useState<ChapterInfo | null>(null)
   const [documentStructure, setDocumentStructure] = useState<any>(null)
   const [contextItems, setContextItems] = useState<DocumentStructureItem[]>([])
+  const [chapterOptions, setChapterOptions] = useState<DocumentStructureItem[]>([])
+  const [selectedChapterId, setSelectedChapterId] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messageRefs = useRef<Map<string, HTMLDivElement>>(new Map())
   const prevMessagesLengthRef = useRef<number>(0)
@@ -147,39 +149,185 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
   // Track user manual selection changes in ContextSelector
   const handleContextChange = useCallback((type: ContextType) => {
     setContextType(type)
+    if (type !== 'chapter') {
+      setSelectedChapterId(null)
+      return
+    }
+
+    setSelectedChapterId(prev => {
+      if (prev && chapterOptions.some(option => option.id === prev)) {
+        return prev
+      }
+      if (chapterOptions.length > 0) {
+        return chapterOptions[chapterOptions.length - 1].id
+      }
+      return null
+    })
+  }, [chapterOptions])
+
+  const flattenStructure = useCallback((items: DocumentStructureItem[]): DocumentStructureItem[] => {
+    const result: DocumentStructureItem[] = []
+
+    const traverse = (nodes: DocumentStructureItem[]) => {
+      for (const node of nodes) {
+        result.push(node)
+        if (node.children && node.children.length > 0) {
+          traverse(node.children)
+        }
+      }
+    }
+
+    traverse(items)
+    return result
+  }, [])
+
+  const buildChapterOptions = useCallback((items: DocumentStructureItem[], page: number, path: DocumentStructureItem[]) => {
+    const options: DocumentStructureItem[] = []
+    const pushUnique = (item: DocumentStructureItem | null) => {
+      if (!item) return
+      if (!options.some(opt => opt.id === item.id)) {
+        options.push(item)
+      }
+    }
+
+    const currentItem = path.length > 0 ? path[path.length - 1] : null
+    const parentItem = path.length > 1 ? path[path.length - 2] : null
+
+    const sortByOrder = (list: DocumentStructureItem[]) =>
+      [...list].sort((a, b) => a.orderIndex - b.orderIndex)
+
+    const containsPage = (item: DocumentStructureItem) => {
+      const withinStart = item.pageFrom <= page
+      const withinEnd = item.pageTo === null || page <= item.pageTo
+      return withinStart && withinEnd
+    }
+
+    if (currentItem) {
+      const siblings = parentItem
+        ? sortByOrder(parentItem.children || [])
+        : sortByOrder(items)
+
+      const currentIndex = siblings.findIndex(item => item.id === currentItem.id)
+
+      if (currentIndex !== -1) {
+        const previousSibling = currentIndex > 0 ? siblings[currentIndex - 1] : null
+        pushUnique(previousSibling)
+        pushUnique(siblings[currentIndex])
+
+        siblings
+          .slice(currentIndex + 1)
+          .filter(containsPage)
+          .forEach(pushUnique)
+      }
+    }
+
+    if (options.length === 0) {
+      const flattened = flattenStructure(items)
+      const sortedByStart = [...flattened].sort((a, b) => {
+        if (a.pageFrom !== b.pageFrom) {
+          return a.pageFrom - b.pageFrom
+        }
+        return a.orderIndex - b.orderIndex
+      })
+
+      let currentIndex = -1
+
+      for (let i = 0; i < sortedByStart.length; i += 1) {
+        const item = sortedByStart[i]
+        if (containsPage(item)) {
+          currentIndex = i
+          break
+        }
+
+        if (item.pageFrom > page) {
+          currentIndex = i - 1
+          break
+        }
+      }
+
+      if (currentIndex === -1 && sortedByStart.length > 0) {
+        currentIndex = sortedByStart.length - 1
+      }
+
+      if (currentIndex >= 0) {
+        const previousCandidate = currentIndex > 0 ? sortedByStart[currentIndex - 1] : null
+        const currentCandidate = sortedByStart[currentIndex]
+        pushUnique(previousCandidate)
+        pushUnique(currentCandidate)
+      }
+    }
+
+    const defaultCandidate =
+      currentItem ||
+      options.find(item => containsPage(item)) ||
+      (options.length > 0 ? options[options.length - 1] : null)
+
+    const defaultId = defaultCandidate ? defaultCandidate.id : null
+
+    return { options, defaultId }
+  }, [flattenStructure])
+
+  const findItemById = useCallback((items: DocumentStructureItem[], id: string): DocumentStructureItem | null => {
+    for (const item of items) {
+      if (item.id === id) {
+        return item
+      }
+      if (item.children && item.children.length > 0) {
+        const found = findItemById(item.children, id)
+        if (found) {
+          return found
+        }
+      }
+    }
+    return null
   }, [])
 
   // Load context items when page changes
   useEffect(() => {
     if (currentPage && documentStructure) {
       const items = findContextItemsForPage(documentStructure.items, currentPage)
-      
-      // Keep all items in the path (for displaying chapter info)
-      const deepestItem = items.length > 0 ? items[items.length - 1] : null
-      
-      if (deepestItem) {
-        // Pass all items in the path to ChatInput so it can find the chapter
-        setContextItems(items)
-        setChapterInfo({
-          id: deepestItem.id,
-          title: deepestItem.title,
-          level: deepestItem.level,
-          pageFrom: deepestItem.pageFrom,
-          pageTo: deepestItem.pageTo
-        })
-        
-      } else {
-        setChapterInfo(null)
-        setContextItems([])
-      }
+      setContextItems(items)
+
+      const { options, defaultId } = buildChapterOptions(documentStructure.items, currentPage, items)
+      setChapterOptions(options)
+      setSelectedChapterId(prev => {
+        if (prev && options.some(option => option.id === prev)) {
+          return prev
+        }
+        return defaultId
+      })
+    } else {
+      setContextItems([])
+      setChapterOptions([])
+      setSelectedChapterId(null)
     }
-  }, [currentPage, documentStructure])
+  }, [currentPage, documentStructure, buildChapterOptions])
 
   useEffect(() => {
-    if (!chapterInfo && contextType === 'chapter') {
+    if (contextType === 'chapter' && chapterOptions.length === 0) {
       setContextType(typeof currentPage === 'number' ? 'page' : 'none')
     }
-  }, [chapterInfo, contextType, currentPage])
+  }, [chapterOptions, contextType, currentPage])
+
+  useEffect(() => {
+    if (!documentStructure || !selectedChapterId) {
+      setChapterInfo(null)
+      return
+    }
+
+    const item = findItemById(documentStructure.items, selectedChapterId)
+    if (item) {
+      setChapterInfo({
+        id: item.id,
+        title: item.title,
+        level: item.level,
+        pageFrom: item.pageFrom,
+        pageTo: item.pageTo
+      })
+    } else {
+      setChapterInfo(null)
+    }
+  }, [documentStructure, selectedChapterId, findItemById])
 
   const handleSendMessage = async () => {
     if (!inputValue.trim() || isStreaming) return
@@ -187,16 +335,16 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
     const message = inputValue.trim()
     setInputValue('')
 
-    const selectedChapter = chapterInfo
     const hasPage = typeof currentPage === 'number'
+    const hasSelectedChapter = !!chapterInfo
     const effectiveContextType: ContextType =
-      contextType === 'chapter' && !selectedChapter
+      contextType === 'chapter' && !hasSelectedChapter
         ? (hasPage ? 'page' : 'none')
         : contextType === 'page' && !hasPage
           ? 'none'
           : contextType
     const pageValue = effectiveContextType === 'page' && hasPage ? currentPage : undefined
-    const chapterId = effectiveContextType === 'chapter' ? selectedChapter?.id : undefined
+    const chapterId = effectiveContextType === 'chapter' ? chapterInfo?.id : undefined
 
     try {
       if (activeThread) {
@@ -460,6 +608,9 @@ export function ChatPanel({ documentId, currentPage, isVisible, onToggle, isMobi
           currentPage={currentPage || 1}
           contextType={contextType}
           onContextChange={handleContextChange}
+          chapterOptions={chapterOptions}
+          selectedChapterId={selectedChapterId}
+          onChapterSelect={setSelectedChapterId}
           isMobile={isMobile}
         />
       </div>

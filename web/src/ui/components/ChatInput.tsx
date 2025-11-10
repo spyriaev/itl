@@ -15,6 +15,9 @@ interface ChatInputProps {
   currentPage?: number
   contextType?: ContextType
   onContextChange?: (type: ContextType) => void
+  chapterOptions?: DocumentStructureItem[]
+  selectedChapterId?: string | null
+  onChapterSelect?: (id: string | null) => void
   isMobile?: boolean
 }
 
@@ -29,6 +32,9 @@ export function ChatInput({
   currentPage = 1,
   contextType = 'page',
   onContextChange,
+  chapterOptions = [],
+  selectedChapterId = null,
+  onChapterSelect,
   isMobile = false
 }: ChatInputProps) {
   const { t } = useTranslation()
@@ -101,10 +107,26 @@ export function ChatInput({
     const value = e.target.value
     if (value === 'none') {
       onContextChange('none')
-    } else if (value === 'chapter') {
-      onContextChange('chapter')
-    } else {
+      handleChapterSelection(null)
+      return
+    }
+
+    if (value === 'page') {
       onContextChange('page')
+      handleChapterSelection(null)
+      return
+    }
+
+    if (value === 'chapter') {
+      onContextChange('chapter')
+      handleChapterSelection(null)
+      return
+    }
+
+    if (value.startsWith('chapter:')) {
+    const chapterId = value.slice('chapter:'.length)
+    onContextChange('chapter')
+    handleChapterSelection(chapterId === 'default' ? null : chapterId)
     }
   }
 
@@ -112,10 +134,17 @@ export function ChatInput({
     if (!onContextChange) return
     if (value === 'none') {
       onContextChange('none')
+      handleChapterSelection(null)
+    } else if (value === 'page') {
+      onContextChange('page')
+      handleChapterSelection(null)
     } else if (value === 'chapter') {
       onContextChange('chapter')
-    } else {
-      onContextChange('page')
+      handleChapterSelection(null)
+    } else if (value.startsWith('chapter:')) {
+      const chapterId = value.slice('chapter:'.length)
+      onContextChange('chapter')
+      handleChapterSelection(chapterId === 'default' ? null : chapterId)
     }
     setIsContextMenuOpen(false)
   }
@@ -136,28 +165,52 @@ export function ChatInput({
     }
   }, [isContextMenuOpen])
 
+  const sanitizeTitle = (title: string) => title
+    .replace(/[☑☒☐✓✗×◊◆►▸▹►▲▼]/g, '')
+    .replace(/[^\p{L}\p{N}\s.,;:!?()[\]{}""''-]/gu, '')
+    .trim()
+
+  const selectedChapter = React.useMemo(() => {
+    if (!selectedChapterId) return null
+    return chapterOptions.find(item => item.id === selectedChapterId) || null
+  }, [selectedChapterId, chapterOptions])
+
+  const formatPageRange = (item: DocumentStructureItem | null | undefined) => {
+    if (!item) return ''
+    if (item.pageTo) {
+      return `${item.pageFrom}–${item.pageTo}`
+    }
+    return `${item.pageFrom}–${t("chatInput.toEnd", "end")}`
+  }
+
   const getContextDisplay = () => {
     if (contextType === 'none') return ''
     if (contextType === 'page') return `${t("chatMessage.page")} ${currentPage}`
-    const item = contextItems[contextItems.length - 1]
-    if (item) {
-      const cleanTitle = item.title
-        .replace(/[☑☒☐✓✗×◊◆►▸▹►▲▼]/g, '')
-        .replace(/[^\p{L}\p{N}\s.,;:!?()[\]{}""''-]/gu, '')
-        .trim()
-      return cleanTitle
-    }
-    return ''
+    return t("chatInput.currentChapter")
   }
 
-  const hasChapter = contextItems.length > 0
+  const hasChapter = chapterOptions.length > 0
 
   // Effect to reset invalid chapter selection when chapter structure disappears
   React.useEffect(() => {
     if (onContextChange && contextType === 'chapter' && !hasChapter) {
       onContextChange('page')
+      onChapterSelect?.(null)
     }
-  }, [hasChapter, contextType, onContextChange])
+  }, [hasChapter, contextType, onContextChange, onChapterSelect])
+
+  const contextSelectorValue =
+    contextType === 'chapter'
+      ? `chapter:${selectedChapterId || 'default'}`
+      : contextType
+
+  const handleChapterSelection = (chapterId: string | null) => {
+    if (chapterId) {
+      onChapterSelect?.(chapterId)
+    } else {
+      onChapterSelect?.(null)
+    }
+  }
 
   const editorStyle = React.useMemo<React.CSSProperties>(() => ({
     ...styles.editor,
@@ -290,9 +343,11 @@ export function ChatInput({
                       textOverflow: 'ellipsis',
                       whiteSpace: 'nowrap',
                     }}>
-                      {contextType === 'none' ? t("chatInput.noContext") :
-                       contextType === 'page' ? t("chatInput.currentPage") :
-                       t("chatInput.currentChapter")}
+                      {contextType === 'none'
+                        ? t("chatInput.noContext")
+                        : contextType === 'page'
+                          ? t("chatInput.currentPage")
+                          : (getContextDisplay() || t("chatInput.currentChapter"))}
                     </span>
                   </button>
                   {isContextMenuOpen && (
@@ -361,51 +416,111 @@ export function ChatInput({
                         {t("chatInput.currentPage")}
                       </button>
                       {hasChapter && (
-                        <button
-                          type="button"
-                          onClick={() => handleMobileContextChange('chapter')}
-                          style={{
-                            width: '100%',
-                            padding: '8px 12px',
-                            backgroundColor: contextType === 'chapter' ? '#EFF6FF' : 'transparent',
-                            border: 'none',
-                            fontSize: 13,
-                            color: contextType === 'chapter' ? '#2d66f5' : '#374151',
-                            cursor: 'pointer',
-                            textAlign: 'left',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 8,
-                            borderTop: '1px solid #F3F4F6',
-                          }}
-                        >
-                          {contextType === 'chapter' && (
-                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-                              <path d="M11.6667 3.5L5.25 9.91667L2.33334 7" stroke="#2d66f5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                            </svg>
-                          )}
-                          {t("chatInput.currentChapter")}
-                        </button>
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                          <button
+                            type="button"
+                            onClick={() => handleMobileContextChange('chapter')}
+                            style={{
+                              width: '100%',
+                              padding: '8px 12px',
+                              backgroundColor: contextType === 'chapter' ? '#EFF6FF' : 'transparent',
+                              border: 'none',
+                              fontSize: 13,
+                              color: contextType === 'chapter' ? '#2d66f5' : '#374151',
+                              cursor: 'pointer',
+                              textAlign: 'left',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 8,
+                              borderTop: '1px solid #F3F4F6',
+                            }}
+                          >
+                            {contextType === 'chapter' && !selectedChapterId && (
+                              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M11.6667 3.5L5.25 9.91667L2.33334 7" stroke="#2d66f5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                              </svg>
+                            )}
+                            {t("chatInput.currentChapter")}
+                          </button>
+                          {chapterOptions.map(item => {
+                            const isSelected = contextType === 'chapter' && selectedChapterId === item.id
+                            return (
+                              <button
+                                key={item.id}
+                                type="button"
+                                onClick={() => handleMobileContextChange(`chapter:${item.id}`)}
+                                style={{
+                                  width: '100%',
+                                  padding: '8px 12px 8px 24px',
+                                  backgroundColor: isSelected ? '#EFF6FF' : 'transparent',
+                                  border: 'none',
+                                  fontSize: 13,
+                                  color: isSelected ? '#2d66f5' : '#374151',
+                                  cursor: 'pointer',
+                                  textAlign: 'left',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  alignItems: 'flex-start',
+                                  gap: 4,
+                                  borderTop: '1px solid #F3F4F6',
+                                }}
+                              >
+                                <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                  {isSelected && (
+                                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                      <path d="M11.6667 3.5L5.25 9.91667L2.33334 7" stroke="#2d66f5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                    </svg>
+                                  )}
+                                  {sanitizeTitle(item.title)}
+                                </span>
+                                <span style={{ marginLeft: isSelected ? 22 : 6, fontSize: 11, color: '#6B7280' }}>
+                                  {item.pageTo ? `${item.pageFrom}–${item.pageTo}` : `${item.pageFrom}–${t("chatInput.toEnd", "end")}`}
+                                </span>
+                              </button>
+                            )
+                          })}
+                        </div>
                       )}
                     </div>
                   )}
                 </>
               ) : (
                 <select
-                  value={contextType}
+                  value={contextSelectorValue}
                   onChange={handleContextChange}
                   disabled={isDisabled}
                   style={contextSelectorStyle}
                 >
                   <option value="none">{t("chatInput.noContext")}</option>
                   <option value="page">{t("chatInput.currentPage")}</option>
-                  {hasChapter && <option value="chapter">{t("chatInput.currentChapter")}</option>}
+                  {hasChapter && (
+                    <optgroup label={t("chatInput.currentChapter")}>
+                      {chapterOptions.map(item => {
+                        return (
+                          <option key={item.id} value={`chapter:${item.id}`}>
+                            {`${sanitizeTitle(item.title)}`}
+                          </option>
+                        )
+                      })}
+                    </optgroup>
+                  )}
                 </select>
               )}
             </div>
             {getContextDisplay() && (
-              <div style={styles.contextDisplay}>
-                {getContextDisplay()}
+              <div style={{ ...styles.contextDisplay, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {contextType === 'chapter' && selectedChapter && (
+                  <>
+                    <span style={{ fontSize: 12, color: '#6B7280' }}>
+                    {t("chatMessage.page")} {formatPageRange(selectedChapter)}
+                    </span>
+                  </>
+                )}
+                {contextType === 'page' && (
+                  <span style={{ fontSize: 12, color: '#6B7280' }}>
+                    {t("chatMessage.page")} {currentPage}
+                  </span>
+                )}
               </div>
             )}
           </div>

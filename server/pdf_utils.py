@@ -46,6 +46,8 @@ async def extract_pdf_outline(pdf_url: str) -> List[Dict[str, Any]]:
         item_map = {}  # Maps outline item to our structure item
         parent_stack = []  # Stack to track hierarchy
         
+        num_pages = doc.page_count
+
         for i, (level, title, page) in enumerate(outline):
             # Generate unique ID
             item_id = str(uuid.uuid4())
@@ -62,32 +64,11 @@ async def extract_pdf_outline(pdf_url: str) -> List[Dict[str, Any]]:
                 'id': item_id,
                 'title': title.strip(),
                 'level': level,
-                'pageFrom': page + 1,  # PyMuPDF uses 0-based indexing
+                'pageFrom': max(1, min(page, num_pages)),
                 'pageTo': None,  # Will be set later
                 'parentId': parent_id,
                 'orderIndex': i
             }
-            
-            # Calculate pageTo based on next item
-            if i < len(outline) - 1:
-                next_level, next_title, next_page = outline[i + 1]
-                if next_level <= level:
-                    # Next item is at same or higher level, so this item ends at next page - 1
-                    item['pageTo'] = next_page  # Next page is 0-based, so pageTo is also 0-based
-                    # Convert to 1-based at the end
-                    if i == len(outline) - 2:
-                        # Last item in outline, but there might be more pages in document
-                        item['pageTo'] = doc.page_count
-                    else:
-                        # Not last, so it ends where next item starts
-                        item['pageTo'] = next_page + 1  # Convert to 1-based
-                else:
-                    # Next item is nested, so we need to find the next item at same or higher level
-                    # This is more complex, let's use a simpler approach
-                    item['pageTo'] = None
-            else:
-                # Last item in outline, goes to end of document
-                item['pageTo'] = doc.page_count
             
             structure_items.append(item)
             item_map[(level, title, page)] = item
@@ -97,19 +78,15 @@ async def extract_pdf_outline(pdf_url: str) -> List[Dict[str, Any]]:
             parent_stack = [p for p in parent_stack if p['level'] < level]
             parent_stack.append({'id': item_id, 'level': level, 'page': page})
         
-        # Fix page_to for nested items
+        # Calculate page_to values
         for i, item in enumerate(structure_items):
-            if item['pageTo'] is None:
-                # Find next item at same or higher level
-                for j in range(i + 1, len(structure_items)):
-                    next_item = structure_items[j]
-                    if next_item['level'] <= item['level']:
-                        item['pageTo'] = next_item['pageFrom'] - 1
-                        break
-                
-                # If still None, set to document end
-                if item['pageTo'] is None:
-                    item['pageTo'] = doc.page_count
+            page_to = num_pages
+            for j in range(i + 1, len(structure_items)):
+                next_item = structure_items[j]
+                if next_item['level'] <= item['level']:
+                    page_to = max(item['pageFrom'], next_item['pageFrom'] - 1)
+                    break
+            item['pageTo'] = page_to
         
         doc.close()
         
