@@ -467,6 +467,17 @@ export function DocumentList({ documents, loading, onDocumentClick, loadingDocum
         </div>
       ) : (
         <div className="document-list-container">
+          {/* ShareDocumentButton components rendered outside table to avoid invalid DOM nesting */}
+          {documents.map((doc) => (
+            <ShareDocumentButton
+              key={`share-${doc.id}`}
+              documentId={doc.id}
+              onShareCreated={onRefresh}
+              onShareRevoked={onRefresh}
+              onExposeOpen={(openFn) => registerShareOpener(doc.id, openFn)}
+              renderTrigger={() => null}
+            />
+          ))}
           <table className="document-table">
             <thead className="document-table-header">
               <tr>
@@ -481,15 +492,8 @@ export function DocumentList({ documents, loading, onDocumentClick, loadingDocum
                 const isLoadingDocument = loadingDocumentId === doc.id
                 const isDeletingDocument = deletingDocumentId === doc.id
                 return (
-                <Fragment key={doc.id}>
-                  <ShareDocumentButton
-                    documentId={doc.id}
-                    onShareCreated={onRefresh}
-                    onShareRevoked={onRefresh}
-                    onExposeOpen={(openFn) => registerShareOpener(doc.id, openFn)}
-                    renderTrigger={() => null}
-                  />
-                  <tr 
+                  <tr
+                    key={doc.id} 
                     onClick={() => {
                       if (openMenuId) {
                         closeMenu()
@@ -621,9 +625,8 @@ export function DocumentList({ documents, loading, onDocumentClick, loadingDocum
                       )}
                     </td>
                   </tr>
-                </Fragment>
-              )
-            })}
+                )
+              })}
             </tbody>
           </table>
         </div>

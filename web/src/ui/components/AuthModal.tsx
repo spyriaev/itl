@@ -267,7 +267,10 @@ const styles: { [key: string]: React.CSSProperties } = {
   tab: {
     flex: 1,
     padding: '12px',
-    border: 'none',
+    borderTop: 'none',
+    borderLeft: 'none',
+    borderRight: 'none',
+    borderBottom: '2px solid transparent',
     background: 'none',
     fontSize: '14px',
     lineHeight: '22px',
@@ -275,14 +278,13 @@ const styles: { [key: string]: React.CSSProperties } = {
     fontWeight: '400',
     color: '#565E6C',
     cursor: 'pointer',
-    borderBottom: '2px solid transparent',
     marginBottom: '-2px',
     transition: 'all 0.2s',
   },
   tabActive: {
     fontWeight: '700',
     color: '#171A1F',
-    borderBottomColor: '#171A1F',
+    borderBottom: '2px solid #171A1F',
   },
   form: {
     display: 'flex',

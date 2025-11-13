@@ -12,6 +12,7 @@ import { ChatPanel } from './ChatPanel'
 import { PageRelatedQuestions } from './PageRelatedQuestions'
 import { TextSelectionMenu } from './TextSelectionMenu'
 import { FloatingAnswer } from './FloatingAnswer'
+import PdfViewerV2 from './PdfViewerV2'
 import 'react-pdf/dist/Page/AnnotationLayer.css'
 import 'react-pdf/dist/Page/TextLayer.css'
 
@@ -81,6 +82,7 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
   const [assistantButtonPosition, setAssistantButtonPosition] = useState<{ right: number | string, bottom: number | string }>({ right: 24, bottom: 24 })
   const [pendingChatScaleRestore, setPendingChatScaleRestore] = useState<number | null>(null)
   const [safariScrollOverride, setSafariScrollOverride] = useState<boolean>(false)
+  const [useV2Viewer, setUseV2Viewer] = useState<boolean>(false)
 
   // Text selection state
   const [selectionMenu, setSelectionMenu] = useState<{ position: { top: number; left: number }, selectedText: string, pageNumber: number } | null>(null)
@@ -392,7 +394,7 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
     })
   }, [visiblePageRange, numPages])
 
-  const onDocumentLoadSuccess = useCallback(async (pdf: PDFDocumentProxy) => {
+  const onDocumentLoadSuccess = useCallback(async (pdf: any) => {
     // Store PDF document instance for cleanup
     pdfDocumentRef.current = pdf
 
@@ -2785,6 +2787,57 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
   // At this point documentInfo is guaranteed to be non-null
   // в отрисовке страниц для continuousScroll
   const WINDOW_RENDER_DISTANCE = 4 // чуть шире окно для textLayer, чтобы не пропадал текст при зуме
+  
+  // Render PdfViewerV2 if toggle is enabled
+  if (useV2Viewer) {
+    return (
+      <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1000 }}>
+        <PdfViewerV2
+          documentId={documentId}
+          onClose={onClose}
+          preloadedDocumentInfo={documentInfo}
+          onRenderComplete={onRenderComplete}
+        />
+        {/* Toggle button to switch back to V1 */}
+        <div
+          style={{
+            position: 'fixed',
+            top: 20,
+            right: 20,
+            zIndex: 3001,
+          }}
+        >
+          <button
+            onClick={() => setUseV2Viewer(false)}
+            style={{
+              padding: '8px 16px',
+              borderRadius: 9999,
+              border: 'none',
+              backgroundColor: 'rgba(17, 24, 39, 0.9)',
+              color: 'white',
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: 'pointer',
+              boxShadow: '0 8px 14px -4px rgba(0, 0, 0, 0.35)',
+              transition: 'opacity 0.2s, transform 0.2s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.opacity = '0.9'
+              e.currentTarget.style.transform = 'translateY(-1px)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.opacity = '1'
+              e.currentTarget.style.transform = 'translateY(0)'
+            }}
+            aria-label="Switch to V1 Viewer"
+          >
+            V1 Viewer
+          </button>
+        </div>
+      </div>
+    )
+  }
+  
   return (
     <div
       style={{
@@ -3601,6 +3654,37 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
             smart zoom
           </button>
         </div>
+        <button
+          onClick={() => setUseV2Viewer(true)}
+          style={{
+            height: isMobile ? 32 : 36,
+            borderRadius: 9999,
+            border: 'none',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '0 14px',
+            backgroundColor: 'rgba(17, 24, 39, 0.9)',
+            color: 'white',
+            fontSize: isMobile ? 10 : 12,
+            fontWeight: 600,
+            letterSpacing: '0.04em',
+            cursor: 'pointer',
+            boxShadow: '0 8px 14px -4px rgba(0, 0, 0, 0.35)',
+            transition: 'opacity 0.2s, transform 0.2s',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.opacity = '0.9'
+            e.currentTarget.style.transform = 'translateY(-1px)'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.opacity = '1'
+            e.currentTarget.style.transform = 'translateY(0)'
+          }}
+          aria-label="Switch to V2 Viewer"
+        >
+          V2
+        </button>
         <button
           onClick={onClose}
           style={{
