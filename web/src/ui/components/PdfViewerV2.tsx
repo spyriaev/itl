@@ -11,7 +11,7 @@ interface PdfViewerV2Props {
 }
 
 const WORKER_URL = 'https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js'
-const BACKGROUND_COLOR = '#0f172a'
+const BACKGROUND_COLOR = '#ffffff'
 
 export default function PdfViewerV2({ documentId, preloadedDocumentInfo, onReady, onClose }: PdfViewerV2Props) {
   const [documentInfo, setDocumentInfo] = useState<DocumentViewInfo | null>(preloadedDocumentInfo ?? null)
@@ -196,9 +196,8 @@ export default function PdfViewerV2({ documentId, preloadedDocumentInfo, onReady
         position: 'relative',
         width: '100%',
         height: '100%',
-        backgroundColor: pdfLoading ? '#ffffff' : BACKGROUND_COLOR,
+        backgroundColor: BACKGROUND_COLOR,
         overflow: 'hidden',
-        transition: 'background-color 0.2s ease-in-out',
       }}
     >
       {pdfLoading && (
@@ -254,23 +253,25 @@ export default function PdfViewerV2({ documentId, preloadedDocumentInfo, onReady
             width: 48,
             height: 48,
             borderRadius: '50%',
-            backgroundColor: 'rgba(17, 24, 39, 0.9)',
-            border: 'none',
+            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+            border: '1px solid #e5e7eb',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 8px 14px -4px rgba(0, 0, 0, 0.35)',
-            transition: 'opacity 0.2s, transform 0.2s',
+            boxShadow: '0 4px 12px -2px rgba(0, 0, 0, 0.15)',
+            transition: 'opacity 0.2s, transform 0.2s, background-color 0.2s',
             padding: 0,
             zIndex: 5000,
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.opacity = '0.9'
+            e.currentTarget.style.opacity = '1'
+            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 1)'
             e.currentTarget.style.transform = 'translateY(-1px)'
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.opacity = '1'
+            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.95)'
             e.currentTarget.style.transform = 'translateY(0)'
           }}
         >
@@ -279,7 +280,7 @@ export default function PdfViewerV2({ documentId, preloadedDocumentInfo, onReady
             height="16"
             viewBox="0 0 24 24"
             fill="none"
-            stroke="#D1D5DB"
+            stroke="#374151"
             strokeWidth="2.3"
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -294,7 +295,7 @@ export default function PdfViewerV2({ documentId, preloadedDocumentInfo, onReady
           style={{
             width: '100%',
             height: '100%',
-            backgroundColor: BACKGROUND_COLOR,
+            backgroundColor: '#ffffff',
           }}
         >
           <Viewer
