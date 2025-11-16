@@ -304,6 +304,7 @@ export default function PdfViewerV2({ documentId, preloadedDocumentInfo, onReady
             initialPage={initialPageIndex}
             onPageChange={handlePageChange}
             onDocumentLoad={handleDocumentLoad}
+            enableSmoothScroll={false} 
           />
         </div>
       </Worker>
