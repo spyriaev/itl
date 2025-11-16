@@ -5,6 +5,7 @@ import { PlansPage } from "./components/PlansPage"
 import { LibraryPage } from "./components/LibraryPage"
 import { UserProfile } from "./components/UserProfile"
 import { SharedDocumentPage } from "./components/SharedDocumentPage"
+import { DocumentViewerPage } from "./components/DocumentViewerPage"
 import { ProtectedRoute } from "./components/ProtectedRoute"
 import { AuthModal } from "./components/AuthModal"
 import { useNetworkStatus } from "../hooks/useNetworkStatus"
@@ -44,6 +45,14 @@ export function App() {
           element={
             <ProtectedRoute fallback={<AuthModal />}>
               <LibraryPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/app/document/:documentId"
+          element={
+            <ProtectedRoute fallback={<AuthModal />}>
+              <DocumentViewerPage />
             </ProtectedRoute>
           }
         />

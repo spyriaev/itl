@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import { useTranslation } from "react-i18next"
 import { useAuth } from "../../contexts/AuthContext"
-import { PdfViewer } from "./PdfViewer"
+import PdfViewerV2 from "./PdfViewerV2"
 import { getSharedDocumentAccess, type SharedDocumentAccess } from "../../services/shareService"
 import { pdfjs } from 'react-pdf'
 import "../styles/upload-page.css"
@@ -18,7 +18,6 @@ export function SharedDocumentPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [documentAccess, setDocumentAccess] = useState<SharedDocumentAccess | null>(null)
-  const [isPdfReady, setIsPdfReady] = useState<boolean>(false)
 
   // Configure PDF.js worker
   useEffect(() => {
@@ -48,7 +47,7 @@ export function SharedDocumentPage() {
         const loadingTask = pdfjs.getDocument({ url: access.url })
         await loadingTask.promise
         
-        setIsPdfReady(true)
+        // noop
       } catch (err) {
         console.error('[SharedDocumentPage] Failed to load document:', err)
         setError(err instanceof Error ? err.message : t("sharedDocument.errorLoading"))
@@ -98,16 +97,17 @@ export function SharedDocumentPage() {
   }
 
   return (
-    <PdfViewer
-      documentId={documentAccess.documentId}
-      onClose={() => navigate('/app')}
-      preloadedDocumentInfo={{
-        url: documentAccess.url,
-        lastViewedPage: documentAccess.lastViewedPage,
-        title: documentAccess.title
-      }}
-      onRenderComplete={() => setIsPdfReady(true)}
-    />
+    <div style={styles.sharedViewerWrapper}>
+      <PdfViewerV2
+        documentId={documentAccess.documentId}
+        preloadedDocumentInfo={{
+          url: documentAccess.url,
+          lastViewedPage: documentAccess.lastViewedPage,
+          title: documentAccess.title
+        }}
+        onClose={() => navigate('/app')}
+      />
+    </div>
   )
 }
 
@@ -147,5 +147,10 @@ const styles: { [key: string]: React.CSSProperties } = {
     fontWeight: '600',
     cursor: 'pointer',
   },
+  sharedViewerWrapper: {
+    position: 'fixed',
+    inset: 0,
+    backgroundColor: '#0f172a',
+  }
 }
 

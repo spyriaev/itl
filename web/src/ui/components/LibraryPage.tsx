@@ -1,36 +1,22 @@
 import { useState, useEffect } from "react"
-import { Link } from "react-router-dom"
+import { Link, useNavigate } from "react-router-dom"
 import { useTranslation } from "react-i18next"
-import { useAuth } from "../../contexts/AuthContext"
 import { FileUpload } from "./FileUpload"
 import { DocumentList } from "./DocumentList"
 import { UserMenu } from "./UserMenu"
 import { OfflineIndicator, OfflineIndicatorIcon } from "./OfflineIndicator"
-import { PdfViewer } from "./PdfViewer"
 import { waitForDocumentUpload, fetchDocuments, getDocumentViewUrl, deleteDocument, type DocumentViewInfo, type DocumentMetadata } from "../../services/uploadService"
-import { pdfjs } from 'react-pdf'
 import "../styles/upload-page.css"
 import "../styles/typography.css"
 
-type ViewMode = "library" | "reader"
-
 export function LibraryPage() {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const [documents, setDocuments] = useState<DocumentMetadata[]>([])
   const [documentsLoading, setDocumentsLoading] = useState(true)
   const [documentsInitialized, setDocumentsInitialized] = useState(false)
-  const [viewMode, setViewMode] = useState<ViewMode>("library")
-  const [currentDocumentId, setCurrentDocumentId] = useState<string | null>(null)
-  const [preloadedDocumentInfo, setPreloadedDocumentInfo] = useState<DocumentViewInfo | null>(null)
   const [loadingDocumentId, setLoadingDocumentId] = useState<string | null>(null)
-  const [waitingForUpload, setWaitingForUpload] = useState<string | null>(null)
-  const [isPdfReady, setIsPdfReady] = useState<boolean>(false)
   const [deletingDocumentId, setDeletingDocumentId] = useState<string | null>(null)
-
-  // Configure PDF.js worker (same as in PdfViewer)
-  useEffect(() => {
-    pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`
-  }, [])
 
   // Load documents only once on mount
   useEffect(() => {
@@ -88,13 +74,6 @@ export function LibraryPage() {
       setDeletingDocumentId(documentId)
       await deleteDocument(documentId)
       setDocuments(prev => prev.filter(doc => doc.id !== documentId))
-
-      if (currentDocumentId === documentId) {
-        setCurrentDocumentId(null)
-        setPreloadedDocumentInfo(null)
-        setViewMode("library")
-        setIsPdfReady(false)
-      }
     } catch (err) {
       console.error('Failed to delete document:', err)
       window.alert(t("documentList.deleteError"))
@@ -104,150 +83,42 @@ export function LibraryPage() {
   }
 
   const handleDocumentClick = async (documentId: string) => {
-    console.log('[handleDocumentClick] Clicked on document:', documentId)
-    
     try {
-      // Small delay to ensure backend has processed the document creation
-      await new Promise(resolve => setTimeout(resolve, 100))
-      
-      // Check if document is already uploaded
-      const documents = await fetchDocuments(100, 0)
+      setLoadingDocumentId(documentId)
+
       const document = documents.find(doc => doc.id === documentId)
-      
-      console.log('[handleDocumentClick] Found document:', document ? { id: document.id, status: document.status, title: document.title } : 'not found')
-      
-      // If document is found and status is "uploaded", preload PDF and open
-      // Check status case-insensitively in case backend returns it differently
       const status = document?.status?.toLowerCase() || ""
-      if (document && status === "uploaded") {
-        console.log('[handleDocumentClick] Document is uploaded, loading PDF...')
-        setLoadingDocumentId(documentId)
-        try {
-          // Get documentInfo (URL)
-          const documentInfo = await getDocumentViewUrl(documentId)
-          console.log('[handleDocumentClick] DocumentInfo loaded, loading PDF document...')
-          
-          // Load PDF document (this is the time-consuming operation)
-          const loadingTask = pdfjs.getDocument({ url: documentInfo.url })
-          const pdf = await loadingTask.promise
-          console.log('[handleDocumentClick] PDF document loaded, opening viewer')
-          
-          // PDF is loaded, open viewer
-          setPreloadedDocumentInfo(documentInfo)
-          setCurrentDocumentId(documentId)
-          setIsPdfReady(false) // Reset ready state
-          setViewMode("reader")
-        } catch (error) {
-          console.error('[handleDocumentClick] Failed to load PDF:', error)
-          // Still try to open, PDF will be loaded in PdfViewer
-          setPreloadedDocumentInfo(null)
-          setCurrentDocumentId(documentId)
-          setViewMode("reader")
-        } finally {
-          setLoadingDocumentId(null)
-        }
-        return
-      }
       
-      // Document not found or status is not "uploaded" - wait for it
-      console.log('[handleDocumentClick] Document not ready yet:', document ? `status="${document.status}"` : 'not found in list')
-      setWaitingForUpload(documentId)
-      
-      try {
-        const uploadedDocument = await waitForDocumentUpload(documentId)
-        console.log('[handleDocumentClick] Document upload complete, loading PDF...')
-        
-        // Get documentInfo and load PDF
-        setLoadingDocumentId(documentId)
-        try {
-          const documentInfo = await getDocumentViewUrl(documentId)
-          console.log('[handleDocumentClick] DocumentInfo loaded, loading PDF document...')
-          
-          // Load PDF document
-          const loadingTask = pdfjs.getDocument({ url: documentInfo.url })
-          const pdf = await loadingTask.promise
-          console.log('[handleDocumentClick] PDF document loaded, opening viewer')
-          
-          setPreloadedDocumentInfo(documentInfo)
-          setCurrentDocumentId(documentId)
-          setIsPdfReady(false) // Reset ready state
-          setViewMode("reader")
-        } catch (error) {
-          console.error('[handleDocumentClick] Failed to load PDF:', error)
-          setPreloadedDocumentInfo(null)
-          setCurrentDocumentId(documentId)
-          setViewMode("reader")
-        } finally {
-          setLoadingDocumentId(null)
-        }
-      } catch (error) {
-        console.error('[handleDocumentClick] Failed to wait for document upload:', error)
-        // Still try to open, maybe it's ready now
-        console.log('[handleDocumentClick] Trying to open anyway...')
-        setPreloadedDocumentInfo(null)
-        setCurrentDocumentId(documentId)
-        setViewMode("reader")
-        setLoadingDocumentId(null)
-      } finally {
-        setWaitingForUpload(null)
-        // Don't refresh the list - it will be updated when needed (e.g., after upload)
+      let documentInfo: DocumentViewInfo | null = null
+
+      if (status === "uploaded") {
+        // Document is ready, get view URL
+        documentInfo = await getDocumentViewUrl(documentId)
+      } else {
+        // Document not ready - wait for upload completion
+        await waitForDocumentUpload(documentId)
+        documentInfo = await getDocumentViewUrl(documentId)
       }
+
+      // Navigate to document viewer with preloaded info
+      navigate(`/app/document/${documentId}`, {
+        state: {
+          preloadedDocumentInfo: documentInfo
+        }
+      })
     } catch (error) {
-      console.error('[handleDocumentClick] Error during document click:', error)
-      // On error, try to open anyway - maybe it will work
-      setCurrentDocumentId(documentId)
-      setViewMode("reader")
-      setWaitingForUpload(null)
+      console.error('Failed to open document:', error)
+      // Navigate anyway - PdfViewerV2 will handle loading
+      navigate(`/app/document/${documentId}`)
+    } finally {
+      setLoadingDocumentId(null)
     }
   }
 
-  const handleCloseReader = () => {
-    setCurrentDocumentId(null)
-    setPreloadedDocumentInfo(null)
-    setViewMode("library")
-    setIsPdfReady(false)
-    // Don't reload documents when returning from PDF viewer
-  }
-
-  const handlePdfRenderComplete = () => {
-    setIsPdfReady(true)
-  }
-
-  // Reset zoom on iOS when component mounts or view mode changes
-  useEffect(() => {
-    // Reset zoom on iOS after navigation
-    const resetZoom = () => {
-      // Check if we're on iOS
-      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
-        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
-      
-      if (isIOS) {
-        // Force reset zoom by scrolling to top
-        window.scrollTo(0, 0)
-        // Reset viewport scale if available
-        if (window.visualViewport && window.visualViewport.scale !== 1) {
-          // Try to reset by setting body zoom
-          if (document.body) {
-            document.body.style.zoom = '1'
-          }
-        }
-      }
-    }
-
-    // Reset immediately and after a short delay to handle navigation
-    resetZoom()
-    const timeoutId = setTimeout(resetZoom, 100)
-    const timeoutId2 = setTimeout(resetZoom, 300)
-
-    return () => {
-      clearTimeout(timeoutId)
-      clearTimeout(timeoutId2)
-    }
-  }, [viewMode])
 
   return (
     <div className="upload-page">
-      <OfflineIndicator hideInReader={viewMode === "reader"} />
+      <OfflineIndicator />
       <header className="upload-header" data-landing-header>
         <Link to="/app" className="upload-header-logo" data-landing-logo>
           <div className="upload-header-logo-icon">
@@ -266,51 +137,28 @@ export function LibraryPage() {
       </header>
 
       <main className="upload-main">
-        {viewMode === "library" ? (
-          <>
-            <div className="documents-header">
-              <div className="documents-title">
-                {t("app.allDocuments")}
-              </div>
-              <div className="documents-actions">
-              </div>
-            </div>
+        <div className="documents-header">
+          <div className="documents-title">
+            {t("app.allDocuments")}
+          </div>
+          <div className="documents-actions">
+          </div>
+        </div>
 
-            <div className="upload-area">
-              <FileUpload onUploadComplete={handleUploadComplete} />
+        <div className="upload-area">
+          <FileUpload onUploadComplete={handleUploadComplete} />
 
-              <DocumentList 
-                documents={documents}
-                loading={documentsLoading}
-                onDocumentClick={handleDocumentClick} 
-                loadingDocumentId={loadingDocumentId}
-                onRefresh={handleRefreshDocuments}
-                onDeleteDocument={handleDeleteDocument}
-                deletingDocumentId={deletingDocumentId}
-              />
-            </div>
-          </>
-        ) : (
-          currentDocumentId && (
-            <div style={{
-              position: 'relative',
-              width: '100%',
-              height: '100%',
-              opacity: isPdfReady ? 1 : 0,
-              transition: 'opacity 0.3s ease-in-out',
-              pointerEvents: isPdfReady ? 'auto' : 'none'
-            }}>
-              <PdfViewer 
-                documentId={currentDocumentId} 
-                onClose={handleCloseReader} 
-                preloadedDocumentInfo={preloadedDocumentInfo}
-                onRenderComplete={handlePdfRenderComplete}
-              />
-            </div>
-          )
-        )}
+          <DocumentList 
+            documents={documents}
+            loading={documentsLoading}
+            onDocumentClick={handleDocumentClick} 
+            loadingDocumentId={loadingDocumentId}
+            onRefresh={handleRefreshDocuments}
+            onDeleteDocument={handleDeleteDocument}
+            deletingDocumentId={deletingDocumentId}
+          />
+        </div>
       </main>
     </div>
   )
 }
-

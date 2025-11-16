@@ -80,9 +80,9 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
   const [initialPageWidth, setInitialPageWidth] = useState<number | null>(null)
   const [visiblePageRange, setVisiblePageRange] = useState<{ start: number, end: number }>({ start: 1, end: 10 })
   const [assistantButtonPosition, setAssistantButtonPosition] = useState<{ right: number | string, bottom: number | string }>({ right: 24, bottom: 24 })
+  const [isV2ViewerActive, setIsV2ViewerActive] = useState<boolean>(false)
   const [pendingChatScaleRestore, setPendingChatScaleRestore] = useState<number | null>(null)
   const [safariScrollOverride, setSafariScrollOverride] = useState<boolean>(false)
-  const [useV2Viewer, setUseV2Viewer] = useState<boolean>(false)
 
   // Text selection state
   const [selectionMenu, setSelectionMenu] = useState<{ position: { top: number; left: number }, selectedText: string, pageNumber: number } | null>(null)
@@ -229,6 +229,10 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
 
   useEffect(() => {
     setSafariScrollOverride(false)
+  }, [documentId])
+
+  useEffect(() => {
+    setIsV2ViewerActive(false)
   }, [documentId])
 
   // Calculate initial scale to avoid flickering (PDF is already loaded on document list screen)
@@ -2787,57 +2791,6 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
   // At this point documentInfo is guaranteed to be non-null
   // в отрисовке страниц для continuousScroll
   const WINDOW_RENDER_DISTANCE = 4 // чуть шире окно для textLayer, чтобы не пропадал текст при зуме
-  
-  // Render PdfViewerV2 if toggle is enabled
-  if (useV2Viewer) {
-    return (
-      <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1000 }}>
-        <PdfViewerV2
-          documentId={documentId}
-          onClose={onClose}
-          preloadedDocumentInfo={documentInfo}
-          onRenderComplete={onRenderComplete}
-        />
-        {/* Toggle button to switch back to V1 */}
-        <div
-          style={{
-            position: 'fixed',
-            top: 20,
-            right: 20,
-            zIndex: 3001,
-          }}
-        >
-          <button
-            onClick={() => setUseV2Viewer(false)}
-            style={{
-              padding: '8px 16px',
-              borderRadius: 9999,
-              border: 'none',
-              backgroundColor: 'rgba(17, 24, 39, 0.9)',
-              color: 'white',
-              fontSize: 12,
-              fontWeight: 600,
-              cursor: 'pointer',
-              boxShadow: '0 8px 14px -4px rgba(0, 0, 0, 0.35)',
-              transition: 'opacity 0.2s, transform 0.2s',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.opacity = '0.9'
-              e.currentTarget.style.transform = 'translateY(-1px)'
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.opacity = '1'
-              e.currentTarget.style.transform = 'translateY(0)'
-            }}
-            aria-label="Switch to V1 Viewer"
-          >
-            V1 Viewer
-          </button>
-        </div>
-      </div>
-    )
-  }
-  
   return (
     <div
       style={{
@@ -2889,6 +2842,78 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
           pointerEvents: 'none',
         }}
       />
+
+      {isV2ViewerActive && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 4000,
+            backgroundColor: '#0f172a',
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
+          <div
+            style={{
+              padding: '12px 20px',
+              backgroundColor: '#ffffff',
+              borderBottom: '1px solid #E5E7EB',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 12,
+              flexWrap: 'wrap',
+            }}
+          >
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <span style={{ fontSize: 16, fontWeight: 600, color: '#0f172a' }}>Новый режим чтения</span>
+              <span style={{ fontSize: 13, color: '#4B5563' }}>Экспериментальный PdfViewerV2</span>
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button
+                onClick={() => setIsV2ViewerActive(false)}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: 9999,
+                  border: '1px solid rgba(15, 23, 42, 0.15)',
+                  backgroundColor: '#F3F4F6',
+                  color: '#111827',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Основной режим
+              </button>
+              <button
+                onClick={onClose}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: 9999,
+                  border: 'none',
+                  backgroundColor: '#2563EB',
+                  color: '#fff',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  boxShadow: '0 10px 15px -3px rgb(37 99 235 / 0.4)',
+                }}
+              >
+                Закрыть
+              </button>
+            </div>
+          </div>
+          <div style={{ flex: 1, minHeight: 0 }}>
+            <PdfViewerV2
+              documentId={documentId}
+              preloadedDocumentInfo={documentInfo}
+              onClose={() => setIsV2ViewerActive(false)}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Navigation Controls */}
       {numPages > 0 && !continuousScroll && (
@@ -3655,23 +3680,24 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
           </button>
         </div>
         <button
-          onClick={() => setUseV2Viewer(true)}
+          onClick={() => setIsV2ViewerActive(true)}
+          aria-pressed={isV2ViewerActive}
           style={{
-            height: isMobile ? 32 : 36,
+            height: zoomButtonSize,
             borderRadius: 9999,
             border: 'none',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '0 14px',
-            backgroundColor: 'rgba(17, 24, 39, 0.9)',
-            color: 'white',
-            fontSize: isMobile ? 10 : 12,
+            padding: '0 18px',
+            backgroundColor: isV2ViewerActive ? '#2563EB' : 'rgba(17, 24, 39, 0.75)',
+            color: '#F9FAFB',
+            fontSize: isMobile ? 8 : 12,
             fontWeight: 600,
             letterSpacing: '0.04em',
             cursor: 'pointer',
-            boxShadow: '0 8px 14px -4px rgba(0, 0, 0, 0.35)',
-            transition: 'opacity 0.2s, transform 0.2s',
+            textTransform: 'uppercase',
+            boxShadow: isV2ViewerActive
+              ? '0 10px 15px -3px rgb(37 99 235 / 0.35)'
+              : '0 6px 12px -4px rgba(0,0,0,0.35)',
+            transition: 'background-color 0.2s, transform 0.2s, opacity 0.2s'
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.opacity = '0.9'
@@ -3681,9 +3707,8 @@ function PdfViewerContent({ documentId, onClose, preloadedDocumentInfo, onRender
             e.currentTarget.style.opacity = '1'
             e.currentTarget.style.transform = 'translateY(0)'
           }}
-          aria-label="Switch to V2 Viewer"
         >
-          V2
+          V2 режим
         </button>
         <button
           onClick={onClose}
